@@ -526,107 +526,49 @@ if ($route === '/shift/handover') {
 // ----------------------------------------------------
 // ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ЗАПРОСА К AVIABIT С АВТОРИЗАЦИЕЙ
 // ----------------------------------------------------
-// ----------------------------------------------------
-// ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ЗАПРОСА К AVIABIT С АВТОРИЗАЦИЕЙ
-// ----------------------------------------------------
-function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTsMs, $templateName = 'WBGarantiya', &$diag = []) {
+function getAviaBitCookie($name, $defaultCookie) {
+    $sessionFile = __DIR__ . "/.session_{$name}.json";
+    if (file_exists($sessionFile)) {
+        $raw = @file_get_contents($sessionFile);
+        $data = json_decode($raw, true);
+        if (!empty($data['connect.sid'])) {
+            return $data['connect.sid'];
+        }
+    }
+    return $defaultCookie;
+}
+
+function saveAviaBitCookie($name, $cookieVal) {
+    $sessionFile = __DIR__ . "/.session_{$name}.json";
+    @file_put_contents($sessionFile, json_encode(['connect.sid' => $cookieVal], JSON_PRETTY_PRINT));
+}
+
+function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTsMs, $name = 'nordwind', &$diag = []) {
     $origin = rtrim($baseUrl, '/');
     $referer = $origin . '/plan-flight';
-    $cookieFile = sys_get_temp_dir() . '/avb_sess_' . md5($origin . $username) . '.txt';
+
+    $defaultCookies = [
+        'nordwind' => 's%3ArghcgrAycdgvsI__Q2iZay-vUij_Yaze.uyVqX6K71%2FcuQ7tYDw%2BH91oWDKhclzgYq6w6HGSqvsM',
+        'ikar' => 's%3AS9kWveGtvxwmmq_YoZv0H6tOW0GW9a2O.MscjJmSqUjyniNClfqtbf61hqLGMwCfjXRuFNW6USUw'
+    ];
+
+    $cookieVal = getAviaBitCookie($name, $defaultCookies[$name] ?? '');
 
     $headers = [
         "Origin: $origin",
         "Referer: $referer",
         'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Content-Type: application/json',
-        'Accept: application/json, text/plain, */*'
+        'Accept: application/json, text/plain, */*',
+        "Cookie: connect.sid=$cookieVal"
     ];
 
     $templateId = 1055;
 
-    // 1. Проверяем валидность кэшированной сессии
-    $isSessionValid = false;
-    if (file_exists($cookieFile) && (time() - filemtime($cookieFile) < 14400)) {
-        $chTest = curl_init("$origin/api/filter-template?code=1001");
-        curl_setopt($chTest, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($chTest, CURLOPT_COOKIEFILE, $cookieFile);
-        curl_setopt($chTest, CURLOPT_TIMEOUT, 8);
-        curl_setopt($chTest, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($chTest, CURLOPT_HTTPHEADER, $headers);
-        $testRes = curl_exec($chTest);
-        $testCode = curl_getinfo($chTest, CURLINFO_HTTP_CODE);
-        curl_close($chTest);
-        if ($testCode === 200 && strpos($testRes, '[') !== false) {
-            $isSessionValid = true;
-            $templates = json_decode($testRes, true);
-            if (is_array($templates)) {
-                foreach ($templates as $t) {
-                    if (stripos($t['text'] ?? '', $templateName) !== false) {
-                        $templateId = (int)($t['value'] ?? 1055);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    if (!$isSessionValid) {
-        // Авторизация в AviaBit
-        $authPayload = json_encode([
-            'rememberMe' => true,
-            'version' => [
-                'date' => '2026-08-06T08:00:00.000Z',
-                'company' => 'ООО "АвиаБит"',
-                'number' => '9.8.1'
-            ],
-            'eng' => false,
-            'username' => $username,
-            'password' => $password
-        ]);
-
-        $ch = curl_init("$origin/api/auth");
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $authPayload);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
-        curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        $authRes = curl_exec($ch);
-        $authCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $authErr = curl_error($ch);
-        curl_close($ch);
-
-        $diag[] = "$origin auth_code: $authCode, err: $authErr, resp: " . substr($authRes, 0, 120);
-
-        // Получаем templateId
-        $chT = curl_init("$origin/api/filter-template?code=1001");
-        curl_setopt($chT, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($chT, CURLOPT_COOKIEFILE, $cookieFile);
-        curl_setopt($chT, CURLOPT_TIMEOUT, 10);
-        curl_setopt($chT, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($chT, CURLOPT_HTTPHEADER, $headers);
-        $tRes = curl_exec($chT);
-        curl_close($chT);
-        if ($tRes) {
-            $templates = json_decode($tRes, true);
-            if (is_array($templates)) {
-                foreach ($templates as $t) {
-                    if (stripos($t['text'] ?? '', $templateName) !== false) {
-                        $templateId = (int)($t['value'] ?? 1055);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    // 2. Получение суточного плана полетов
+    // 1. Прямой запрос суточного плана полетов с сохраненной сессией
     $url = "$origin/api/plan-flight?dateBegin={$startTsMs}&dateEnd={$endTsMs}&eng=false&apCode=3&apId=0&template={$templateId}&showCancel=false";
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
@@ -635,10 +577,62 @@ function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTs
     $schedErr = curl_error($ch);
     curl_close($ch);
 
-    $diag[] = "$origin sched_code: $schedCode, err: $schedErr, len: " . strlen($schedRes);
+    $diag[] = "[$name] sched_code: $schedCode, len: " . strlen($schedRes);
 
-    if ($schedRes) {
+    if ($schedCode === 200 && $schedRes) {
         $data = json_decode($schedRes, true);
+        if (is_array($data)) {
+            return $data;
+        }
+    }
+
+    // 2. Если сессия устарела (код 302, 401) - выполняем логин
+    $authPayload = json_encode([
+        'rememberMe' => true,
+        'version' => [
+            'date' => '2026-08-06T08:00:00.000Z',
+            'company' => 'ООО "АвиаБит"',
+            'number' => '9.8.1'
+        ],
+        'eng' => false,
+        'username' => $username,
+        'password' => $password
+    ]);
+
+    $ch = curl_init("$origin/api/auth");
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $authPayload);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HEADER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Origin: $origin",
+        "Referer: $referer",
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Content-Type: application/json',
+        'Accept: application/json, text/plain, */*'
+    ]);
+    $authFull = curl_exec($ch);
+    curl_close($ch);
+
+    if (preg_match('/connect\.sid=([^;]+)/', $authFull, $m)) {
+        $newCookie = $m[1];
+        saveAviaBitCookie($name, $newCookie);
+        $headers[count($headers) - 1] = "Cookie: connect.sid=$newCookie";
+    }
+
+    // Повторный запрос расписания
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    $schedRes2 = curl_exec($ch);
+    curl_close($ch);
+
+    if ($schedRes2) {
+        $data = json_decode($schedRes2, true);
         if (is_array($data)) {
             return $data;
         }
