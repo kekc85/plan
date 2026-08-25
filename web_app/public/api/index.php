@@ -657,11 +657,17 @@ if ($route === '/fetch_schedule') {
         $flightNo = trim($fl['flight'] ?? '');
         $dep = strtoupper(trim($fl['airPortTOCode'] ?? ''));
         $arr = strtoupper(trim($fl['airPortLACode'] ?? ''));
-
         if (empty($flightNo) || empty($dep) || empty($arr)) continue;
         if (!isset($allowedDeps[$dep])) continue;
 
+        // Исключаем резервные рейсы (~РЕ307д, ~РЕЗ, РЕЗ, REZ, ~ и т.д.) и спецрейсы
+        if (strpos($flightNo, '~') !== false) continue;
+        if (preg_match('/(^|~|\s)(РЕЗ|REZ|РЕ|RE)\d+/ui', $flightNo)) continue;
+        if (stripos($flightNo, 'РЕЗ') !== false || stripos($flightNo, 'REZ') !== false) continue;
+        if (!empty($fl['isSpecialFlight'])) continue;
+
         $flClean = str_replace(['-', ' '], '', $flightNo);
+        if (preg_match('/^РЕ\d+/ui', $flClean) || preg_match('/^REZ\d+/ui', $flClean)) continue;
         $takeoffRaw = $fl['dateTakeoffReal'] ?? $fl['dateTakeoffCalculation'] ?? $fl['dateTakeoff'] ?? '';
 
         $timeStr = '';

@@ -411,10 +411,13 @@ def process_flights(
         dep = (fl.get("airPortTOCode") or "").strip().upper()
         arr = (fl.get("airPortLACode") or "").strip().upper()
 
-        # Исключаем резервы (~РЕЗ, ~РЕЗ-04 и т.д.), спецзаписи с буквой R и пустые номера
+        # Исключаем любые резервы (~РЕ307д, ~РЕЗ, РЕЗ, REZ, ~ и т.д.) и спецрейсы
         if not flight_no or flight_no.startswith("~") or "~" in flight_no:
             continue
-        if "РЕЗ" in flight_no.upper() or "REZ" in flight_no.upper():
+        fl_upper = flight_no.upper()
+        if "РЕЗ" in fl_upper or "REZ" in fl_upper:
+            continue
+        if fl_upper.startswith("РЕ") or fl_upper.startswith("RE"):
             continue
         if fl.get("isSpecialFlight") is True:
             continue
