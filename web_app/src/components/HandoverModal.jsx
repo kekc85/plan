@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ArrowRightLeft, ShieldCheck, CheckCircle2, AlertCircle, Clock, Plane, FileText, Check, UserCheck } from 'lucide-react';
+import { X, ArrowRightLeft, ShieldCheck, CheckCircle2, AlertCircle, Clock, Plane, FileText, Check, ChevronDown, User } from 'lucide-react';
 import { handoverShift, getActiveUsers } from '../utils/api';
 
 export default function HandoverModal({
@@ -11,8 +11,11 @@ export default function HandoverModal({
   onHandoverSuccess
 }) {
   const currentDispatcher = shiftInfo?.dispatcher || currentUser?.full_name || 'Диспетчер по центровке';
-  const [incomingDispatcher, setIncomingDispatcher] = useState(currentUser?.full_name || '');
-  const [activeUsers, setActiveUsers] = useState([]);
+  const [incomingDispatcher, setIncomingDispatcher] = useState('');
+  const [activeUsers, setActiveUsers] = useState([
+    { id: 1, full_name: 'Администратор системы', username: 'admin', role: 'admin' },
+    { id: 2, full_name: 'Диспетчер по центровке', username: 'dispatcher', role: 'dispatcher' }
+  ]);
   const [notes, setNotes] = useState('');
   const [archiveClosed, setArchiveClosed] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,16 +32,16 @@ export default function HandoverModal({
       const res = await getActiveUsers();
       if (res && res.users && res.users.length > 0) {
         setActiveUsers(res.users);
-        // Выбираем следующего пользователя из списка (не того, кто сейчас сдает)
+        // Выбираем первого сменщика (отличного от текущего)
         const others = res.users.filter(u => u.full_name !== currentDispatcher);
         if (others.length > 0) {
           setIncomingDispatcher(others[0].full_name);
-        } else if (res.users.length > 0) {
+        } else {
           setIncomingDispatcher(res.users[0].full_name);
         }
       }
     } catch {
-      // Игнорируем ошибку, fallback на текущее имя
+      // Игнорируем ошибку, используем список по умолчанию
     }
   };
 
@@ -50,8 +53,9 @@ export default function HandoverModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!incomingDispatcher.trim()) {
-      setErrorMsg('Укажите ФИО принимающего диспетчера');
+    const finalIncoming = incomingDispatcher || (activeUsers[0] ? activeUsers[0].full_name : currentDispatcher);
+    if (!finalIncoming.trim()) {
+      setErrorMsg('Выберите принимающего диспетчера');
       return;
     }
 
@@ -61,13 +65,13 @@ export default function HandoverModal({
     try {
       const res = await handoverShift({
         handed_over_by: currentDispatcher,
-        accepted_by: incomingDispatcher.trim(),
+        accepted_by: finalIncoming.trim(),
         notes: notes.trim(),
         archive_closed_flights: archiveClosed
       });
 
       if (res && res.success) {
-        onHandoverSuccess(incomingDispatcher.trim(), archiveClosed);
+        onHandoverSuccess(finalIncoming.trim(), archiveClosed);
         onClose();
       }
     } catch (err) {
@@ -120,38 +124,34 @@ export default function HandoverModal({
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
                 Смену сдаёт
               </span>
-              <p className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+              <p className="font-extrabold text-sm text-slate-900 dark:text-slate-100 py-1">
                 {currentDispatcher}
               </p>
             </div>
+
             <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-700 dark:text-sky-400 block mb-1">
-                Смену принимает *
-              </span>
-              {activeUsers && activeUsers.length > 0 ? (
+              <label className="text-[10px] font-extrabold uppercase tracking-wider text-sky-700 dark:text-sky-400 block mb-1">
+                Смену принимает (выберите учётную запись) *
+              </label>
+              <div className="relative">
                 <select
                   value={incomingDispatcher}
                   onChange={(e) => setIncomingDispatcher(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-900 border border-sky-300 dark:border-sky-600 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-extrabold focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-sm cursor-pointer"
+                  className="w-full appearance-none bg-white dark:bg-slate-900 border-2 border-sky-400 dark:border-sky-500 rounded-xl pl-3 pr-9 py-2 text-xs text-slate-900 dark:text-slate-100 font-extrabold focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-sm cursor-pointer"
                 >
                   {activeUsers.map(u => (
                     <option key={u.id} value={u.full_name}>
-                      {u.full_name} ({u.role === 'admin' ? 'Админ' : 'Диспетчер'})
+                      👤 {u.full_name} ({u.role === 'admin' ? 'Админ' : 'Диспетчер'})
                     </option>
                   ))}
                   {incomingDispatcher && !activeUsers.some(u => u.full_name === incomingDispatcher) && (
-                    <option value={incomingDispatcher}>{incomingDispatcher}</option>
+                    <option value={incomingDispatcher}>👤 {incomingDispatcher}</option>
                   )}
                 </select>
-              ) : (
-                <input
-                  type="text"
-                  value={incomingDispatcher}
-                  onChange={(e) => setIncomingDispatcher(e.target.value)}
-                  placeholder="ФИО принимающего диспетчера..."
-                  className="w-full bg-white dark:bg-slate-900 border border-sky-300 dark:border-sky-600 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-sm"
-                />
-              )}
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-sky-600 dark:text-sky-400">
+                  <ChevronDown className="w-4 h-4" />
+                </div>
+              </div>
             </div>
           </div>
 
