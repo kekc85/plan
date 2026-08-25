@@ -175,10 +175,17 @@ export function sortFlightsChronologically(flights, baseHour = 8) {
       const m = parts[1];
       if (isNaN(h) || isNaN(m)) return 99999999;
 
-      // Если указано конкретное число/дата (например 25 или 26 или 25.08)
+      // Если указано конкретное число/дата (например 25.08 или 26.08)
       let dayOffset = 0;
       const dStr = f.flight_date || f.date || '';
-      if (dStr) {
+      if (dStr && dStr.includes('.')) {
+        const dParts = dStr.split('.').map(Number);
+        const day = dParts[0];
+        const month = dParts[1];
+        if (!isNaN(day) && !isNaN(month)) {
+          dayOffset = (month * 32 + day) * 1440;
+        }
+      } else if (dStr) {
         const dayMatch = dStr.match(/\b(\d{1,2})\b/);
         if (dayMatch) {
           dayOffset = parseInt(dayMatch[1], 10) * 1440;

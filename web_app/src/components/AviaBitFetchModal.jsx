@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Plane, Zap, Calendar, Clock, AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
-import { formatValidDateInterval, formatValidTime } from '../utils/validators';
+import { formatValidDateInterval, formatValidTime, sortFlightsChronologically } from '../utils/validators';
 import { fetchAviaBitSchedule, smartMergeSchedules } from '../utils/api';
 
 export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, currentFlights = [] }) {
@@ -76,15 +76,42 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
 
       // Умное слияние с сохранением данных предыдущего диспетчера
       if (useSmartMerge && currentFlights && currentFlights.length > 0) {
-        try {
-          const mergeRes = await smartMergeSchedules(currentFlights, finalFlights);
-          if (mergeRes && mergeRes.flights) {
-            finalFlights = mergeRes.flights;
-          }
-        } catch (mErr) {
-          console.warn('Smart merge fallback:', mErr);
-        }
+        const existingMap = new Map();
+        currentFlights.forEach(f => {
+          const flNum = (f.flight || '').replace(/[-\s]/g, '').toUpperCase();
+          const flDate = (f.flight_date || '').trim();
+          const key = `${flNum}_${flDate}`;
+          existingMap.set(key, f);
+        });
+
+        // Обогащаем только входящие рейсы нового расписания
+        finalFlights = finalFlights.map(inc => {
+          const flNum = (inc.flight || '').replace(/[-\s]/g, '').toUpperCase();
+          const flDate = (inc.flight_date || '').trim();
+          const key = `${flNum}_${flDate}`;
+          const old = existingMap.get(key);
+          if (!old) return inc;
+
+          const merged = { ...inc };
+          if (old.id) merged.id = old.id;
+          if (old.status) merged.status = old.status;
+          if (old.lir_sent !== undefined) merged.lir_sent = old.lir_sent;
+          if (old.szv_sent !== undefined) merged.szv_sent = old.szv_sent;
+          if (old.ldm_sent !== undefined) merged.ldm_sent = old.ldm_sent;
+          if (old.astra_times_sent !== undefined) merged.astra_times_sent = old.astra_times_sent;
+          if (old.notes) merged.notes = old.notes;
+
+          ['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'cargo', 'mail', 'baggage', 'pax', 'crew'].forEach(field => {
+            if (old[field] !== undefined && old[field] !== '') {
+              merged[field] = old[field];
+            }
+          });
+
+          return merged;
+        });
       }
+
+      finalFlights = sortFlightsChronologically(finalFlights);
 
       setSuccessMsg(`Успешно загружено ${finalFlights.length} рейсов!`);
       setTimeout(() => {
