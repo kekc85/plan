@@ -85,6 +85,7 @@ class CreateUserRequest(BaseModel):
 
 
 class UpdateUserRequest(BaseModel):
+    username: Optional[str] = None
     full_name: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
@@ -296,6 +297,10 @@ def update_user(user_id: int, req: UpdateUserRequest, admin: dict = Depends(requ
 
     updates = []
     params = []
+
+    if req.username is not None:
+        updates.append("username = %s")
+        params.append(req.username.strip().lower())
 
     if req.full_name is not None:
         updates.append("full_name = %s")

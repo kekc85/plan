@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Plane, Lock, User, AlertCircle, LogIn, KeyRound } from 'lucide-react';
+import { Plane, Lock, User, AlertCircle, LogIn, Eye, EyeOff } from 'lucide-react';
 import { authLogin } from '../utils/api';
 
 export default function LoginModal({ isOpen, isFullScreen = false, onClose, onLoginSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -31,12 +32,6 @@ export default function LoginModal({ isOpen, isFullScreen = false, onClose, onLo
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleDemoFill = (u, p) => {
-    setUsername(u);
-    setPassword(p);
-    setErrorMsg('');
   };
 
   const containerClasses = isFullScreen
@@ -71,7 +66,7 @@ export default function LoginModal({ isOpen, isFullScreen = false, onClose, onLo
           {/* Логин */}
           <div>
             <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
-              Логин диспетчера
+              Логин
             </label>
             <div className="relative flex items-center">
               <User className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
@@ -79,14 +74,14 @@ export default function LoginModal({ isOpen, isFullScreen = false, onClose, onLo
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="например admin или dispatcher"
+                placeholder="Введите ваш логин"
                 className="w-full bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
                 autoFocus
               />
             </div>
           </div>
 
-          {/* Пароль */}
+          {/* Пароль с кнопкой показать / скрыть */}
           <div>
             <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
               Пароль
@@ -94,12 +89,24 @@ export default function LoginModal({ isOpen, isFullScreen = false, onClose, onLo
             <div className="relative flex items-center">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
+                className="w-full bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                title={showPassword ? "Скрыть пароль" : "Показать пароль"}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
             </div>
           </div>
 
@@ -112,29 +119,6 @@ export default function LoginModal({ isOpen, isFullScreen = false, onClose, onLo
             <LogIn className="w-4 h-4" />
             <span>{isLoading ? 'Проверка...' : 'Войти в систему'}</span>
           </button>
-
-          {/* Быстрый выбор начальных учетных записей */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2 font-medium">
-              Быстрый вход для первого запуска:
-            </p>
-            <div className="flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoFill('admin', 'admin123')}
-                className="text-[11px] font-mono font-bold text-sky-600 dark:text-sky-400 hover:underline px-2.5 py-1 bg-sky-50 dark:bg-sky-950/40 rounded-lg border border-sky-200 dark:border-sky-800 transition-colors"
-              >
-                Администратор (admin)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoFill('dispatcher', 'dispatch123')}
-                className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400 hover:underline px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/40 rounded-lg border border-indigo-200 dark:border-indigo-800 transition-colors"
-              >
-                Диспетчер (dispatcher)
-              </button>
-            </div>
-          </div>
 
         </form>
 

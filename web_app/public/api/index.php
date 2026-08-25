@@ -737,14 +737,20 @@ if (strpos($route, '/admin/users') === 0) {
     }
 
     $db = getDb();
+    $method = $_SERVER['REQUEST_METHOD'];
 
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $targetId = null;
+    if (preg_match('#/admin/users/(\d+)#', $route, $matches)) {
+        $targetId = (int)$matches[1];
+    }
+
+    if ($method === 'GET') {
         $stmt = $db->query("SELECT id, username, full_name, role, is_active, created_at FROM plan_users ORDER BY id ASC");
         echo json_encode(['users' => $stmt->fetchAll()]);
         exit;
     }
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($method === 'POST' && !$targetId) {
         $input = getJsonInput();
         $username = strtolower(trim($input['username'] ?? ''));
         $password = $input['password'] ?? '';
@@ -770,6 +776,65 @@ if (strpos($route, '/admin/users') === 0) {
         $ins->execute([$username, $hash, $salt, $fullName, $role, date('Y-m-d H:i:s')]);
 
         echo json_encode(['success' => true, 'message' => "Пользователь $username успешно создан"]);
+        exit;
+    }
+
+    if ($method === 'PUT' || ($method === 'POST' && $targetId)) {
+        $input = getJsonInput();
+        $stmt = $db->prepare("SELECT * FROM plan_users WHERE id = ?");
+        $stmt->execute([$targetId]);
+        $targetUser = $stmt->fetch();
+
+        if (!$targetUser) {
+            http_response_code(404);
+            echo json_encode(['detail' => 'Пользователь не найден']);
+            exit;
+        }
+
+        $fullName = isset($input['full_name']) ? trim($input['full_name']) : $targetUser['full_name'];
+        $username = isset($input['username']) ? strtolower(trim($input['username'])) : $targetUser['username'];
+        $role = isset($input['role']) ? $input['role'] : $targetUser['role'];
+        $isActive = isset($input['is_active']) ? ($input['is_active'] ? 1 : 0) : $targetUser['is_active'];
+
+        if ($username !== $targetUser['username']) {
+            $check = $db->prepare("SELECT id FROM plan_users WHERE username = ? AND id != ?");
+            $check->execute([$username, $targetId]);
+            if ($check->fetch()) {
+                http_response_code(400);
+                echo json_encode(['detail' => "Логин $username уже занят другим пользователем"]);
+                exit;
+            }
+        }
+
+        $passwordHash = $targetUser['password_hash'];
+        $salt = $targetUser['salt'];
+
+        $newPass = $input['new_password'] ?? $input['password'] ?? null;
+        if (!empty($newPass)) {
+            list($passwordHash, $salt) = hashPassword($newPass);
+        }
+
+        $upd = $db->prepare("UPDATE plan_users SET full_name = ?, username = ?, role = ?, is_active = ?, password_hash = ?, salt = ? WHERE id = ?");
+        $upd->execute([$fullName, $username, $role, $isActive, $passwordHash, $salt, $targetId]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Данные пользователя $username успешно обновлены"
+        ]);
+        exit;
+    }
+
+    if ($method === 'DELETE' && $targetId) {
+        if ($targetId === (int)$admin['id']) {
+            http_response_code(400);
+            echo json_encode(['detail' => 'Нельзя удалить собственную учетную запись']);
+            exit;
+        }
+
+        $del = $db->prepare("DELETE FROM plan_users WHERE id = ?");
+        $del->execute([$targetId]);
+
+        echo json_encode(['success' => true, 'message' => 'Пользователь удален']);
         exit;
     }
 }
