@@ -223,8 +223,14 @@ class AviaBitClient:
                     code = None
                     if prompt_code_callback:
                         code = prompt_code_callback(self.name, sending_info)
+                    elif sys.stdin and hasattr(sys.stdin, 'isatty') and sys.stdin.isatty():
+                        try:
+                            code = input(f"[{self.name}] Введите код подтверждения из письма ({sending_info}): ").strip()
+                        except Exception:
+                            code = None
                     else:
-                        code = input(f"[{self.name}] Введите код подтверждения из письма ({sending_info}): ").strip()
+                        print(f"[-] [{self.name}] Фоновый режим: требуется ввод 2FA кода.")
+                        return False
 
                     if not code:
                         print(f"[-] [{self.name}] Код подтверждения не введен.")
