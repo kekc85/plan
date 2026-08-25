@@ -226,7 +226,7 @@ export default function FlightRow({
       </td>
 
       {/* 2. № Рейса */}
-      <td className="py-2.5 px-1 font-mono font-extrabold text-base text-sky-700 dark:text-sky-400 whitespace-nowrap">
+      <td className="py-2.5 px-1 font-mono font-extrabold text-base text-sky-700 dark:text-sky-400 whitespace-nowrap min-w-[82px] text-center">
         <input
           type="text"
           value={flight.flight || ''}
@@ -240,7 +240,7 @@ export default function FlightRow({
       </td>
 
       {/* 3. Маршрут (Выравнивание строго по центру: Город сверху, Коды снизу) */}
-      <td className="py-1.5 px-1 whitespace-nowrap leading-tight text-center">
+      <td className="py-1.5 px-1.5 whitespace-nowrap leading-tight text-center min-w-[125px]">
         <div className="flex flex-col items-center justify-center gap-0.5 w-full">
           <input
             type="text"
@@ -251,7 +251,8 @@ export default function FlightRow({
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="Город"
-            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 text-xs font-bold text-slate-900 dark:text-slate-100 outline-none w-20 cursor-text text-center"
+            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1.5 py-0.5 text-xs font-bold text-slate-900 dark:text-slate-100 outline-none w-full min-w-[110px] cursor-text text-center"
+            title={flight.route_city || ''}
           />
           <input
             type="text"
@@ -262,14 +263,14 @@ export default function FlightRow({
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="DEP-ARR"
-            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400 outline-none w-20 uppercase cursor-text tracking-wider text-center"
+            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400 outline-none w-full min-w-[110px] uppercase cursor-text tracking-wider text-center"
           />
         </div>
       </td>
 
       {/* 4. ВРЕМЯ (Сверху Время Выпуска, затем Время Вылета, снизу Дата число.месяц 25.08) */}
-      <td className="py-1 px-1 whitespace-nowrap text-center">
-        <div className={`flex flex-col items-center gap-0.5 rounded-md p-1 min-w-[76px] transition-colors ${
+      <td className="py-1 px-1 whitespace-nowrap text-center min-w-[90px]">
+        <div className={`flex flex-col items-center gap-0.5 rounded-md p-1 min-w-[84px] transition-colors ${
           isOverdue
             ? 'bg-rose-100/95 dark:bg-rose-950/80 border-2 border-rose-500 shadow-sm'
             : 'bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700'
@@ -290,7 +291,7 @@ export default function FlightRow({
               onMouseDown={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="--:--"
-              className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 rounded px-0.5 text-center font-mono font-extrabold text-xs outline-none w-12 cursor-text ${
+              className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 rounded px-0.5 text-center font-mono font-extrabold text-xs outline-none w-14 cursor-text ${
                 isOverdue
                   ? 'text-rose-900 dark:text-rose-100 focus:ring-rose-500 font-black'
                   : 'text-emerald-700 dark:text-emerald-300 focus:ring-emerald-500'
@@ -330,7 +331,7 @@ export default function FlightRow({
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="25.08"
               maxLength={5}
-              className="bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-0.5 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-14 cursor-text tracking-wide"
+              className="bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-1 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-16 cursor-text tracking-wide"
               title="Дата рейса (число.месяц с маской, например 2608 -> 26.08)"
             />
           </div>

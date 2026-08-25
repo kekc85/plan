@@ -47,9 +47,9 @@ export default function ShiftTable({
           <thead className="sticky top-0 z-30 shadow-sm">
             <tr className="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-b border-slate-300 dark:border-slate-700 select-none text-xs">
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-8 no-print shadow-sm">#</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 font-extrabold tracking-wider uppercase w-20 shadow-sm">№ Рейса</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 font-extrabold tracking-wider uppercase w-20 shadow-sm">Маршрут</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-20 text-amber-700 dark:text-amber-300 shadow-sm">
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 font-extrabold tracking-wider uppercase w-20 min-w-[82px] shadow-sm">№ Рейса</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1.5 font-extrabold tracking-wider uppercase min-w-[125px] shadow-sm text-center">Маршрут</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase min-w-[90px] text-amber-700 dark:text-amber-300 shadow-sm">
                 Время<br/>
                 <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">Вып (-40)</span> / <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400">Вылет</span>
               </th>
