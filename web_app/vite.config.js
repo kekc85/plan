@@ -18,7 +18,7 @@ const formattedDate = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.ge
 const appVersion = `v1.0.${commitCount}`
 
 export default defineConfig({
-  base: './',
+  base: '/plan/',
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),

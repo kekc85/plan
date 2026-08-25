@@ -34,8 +34,8 @@ async function request(endpoint, options = {}) {
     headers
   });
 
-  if (response.status === 401) {
-    // Токен истек или недействителен
+  if (response.status === 401 && !endpoint.includes('/auth/login')) {
+    // Токен истек или недействителен (для защищенных эндпоинтов)
     localStorage.removeItem('aeroplan_token');
     localStorage.removeItem('aeroplan_user');
     window.dispatchEvent(new CustomEvent('aeroplan_auth_expired'));

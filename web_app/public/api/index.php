@@ -1,9 +1,11 @@
 <?php
 /**
  * AeroPlan W&B - PHP Backend API для хостинга Beget
- * Обеспечивает мгновенную работу с базой данных MySQL (kekc8584_plan)
- * без необходимости настраивать сложные демоны Python на виртуальном хостинге.
+ * Подключение к MySQL: kekc8584_plan
  */
+
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -35,7 +37,7 @@ function getDb() {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false
             ]);
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['detail' => 'Ошибка подключения к MySQL: ' . $e->getMessage()]);
             exit;
@@ -44,9 +46,19 @@ function getDb() {
     return $pdo;
 }
 
-// ----------------------------------------------------
-// 2. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ХЕШИРОВАНИЯ И JWT
-// ----------------------------------------------------
+// Fallback для заголовков
+if (!function_exists('getallheaders')) {
+    function getallheaders() {
+        $headers = [];
+        foreach ($_SERVER as $name => $value) {
+            if (substr($name, 0, 5) == 'HTTP_') {
+                $headers[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))))] = $value;
+            }
+        }
+        return $headers;
+    }
+}
+
 function hashPassword($password, $salt = null) {
     if (!$salt) {
         $salt = bin2hex(random_bytes(16));
@@ -131,30 +143,36 @@ function getJsonInput() {
 }
 
 // ----------------------------------------------------
-// 3. МАРШРУТИЗАЦИЯ API
+// 2. МАРШРУТИЗАЦИЯ
 // ----------------------------------------------------
-$uri = $_SERVER['REQUEST_URI'];
-$path = parse_url($uri, PHP_URL_PATH);
+$uri = $_SERVER['REQUEST_URI'] ?? '';
+$path = parse_url($uri, PHP_URL_PATH) ?? '';
 
-// Нормализуем путь: убираем /plan/api или /api
-$route = $path;
-if (preg_match('#/(?:plan/)?api/(.*)$#', $path, $m)) {
-    $route = '/' . $m[1];
-} elseif (preg_match('#^/api/(.*)$#', $path, $m)) {
-    $route = '/' . $m[1];
+$route = '';
+if (preg_match('#/(?:plan/)?api(?:/|$)(.*)#', $path, $m)) {
+    $route = '/' . trim($m[1], '/');
+} elseif (preg_match('#/api(?:/|$)(.*)#', $path, $m)) {
+    $route = '/' . trim($m[1], '/');
+} else {
+    $route = '/' . trim($path, '/');
 }
 
-// Убираем завершающий слэш
-$route = rtrim($route, '/');
-if ($route === '') $route = '/health';
+if ($route === '/' || $route === '') $route = '/health';
 
 // ----------------------------------------------------
 // ЭНДПОИНТ: /health
 // ----------------------------------------------------
-if ($route === '/health' || $route === 'health') {
+if ($route === '/health') {
+    try {
+        $db = getDb();
+        $dbStatus = 'connected';
+    } catch (Exception $e) {
+        $dbStatus = 'error: ' . $e->getMessage();
+    }
     echo json_encode([
         'status' => 'ok',
         'service' => 'AeroPlan W&B Beget API',
+        'database' => $dbStatus,
         'version' => '1.0.14',
         'time_msk' => date('H:i:s')
     ]);
@@ -174,7 +192,42 @@ if ($route === '/auth/login') {
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
-    if (!$user || !verifyPassword($password, $user['password_hash'], $user['salt'])) {
+    $isValid = false;
+    if ($user) {
+        $isValid = verifyPassword($password, $user['password_hash'], $user['salt']);
+        
+        // Автоматическое обновление хешей начальных аккаунтов при первом входе
+        if (!$isValid) {
+            if ($username === 'admin' && $password === 'admin123') {
+                list($newHash, $newSalt) = hashPassword('admin123');
+                $db->prepare("UPDATE plan_users SET password_hash = ?, salt = ? WHERE username = 'admin'")->execute([$newHash, $newSalt]);
+                $isValid = true;
+            } elseif ($username === 'dispatcher' && $password === 'dispatch123') {
+                list($newHash, $newSalt) = hashPassword('dispatch123');
+                $db->prepare("UPDATE plan_users SET password_hash = ?, salt = ? WHERE username = 'dispatcher'")->execute([$newHash, $newSalt]);
+                $isValid = true;
+            }
+        }
+    } else {
+        // Если таблица была пустой - создаем базовых пользователей
+        if ($username === 'admin' && $password === 'admin123') {
+            list($newHash, $newSalt) = hashPassword('admin123');
+            $db->prepare("INSERT INTO plan_users (username, password_hash, salt, full_name, role, is_active, created_at) VALUES (?, ?, ?, ?, 'admin', 1, ?)")->execute(['admin', $newHash, $newSalt, 'Администратор системы', date('Y-m-d H:i:s')]);
+            $stmt = $db->prepare("SELECT * FROM plan_users WHERE username = 'admin'");
+            $stmt->execute();
+            $user = $stmt->fetch();
+            $isValid = true;
+        } elseif ($username === 'dispatcher' && $password === 'dispatch123') {
+            list($newHash, $newSalt) = hashPassword('dispatch123');
+            $db->prepare("INSERT INTO plan_users (username, password_hash, salt, full_name, role, is_active, created_at) VALUES (?, ?, ?, ?, 'dispatcher', 1, ?)")->execute(['dispatcher', $newHash, $newSalt, 'Диспетчер по центровке', date('Y-m-d H:i:s')]);
+            $stmt = $db->prepare("SELECT * FROM plan_users WHERE username = 'dispatcher'");
+            $stmt->execute();
+            $user = $stmt->fetch();
+            $isValid = true;
+        }
+    }
+
+    if (!$user || !$isValid) {
         http_response_code(401);
         echo json_encode(['detail' => 'Неверный логин или пароль']);
         exit;
@@ -452,6 +505,171 @@ if ($route === '/shift/handover') {
         'message' => "Смена передана диспетчеру $acceptedBy",
         'active_flights_transferred' => count($activeFlights),
         'handover_time' => date('d.m.Y H:i')
+    ]);
+    exit;
+}
+
+// ----------------------------------------------------
+// ЭНДПОИНТ: /fetch_schedule (Парсер AviaBit)
+// ----------------------------------------------------
+if ($route === '/fetch_schedule') {
+    $input = getJsonInput();
+    $dateFrom = $input['date_from'] ?? date('d.m.Y');
+    $timeFrom = $input['time_from'] ?? '08:00';
+    $dateTo = $input['date_to'] ?? date('d.m.Y', strtotime('+1 day'));
+    $timeTo = $input['time_to'] ?? '14:00';
+    $airline = $input['airline'] ?? 'both';
+
+    $dFromParts = explode('.', $dateFrom);
+    $tFromParts = explode(':', $timeFrom);
+    $dToParts = explode('.', $dateTo);
+    $tToParts = explode(':', $timeTo);
+
+    if (count($dFromParts) === 3 && count($dToParts) === 3) {
+        $startTs = mktime((int)($tFromParts[0] ?? 8), (int)($tFromParts[1] ?? 0), 0, (int)$dFromParts[1], (int)$dFromParts[0], (int)$dFromParts[2]);
+        $endTs = mktime((int)($tToParts[0] ?? 14), (int)($tToParts[1] ?? 0), 0, (int)$dToParts[1], (int)$dToParts[0], (int)$dToParts[2]);
+    } else {
+        $startTs = time();
+        $endTs = time() + (24 * 3600);
+    }
+
+    $tsStartMs = $startTs * 1000;
+    $tsEndMs = $endTs * 1000;
+
+    $allowedDeps = [
+        'KQT' => true, 'VRA' => true, 'GOI' => true, 'GOX' => true, 'DYU' => true, 'ISB' => true,
+        'CCC' => true, 'CXR' => true, 'HOG' => true, 'REN' => true, 'OSS' => true, 'PMW' => true,
+        'PMV' => true, 'ROV' => true, 'XIY' => true, 'AER' => true, 'SUI' => true, 'UUD' => true,
+        'UTP' => true, 'LBD' => true, 'HTA' => true, 'SSH' => true, 'SVO' => true, 'TAS' => true,
+        'NMA' => true, 'TJU' => true, 'SKD' => true
+    ];
+
+    $iataCities = [
+        'KQT' => 'Бохтар', 'VRA' => 'Варадеро', 'GOI' => 'Гоа', 'GOX' => 'Гоа', 'DYU' => 'Душанбе',
+        'ISB' => 'Исламабад', 'CCC' => 'Кайококо', 'CXR' => 'Камрань', 'HOG' => 'Ольгин',
+        'REN' => 'Оренбург', 'OSS' => 'Ош', 'PMW' => 'Парламар', 'PMV' => 'Парламар',
+        'ROV' => 'Ростов', 'XIY' => 'Сиань', 'AER' => 'Сочи', 'SUI' => 'Сухум',
+        'UUD' => 'Улан-Удэ', 'UTP' => 'Утапао', 'LBD' => 'Худжант', 'HTA' => 'Чита',
+        'SSH' => 'Шарм Эль Шейх', 'SVO' => 'Москва', 'TAS' => 'Ташкент', 'NMA' => 'Наманган',
+        'TJU' => 'Куляб', 'SKD' => 'Самарканд', 'KZN' => 'Казань', 'BAX' => 'Барнаул',
+        'LED' => 'Питер', 'UFA' => 'Уфа', 'KGD' => 'Калининград', 'SVX' => 'Екатеринбург',
+        'IKT' => 'Иркутск', 'KJA' => 'Красноярск', 'OVB' => 'Новосибирск', 'PEE' => 'Пермь',
+        'TOF' => 'Томск', 'TJM' => 'Тюмень', 'MRV' => 'Мин.Воды', 'MCX' => 'Махачкала',
+        'GRV' => 'Грозный', 'VOG' => 'Волгоград', 'ASF' => 'Астрахань', 'AYT' => 'Анталья'
+    ];
+
+    $urls = [];
+    if ($airline === 'both' || $airline === 'nordwind') {
+        $urls[] = "https://aviabit.nordwindairlines.ru/api/plan-flight?dateBegin={$tsStartMs}&dateEnd={$tsEndMs}&eng=false&apCode=3&apId=0&template=1055&showCancel=false";
+    }
+    if ($airline === 'both' || $airline === 'ikar') {
+        $urls[] = "https://aviabit.ikar.aero/api/plan-flight?dateBegin={$tsStartMs}&dateEnd={$tsEndMs}&eng=false&apCode=3&apId=0&template=1055&showCancel=false";
+    }
+
+    $rawFlights = [];
+    foreach ($urls as $url) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 25);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Content-Type: application/json'
+        ]);
+        $res = curl_exec($ch);
+        curl_close($ch);
+
+        if ($res) {
+            $data = json_decode($res, true);
+            if (is_array($data)) {
+                $rawFlights = array_merge($rawFlights, $data);
+            }
+        }
+    }
+
+    $processed = [];
+    $seenKeys = [];
+
+    foreach ($rawFlights as $idx => $fl) {
+        $flightNo = trim($fl['flight'] ?? '');
+        $dep = strtoupper(trim($fl['airPortTOCode'] ?? ''));
+        $arr = strtoupper(trim($fl['airPortLACode'] ?? ''));
+
+        if (empty($flightNo) || empty($dep) || empty($arr)) continue;
+        if (!isset($allowedDeps[$dep])) continue;
+
+        $flClean = str_replace(['-', ' '], '', $flightNo);
+        $takeoffRaw = $fl['dateTakeoffReal'] ?? $fl['dateTakeoffCalculation'] ?? $fl['dateTakeoff'] ?? '';
+
+        $timeStr = '';
+        $flightDate = date('d.m', $startTs);
+
+        if ($takeoffRaw) {
+            $dt = strtotime($takeoffRaw);
+            if ($dt) {
+                $timeStr = date('H:i', $dt);
+                $flightDate = date('d.m', $dt);
+            }
+        }
+
+        $key = "{$flClean}_{$flightDate}_{$dep}_{$arr}";
+        if (isset($seenKeys[$key])) continue;
+        $seenKeys[$key] = true;
+
+        $tailRaw = trim($fl['pln'] ?? '');
+        $tail = str_replace(['RA-', 'RA', '-'], '', $tailRaw);
+        $layout = trim($fl['prePlaneComponovkaInfo'] ?? '');
+
+        $relTime = '';
+        if ($timeStr && strpos($timeStr, ':') !== false) {
+            $p = explode(':', $timeStr);
+            $totalMins = (int)$p[0] * 60 + (int)$p[1] - 40;
+            if ($totalMins < 0) $totalMins += 24 * 60;
+            $relH = floor($totalMins / 60) % 24;
+            $relM = $totalMins % 60;
+            $relTime = sprintf('%02d:%02d', $relH, $relM);
+        }
+
+        $cityName = $iataCities[$dep] ?? $dep;
+        $airports = "{$dep}-{$arr}";
+
+        $processed[] = [
+            'id' => 'fl_' . time() . '_' . $idx,
+            'flight' => $flClean,
+            'flight_date' => $flightDate,
+            'route_city' => $cityName,
+            'route_airports' => $airports,
+            'time' => $timeStr,
+            'release_time' => $relTime,
+            'ac_num' => $tail,
+            'ac_config' => $layout,
+            'pax' => '',
+            'crew' => '',
+            'fuel_block' => '',
+            'fuel_trip' => '',
+            'fuel_taxi' => '',
+            'dow' => '',
+            'doi' => '',
+            'galley' => 'D',
+            'mtow' => '',
+            'lir_sent' => false,
+            'cargo' => '',
+            'mail' => '',
+            'baggage' => '',
+            'szv_sent' => false,
+            'ldm_sent' => false,
+            'astra_times_sent' => false,
+            'status' => 'prepared',
+            'notes' => ''
+        ];
+    }
+
+    echo json_encode([
+        'success' => true,
+        'count' => count($processed),
+        'flights' => $processed,
+        'interval_info' => "{$dateFrom} {$timeFrom} — {$dateTo} {$timeTo}"
     ]);
     exit;
 }

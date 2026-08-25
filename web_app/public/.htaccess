@@ -1,19 +1,22 @@
-# Настройки маршрутизации и безопасности для хостинга Beget
+Options -Indexes
+DirectoryIndex index.html index.php
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /plan/
 
-    # Перенаправление всех запросов к API в обработчик PHP
-    RewriteRule ^api/(.*)$ api/index.php [QSA,L]
-    RewriteRule ^api$ api/index.php [QSA,L]
+    # 1. Если запрашивается существующий файл или папка (CSS, JS, картинки) - отдавать напрямую
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
 
-    # Для остальных файлов: если файл или папка не существует - отдавать index.html
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteRule ^.*$ index.html [L]
+    # 2. Перенаправление всех запросов к API в обработчик PHP
+    RewriteRule ^api(?:/.*)?$ api/index.php [QSA,L]
+
+    # 3. Для всех остальных маршрутов SPA - отдавать index.html
+    RewriteRule ^ index.html [L]
 </IfModule>
 
-# Включение сжатия GZIP
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
 </IfModule>
