@@ -31,7 +31,8 @@ from parser import (
     IATA_CITIES,
     parse_date_arg,
     parse_time_arg,
-    process_flights
+    process_flights,
+    export_to_excel
 )
 
 app = FastAPI(
@@ -239,7 +240,7 @@ def fetch_schedule(req: FetchScheduleRequest):
 @app.post("/api/export_excel")
 def export_excel_endpoint(req: ExportExcelRequest):
     """
-    Генерирует Excel файл суточного плана со 100% точным форматированием и стилями openpyxl из parser.py:
+    Генерирует Excel файл суточного плана со 100% точным форматированием openpyxl из parser.py:
     - 15 колонок
     - Calibri шрифты
     - Тонкие и средние рамки
@@ -250,184 +251,41 @@ def export_excel_endpoint(req: ExportExcelRequest):
     if not req.flights:
         raise HTTPException(status_code=400, detail="Список рейсов пуст")
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Суточный план"
+    normalized_rows = []
+    for f in req.flights:
+        route_combined = f.get("route_airports") or ""
+        if f.get("route_city"):
+            route_combined = f"{f['route_city']}\n{route_combined}"
 
-    # Заголовок
+        normalized_rows.append({
+            "flight_no": f.get("flight") or "",
+            "route": route_combined,
+            "std": f.get("time") or "",
+            "tail": f.get("ac_num") or "",
+            "layout": f.get("ac_config") or "",
+            "pax_notes": f.get("pax") or "",
+            "crew": f.get("crew") or "",
+            "fuel": f.get("fuel") or f.get("fuel_block") or "",
+            "fuel_block": f.get("fuel_block") or "",
+            "fuel_trip": f.get("fuel_trip") or "",
+            "fuel_taxi": f.get("fuel_taxi") or "",
+            "mtow": f.get("mtow") or "",
+            "lir": f.get("lir_sent") or f.get("lir") or "",
+            "cargo": f.get("cargo") or "",
+            "mail": f.get("mail") or "",
+            "baggage": f.get("baggage") or "",
+            "szv": f.get("szv_sent") or f.get("szv") or "",
+            "ldm": f.get("ldm_sent") or f.get("ldm") or ""
+        })
+
     date_str = ""
     if req.shift_info:
         date_str = req.shift_info.get("date_interval") or req.shift_info.get("date") or ""
     if not date_str:
         date_str = datetime.now(MSK_TZ).strftime("%d.%m.%Y")
 
-    title_text = f"Суточный план Диспетчера группы центровки  {date_str}"
-
-    # Строка 1: Заголовок
-    ws.merge_cells("A1:O1")
-    title_cell = ws["A1"]
-    title_cell.value = title_text
-    title_cell.font = Font(name="Calibri", size=12, bold=True, color="000000")
-    title_cell.alignment = Alignment(horizontal="center", vertical="center")
-    ws.row_dimensions[1].height = 26
-
-    # Строка 2: Шапка таблицы (15 колонок)
-    headers = [
-        "№ рейса",      # A
-        "Маршрут",      # B
-        "Время",        # C
-        "Номер\nВС",    # D
-        "Компано\nвка", # E
-        "PAX,\nNOTES",  # F
-        "Экипаж\nЛ/Б/И/П", # G
-        "Топливо",      # H
-        "MTOW",         # I
-        "LIR",          # J
-        "Груз",         # K
-        "Почта",        # L
-        "Багаж",        # M
-        "СЗВ",          # N
-        "ЛДМ"           # O
-    ]
-
-    header_font = Font(name="Calibri", size=11, bold=True, color="000000")
-    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    header_border = Border(
-        left=Side(style="medium", color="000000"),
-        right=Side(style="medium", color="000000"),
-        top=Side(style="medium", color="000000"),
-        bottom=Side(style="medium", color="000000")
-    )
-
-    thin_border = Border(
-        left=Side(style="thin", color="000000"),
-        right=Side(style="thin", color="000000"),
-        top=Side(style="thin", color="000000"),
-        bottom=Side(style="thin", color="000000")
-    )
-
-    ws.row_dimensions[2].height = 36
-    for col_idx, h_text in enumerate(headers, start=1):
-        cell = ws.cell(row=2, column=col_idx, value=h_text)
-        cell.font = header_font
-        if col_idx in (14, 15):
-            cell.alignment = Alignment(horizontal="center", vertical="center", text_rotation=90)
-        else:
-            cell.alignment = header_align
-        cell.border = header_border
-
-    # Стили данных
-    data_font = Font(name="Calibri", size=11)
-    bold_data_font = Font(name="Calibri", size=11, bold=True)
-    route_data_font = Font(name="Calibri", size=9)
-    align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    for idx, f in enumerate(req.flights, start=1):
-        row_num = idx + 2
-        ws.row_dimensions[row_num].height = 36
-
-        # Маршрут
-        route_combined = f.get("route_airports") or ""
-        if f.get("route_city"):
-            route_combined = f"{f['route_city']}\n{route_combined}"
-
-        # Числовые значения
-        raw_tail = str(f.get("ac_num") or "")
-        tail_val = int(raw_tail) if raw_tail.isdigit() else raw_tail
-
-        raw_config = str(f.get("ac_config") or "")
-        config_val = int(raw_config) if raw_config.isdigit() else raw_config
-
-        raw_pax = str(f.get("pax") or "")
-        pax_val = int(raw_pax) if raw_pax.isdigit() else raw_pax
-
-        raw_mtow = str(f.get("mtow") or "")
-        mtow_val = int(raw_mtow) if raw_mtow.isdigit() else raw_mtow
-
-        # Топливо
-        fuel_parts = []
-        if f.get("fuel_block"): fuel_parts.append(f"B:{f['fuel_block']}")
-        if f.get("fuel_trip"): fuel_parts.append(f"T:{f['fuel_trip']}")
-        if f.get("fuel_taxi"): fuel_parts.append(f"Tx:{f['fuel_taxi']}")
-        fuel_combined = " ".join(fuel_parts) if fuel_parts else (f.get("fuel") or "")
-
-        lir_val = "ДА" if f.get("lir_sent") else ""
-        szv_val = "ДА" if f.get("szv_sent") else ""
-        ldm_val = "ДА" if f.get("ldm_sent") else ""
-
-        row_values = [
-            f.get("flight") or "",
-            route_combined,
-            f.get("time") or "",
-            tail_val,
-            config_val,
-            pax_val,
-            f.get("crew") or "",
-            fuel_combined,
-            mtow_val,
-            lir_val,
-            f.get("cargo") or "",
-            f.get("mail") or "",
-            f.get("baggage") or "",
-            szv_val,
-            ldm_val
-        ]
-
-        for col_idx, val in enumerate(row_values, start=1):
-            cell = ws.cell(row=row_num, column=col_idx, value=val)
-            if col_idx == 2:
-                cell.font = route_data_font
-            elif col_idx == 6:
-                cell.font = bold_data_font
-            else:
-                cell.font = data_font
-
-            cell.alignment = align_center
-            cell.border = thin_border
-
-    # Точные ширины колонок
-    col_widths = {
-        "A": 11.0,  # № рейса
-        "B": 14.5,  # Маршрут
-        "C": 8.5,   # Время
-        "D": 9.5,   # Номер ВС
-        "E": 11.0,  # Компановка
-        "F": 10.0,  # PAX, NOTES
-        "G": 10.0,  # Экипаж
-        "H": 14.0,  # Топливо
-        "I": 9.0,   # MTOW
-        "J": 5.5,   # LIR
-        "K": 9.5,   # Груз
-        "L": 9.5,   # Почта
-        "M": 9.5,   # Багаж
-        "N": 4.5,   # СЗВ
-        "O": 4.5    # ЛДМ
-    }
-
-    for col_letter, width in col_widths.items():
-        ws.column_dimensions[col_letter].width = width
-
-    # Фиксация шапки
-    ws.freeze_panes = "A3"
-
-    # Параметры печати: Альбомная ориентация A4
-    ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
-    ws.page_setup.paperSize = ws.PAPERSIZE_A4
-    ws.sheet_properties.pageSetUpPr.fitToPage = True
-    ws.page_setup.fitToWidth = 1
-    ws.page_setup.fitToHeight = 0
-    ws.page_margins.left = 0.25
-    ws.page_margins.right = 0.25
-    ws.page_margins.top = 0.2
-    ws.page_margins.bottom = 0.2
-    ws.page_margins.header = 0.0
-    ws.page_margins.footer = 0.0
-    ws.print_options.horizontalCentered = True
-    ws.print_options.verticalCentered = False
-
     output_stream = io.BytesIO()
-    wb.save(output_stream)
+    export_to_excel(normalized_rows, output_stream, date_str)
     output_stream.seek(0)
 
     clean_date = "".join(c for c in date_str if c.isalnum() or c in "._-")

@@ -651,23 +651,36 @@ def export_to_excel(
         tail_val = int(r_data["tail"]) if str(r_data.get("tail", "")).isdigit() else r_data.get("tail", "")
         layout_val = int(r_data["layout"]) if str(r_data.get("layout", "")).isdigit() else r_data.get("layout", "")
         pax_val = int(r_data["pax_notes"]) if str(r_data.get("pax_notes", "")).isdigit() else r_data.get("pax_notes", "")
+        mtow_val = int(r_data["mtow"]) if str(r_data.get("mtow", "")).isdigit() else r_data.get("mtow", "")
+
+        fuel_val = r_data.get("fuel") or ""
+        if not fuel_val:
+            fuel_parts = []
+            if r_data.get("fuel_block"): fuel_parts.append(f"B:{r_data['fuel_block']}")
+            if r_data.get("fuel_trip"): fuel_parts.append(f"T:{r_data['fuel_trip']}")
+            if r_data.get("fuel_taxi"): fuel_parts.append(f"Tx:{r_data['fuel_taxi']}")
+            fuel_val = " ".join(fuel_parts)
+
+        lir_val = "ДА" if r_data.get("lir") is True or str(r_data.get("lir", "")).upper() in ("ДА", "TRUE", "1") else (r_data.get("lir") or "")
+        szv_val = "ДА" if r_data.get("szv") is True or str(r_data.get("szv", "")).upper() in ("ДА", "TRUE", "1") else (r_data.get("szv") or "")
+        ldm_val = "ДА" if r_data.get("ldm") is True or str(r_data.get("ldm", "")).upper() in ("ДА", "TRUE", "1") else (r_data.get("ldm") or "")
 
         row_values = [
-            r_data["flight_no"],   # A: № рейса
-            r_data["route"],       # B: Маршрут
-            r_data["std"],         # C: Время
-            tail_val,              # D: Номер ВС (число)
-            layout_val,            # E: Компановка (число)
-            pax_val,               # F: PAX, NOTES (число)
-            r_data["crew"],        # G: Экипаж
-            r_data["fuel"],        # H: Топливо
-            "",                    # I: MTOW
-            "",                    # J: LIR
-            "",                    # K: Груз
-            "",                    # L: Почта
-            "",                    # M: Багаж
-            "",                    # N: СЗВ
-            ""                     # O: ЛДМ
+            r_data.get("flight_no") or r_data.get("flight") or "",   # A: № рейса
+            r_data.get("route") or "",                               # B: Маршрут
+            r_data.get("std") or r_data.get("time") or "",          # C: Время
+            tail_val,                                                # D: Номер ВС (число)
+            layout_val,                                              # E: Компановка (число)
+            pax_val,                                                 # F: PAX, NOTES (число)
+            r_data.get("crew") or "",                                # G: Экипаж
+            fuel_val,                                                # H: Топливо
+            mtow_val,                                                # I: MTOW
+            lir_val,                                                 # J: LIR
+            r_data.get("cargo") or "",                               # K: Груз
+            r_data.get("mail") or "",                                # L: Почта
+            r_data.get("baggage") or "",                             # M: Багаж
+            szv_val,                                                 # N: СЗВ
+            ldm_val                                                  # O: ЛДМ
         ]
 
         for col_idx, val in enumerate(row_values, start=1):
@@ -722,6 +735,13 @@ def export_to_excel(
     ws.page_margins.footer = 0.0
     ws.print_options.horizontalCentered = True
     ws.print_options.verticalCentered = False
+
+    if hasattr(output_filename, "write"):
+        wb.save(output_filename)
+        return output_filename
+
+    if output_filename is None:
+        return wb
 
     # Сохранение файла с обработкой блокировки (если файл открыт в Excel)
     actual_path = output_filename
