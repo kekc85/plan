@@ -6,6 +6,7 @@
 
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
+date_default_timezone_set('Europe/Moscow');
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -525,61 +526,108 @@ if ($route === '/shift/handover') {
 // ----------------------------------------------------
 // ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ЗАПРОСА К AVIABIT С АВТОРИЗАЦИЕЙ
 // ----------------------------------------------------
-function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTsMs, $templateId = 1055) {
-    $cookieJar = tempnam(sys_get_temp_dir(), 'avb_');
+// ----------------------------------------------------
+// ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ЗАПРОСА К AVIABIT С АВТОРИЗАЦИЕЙ
+// ----------------------------------------------------
+function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTsMs, $templateName = 'WBGarantiya') {
     $origin = rtrim($baseUrl, '/');
     $referer = $origin . '/plan-flight';
+    $cookieFile = sys_get_temp_dir() . '/avb_sess_' . md5($origin . $username) . '.txt';
 
-    // 1. Авторизация в AviaBit
-    $authPayload = json_encode([
-        'rememberMe' => true,
-        'version' => [
-            'date' => '2026-08-06T08:00:00.000Z',
-            'company' => 'AviaBit',
-            'number' => '9.8.1'
-        ],
-        'eng' => false,
-        'username' => $username,
-        'password' => $password
-    ]);
-
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, "$origin/api/auth");
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $authPayload);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieJar);
-    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieJar);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    $headers = [
         "Origin: $origin",
         "Referer: $referer",
         'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Content-Type: application/json',
         'Accept: application/json, text/plain, */*'
-    ]);
-    curl_exec($ch);
-    curl_close($ch);
+    ];
+
+    $templateId = 1055;
+
+    // 1. Проверяем валидность кэшированной сессии
+    $isSessionValid = false;
+    if (file_exists($cookieFile) && (time() - filemtime($cookieFile) < 14400)) {
+        $chTest = curl_init("$origin/api/filter-template?code=1001");
+        curl_setopt($chTest, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($chTest, CURLOPT_COOKIEFILE, $cookieFile);
+        curl_setopt($chTest, CURLOPT_TIMEOUT, 8);
+        curl_setopt($chTest, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($chTest, CURLOPT_HTTPHEADER, $headers);
+        $testRes = curl_exec($chTest);
+        $testCode = curl_getinfo($chTest, CURLINFO_HTTP_CODE);
+        curl_close($chTest);
+        if ($testCode === 200 && strpos($testRes, '[') !== false) {
+            $isSessionValid = true;
+            $templates = json_decode($testRes, true);
+            if (is_array($templates)) {
+                foreach ($templates as $t) {
+                    if (stripos($t['text'] ?? '', $templateName) !== false) {
+                        $templateId = (int)($t['value'] ?? 1055);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!$isSessionValid) {
+        // Авторизация в AviaBit
+        $authPayload = json_encode([
+            'rememberMe' => true,
+            'version' => [
+                'date' => '2026-08-06T08:00:00.000Z',
+                'company' => 'ООО "АвиаБит"',
+                'number' => '9.8.1'
+            ],
+            'eng' => false,
+            'username' => $username,
+            'password' => $password
+        ]);
+
+        $ch = curl_init("$origin/api/auth");
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $authPayload);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
+        curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_exec($ch);
+        curl_close($ch);
+
+        // Получаем templateId
+        $chT = curl_init("$origin/api/filter-template?code=1001");
+        curl_setopt($chT, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($chT, CURLOPT_COOKIEFILE, $cookieFile);
+        curl_setopt($chT, CURLOPT_TIMEOUT, 10);
+        curl_setopt($chT, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($chT, CURLOPT_HTTPHEADER, $headers);
+        $tRes = curl_exec($chT);
+        curl_close($chT);
+        if ($tRes) {
+            $templates = json_decode($tRes, true);
+            if (is_array($templates)) {
+                foreach ($templates as $t) {
+                    if (stripos($t['text'] ?? '', $templateName) !== false) {
+                        $templateId = (int)($t['value'] ?? 1055);
+                        break;
+                    }
+                }
+            }
+        }
+    }
 
     // 2. Получение суточного плана полетов
     $url = "$origin/api/plan-flight?dateBegin={$startTsMs}&dateEnd={$endTsMs}&eng=false&apCode=3&apId=0&template={$templateId}&showCancel=false";
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
+    $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieJar);
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Origin: $origin",
-        "Referer: $referer",
-        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept: application/json, text/plain, */*'
-    ]);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     $schedRes = curl_exec($ch);
     curl_close($ch);
-
-    @unlink($cookieJar);
 
     if ($schedRes) {
         $data = json_decode($schedRes, true);
@@ -607,15 +655,19 @@ if ($route === '/fetch_schedule') {
     $tToParts = explode(':', $timeTo);
 
     if (count($dFromParts) === 3 && count($dToParts) === 3) {
-        $startTs = mktime((int)($tFromParts[0] ?? 8), (int)($tFromParts[1] ?? 0), 0, (int)$dFromParts[1], (int)$dFromParts[0], (int)$dFromParts[2]);
-        $endTs = mktime((int)($tToParts[0] ?? 14), (int)($tToParts[1] ?? 0), 0, (int)$dToParts[1], (int)$dToParts[0], (int)$dToParts[2]);
+        $startBoundTs = mktime(0, 0, 0, (int)$dFromParts[1], (int)$dFromParts[0], (int)$dFromParts[2]);
+        $endBoundTs = mktime(23, 59, 59, (int)$dToParts[1], (int)$dToParts[0], (int)$dToParts[2]);
+        $shiftStartTs = mktime((int)($tFromParts[0] ?? 8), (int)($tFromParts[1] ?? 0), 0, (int)$dFromParts[1], (int)$dFromParts[0], (int)$dFromParts[2]);
+        $shiftEndTs = mktime((int)($tToParts[0] ?? 14), (int)($tToParts[1] ?? 0), 0, (int)$dToParts[1], (int)$dToParts[0], (int)$dToParts[2]);
     } else {
-        $startTs = time();
-        $endTs = time() + (24 * 3600);
+        $startBoundTs = strtotime('today 00:00:00');
+        $endBoundTs = strtotime('tomorrow 23:59:59');
+        $shiftStartTs = strtotime('today 08:00:00');
+        $shiftEndTs = strtotime('tomorrow 14:00:00');
     }
 
-    $tsStartMs = $startTs * 1000;
-    $tsEndMs = $endTs * 1000;
+    $tsStartMs = $startBoundTs * 1000;
+    $tsEndMs = $endBoundTs * 1000;
 
     $allowedDeps = [
         'KQT' => true, 'VRA' => true, 'GOI' => true, 'GOX' => true, 'DYU' => true, 'ISB' => true,
@@ -664,21 +716,24 @@ if ($route === '/fetch_schedule') {
 
         // Исключаем резервные рейсы (~РЕ307д, ~РЕЗ, РЕЗ, REZ, ~ и т.д.) и спецрейсы
         if (strpos($flightNo, '~') !== false) continue;
-        if (preg_match('/(^|~|\s)(РЕЗ|REZ|РЕ|RE)\d+/ui', $flightNo)) continue;
+        if (preg_match('/^[~]?(?:РЕЗ|REZ|РЕ|RE)/ui', $flightNo)) continue;
         if (stripos($flightNo, 'РЕЗ') !== false || stripos($flightNo, 'REZ') !== false) continue;
         if (!empty($fl['isSpecialFlight'])) continue;
 
         $flClean = str_replace(['-', ' '], '', $flightNo);
-        if (preg_match('/^РЕ\d+/ui', $flClean) || preg_match('/^REZ\d+/ui', $flClean)) continue;
         $takeoffRaw = $fl['dateTakeoffReal'] ?? $fl['dateTakeoffCalculation'] ?? $fl['dateTakeoff'] ?? '';
 
         $timeStr = '';
-        $flightDate = date('d.m', $startTs);
+        $flightDate = date('d.m', $shiftStartTs);
 
         if ($takeoffRaw) {
             $dt = strtotime($takeoffRaw);
             if ($dt) {
-                $timeStr = date('H:i', $dt);
+                // Строгая фильтрация по Московскому времени смены
+                if ($dt < $shiftStartTs || $dt > $shiftEndTs) {
+                    continue;
+                }
+                $timeStr = date('G:i', $dt);
                 $flightDate = date('d.m', $dt);
             }
         }
