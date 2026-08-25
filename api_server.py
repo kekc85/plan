@@ -751,10 +751,9 @@ def fetch_schedule(req: FetchScheduleRequest):
         else:
             airports = route_str
 
-        flight_date = start_dt.strftime("%d.%m")
-        dep_dt = row.get("dep_datetime")
-        if dep_dt and hasattr(dep_dt, "strftime"):
-            flight_date = dep_dt.strftime("%d.%m")
+        flight_date = str(row.get("flight_date") or "").strip()
+        if not flight_date:
+            flight_date = start_dt.strftime("%d.%m")
 
         release_t = calc_release_time_py(std_time, 40)
 

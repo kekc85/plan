@@ -699,11 +699,11 @@ if ($route === '/fetch_schedule') {
     $rawFlights = [];
     $diag = [];
     if ($airline === 'both' || $airline === 'nordwind') {
-        $nw = fetchAviaBitSchedule('https://aviabit.nordwindairlines.ru', $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'WBGarantiya', $diag);
+        $nw = fetchAviaBitSchedule('https://aviabit.nordwindairlines.ru', $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'nordwind', $diag);
         if (!empty($nw)) $rawFlights = array_merge($rawFlights, $nw);
     }
     if ($airline === 'both' || $airline === 'ikar') {
-        $ik = fetchAviaBitSchedule('https://aviabit.ikar.aero', $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'WBGarantiya', $diag);
+        $ik = fetchAviaBitSchedule('https://aviabit.ikar.aero', $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'ikar', $diag);
         if (!empty($ik)) $rawFlights = array_merge($rawFlights, $ik);
     }
 
