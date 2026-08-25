@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, Plane, Zap, Calendar, Clock, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { X, Plane, Zap, Calendar, Clock, AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import { formatValidDateInterval, formatValidTime } from '../utils/validators';
+import { fetchAviaBitSchedule, smartMergeSchedules } from '../utils/api';
 
-export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded }) {
+export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, currentFlights = [] }) {
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -15,6 +16,7 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded })
   const [dateTo, setDateTo] = useState(formatD(tomorrow));
   const [timeTo, setTimeTo] = useState('14:00');
   const [airline, setAirline] = useState('both'); // "both", "nordwind", "ikar"
+  const [useSmartMerge, setUseSmartMerge] = useState(true);
   
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -61,56 +63,37 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded })
       filter_name: 'WBGarantiya'
     };
 
-    // Пробуем через прокси /api/fetch_schedule, а если недоступно - напрямую http://127.0.0.1:8000
-    const endpoints = [
-      '/api/fetch_schedule',
-      'http://127.0.0.1:8000/api/fetch_schedule',
-      'http://localhost:8000/api/fetch_schedule'
-    ];
-
-    let lastError = null;
-    let fetched = false;
-
-    for (const url of endpoints) {
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.detail || `Ошибка сервера: ${response.status}`);
-        }
-
-        const result = await response.json();
-        if (!result.success) {
-          throw new Error(result.message || 'Не удалось получить данные с серверов AviaBit');
-        }
-
-        if (result.count === 0) {
-          setErrorMsg('За указанный интервал времени рейсов в AviaBit не найдено.');
-          setIsLoading(false);
-          return;
-        }
-
-        setSuccessMsg(`Успешно загружено ${result.count} рейсов из AviaBit!`);
-        setTimeout(() => {
-          onScheduleLoaded(result.flights, result.shift_interval);
-          onClose();
-        }, 500);
-
-        fetched = true;
-        break;
-      } catch (err) {
-        lastError = err;
+    try {
+      const result = await fetchAviaBitSchedule(payload);
+      if (!result.success) {
+        throw new Error(result.message || 'Не удалось получить данные с серверов AviaBit');
       }
-    }
 
-    if (!fetched) {
-      console.error(lastError);
-      setErrorMsg(lastError?.message || 'Ошибка соединения с локальным API сервером. Проверьте api_server.py.');
+      let finalFlights = result.flights || [];
+
+      // Умное слияние с сохранением данных предыдущего диспетчера
+      if (useSmartMerge && currentFlights && currentFlights.length > 0) {
+        try {
+          const mergeRes = await smartMergeSchedules(currentFlights, finalFlights);
+          if (mergeRes && mergeRes.flights) {
+            finalFlights = mergeRes.flights;
+          }
+        } catch (mErr) {
+          console.warn('Smart merge fallback:', mErr);
+        }
+      }
+
+      setSuccessMsg(`Успешно загружено ${finalFlights.length} рейсов!`);
+      setTimeout(() => {
+        onScheduleLoaded(finalFlights, {
+          date_interval: `${dateFrom} — ${dateTo}`,
+          date: dateFrom
+        });
+        onClose();
+      }, 500);
+    } catch (err) {
+      setErrorMsg(err.message || 'Ошибка подключения к серверу');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -126,104 +109,111 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded })
               <Zap className="w-5 h-5 fill-current" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base leading-tight">Загрузка расписания из AviaBit</h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">Прямая подкачка суточного плана с портала</p>
+              <h3 className="font-extrabold text-base leading-none">Загрузка из AviaBit</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-normal mt-0.5">
+                Прямой парсер суточного плана авиакомпаний
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Quick Presets */}
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Быстрый выбор:</span>
-          <button
-            type="button"
-            onClick={setPresetToday}
-            className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 font-semibold transition-colors"
-          >
-            Сутки сегодня (08:00-14:00)
-          </button>
-          <button
-            type="button"
-            onClick={setPresetTomorrow}
-            className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 font-semibold transition-colors"
-          >
-            Сутки завтра (08:00-14:00)
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleFetch} className="space-y-3.5 text-xs">
+        {/* Form Body */}
+        <form onSubmit={handleFetch} className="space-y-4">
           
-          {/* Дата и Время начала (по умолчанию 08:00) */}
-          <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700/80">
-            <div>
-              <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-sky-600" /> Дата начала
-              </label>
-              <input
-                type="text"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                placeholder="25.08.2026"
-                className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono font-bold text-sm text-slate-900 dark:text-white focus:border-sky-500 focus:outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-amber-600" /> Время начала (МСК)
-              </label>
-              <input
-                type="text"
-                value={timeFrom}
-                onChange={(e) => setTimeFrom(formatValidTime(e.target.value))}
-                placeholder="08:00"
-                className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono font-bold text-sm text-amber-600 dark:text-amber-300 text-center focus:border-amber-500 focus:outline-none"
-                required
-              />
+          {/* Пресеты дат */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 font-medium">Быстрый выбор:</span>
+            <button
+              type="button"
+              onClick={setPresetToday}
+              className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-sky-950/50 hover:text-sky-600 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
+            >
+              Смена Сегодня (08:00 - 14:00)
+            </button>
+            <button
+              type="button"
+              onClick={setPresetTomorrow}
+              className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-sky-950/50 hover:text-sky-600 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
+            >
+              Смена Завтра
+            </button>
+          </div>
+
+          {/* Дата и время начала */}
+          <div className="bg-slate-50 dark:bg-slate-850/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-sky-500" />
+              <span>Начало периода (по Москве):</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-0.5">Дата (ДД.ММ.ГГГГ)</span>
+                <input
+                  type="text"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(formatValidDateInterval(e.target.value))}
+                  placeholder="25.08.2026"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  required
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-0.5">Время (ЧЧ:ММ)</span>
+                <input
+                  type="text"
+                  value={timeFrom}
+                  onChange={(e) => setTimeFrom(formatValidTime(e.target.value))}
+                  placeholder="08:00"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  required
+                />
+              </div>
             </div>
           </div>
 
-          {/* Дата и Время окончания (по умолчанию 14:00) */}
-          <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700/80">
-            <div>
-              <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-sky-600" /> Дата окончания
-              </label>
-              <input
-                type="text"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                placeholder="26.08.2026"
-                className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono font-bold text-sm text-slate-900 dark:text-white focus:border-sky-500 focus:outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-amber-600" /> Время окончания (МСК)
-              </label>
-              <input
-                type="text"
-                value={timeTo}
-                onChange={(e) => setTimeTo(formatValidTime(e.target.value))}
-                placeholder="14:00"
-                className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono font-bold text-sm text-amber-600 dark:text-amber-300 text-center focus:border-amber-500 focus:outline-none"
-                required
-              />
+          {/* Дата и время окончания */}
+          <div className="bg-slate-50 dark:bg-slate-850/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-sky-500" />
+              <span>Окончание периода (по Москве):</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-0.5">Дата (ДД.ММ.ГГГГ)</span>
+                <input
+                  type="text"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(formatValidDateInterval(e.target.value))}
+                  placeholder="26.08.2026"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  required
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-0.5">Время (ЧЧ:ММ)</span>
+                <input
+                  type="text"
+                  value={timeTo}
+                  onChange={(e) => setTimeTo(formatValidTime(e.target.value))}
+                  placeholder="14:00"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  required
+                />
+              </div>
             </div>
           </div>
 
           {/* Выбор Авиакомпании */}
           <div>
-            <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
-              Авиакомпания
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <Plane className="w-3.5 h-3.5 text-sky-500" />
+              <span>Авиакомпания:</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -260,6 +250,20 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded })
                 Только Икар
               </button>
             </div>
+          </div>
+
+          {/* Опция Smart Merge */}
+          <div className="flex items-center gap-2 p-2.5 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/80 rounded-xl">
+            <input
+              type="checkbox"
+              id="smartMergeAviaBit"
+              checked={useSmartMerge}
+              onChange={(e) => setUseSmartMerge(e.target.checked)}
+              className="w-4 h-4 text-sky-600 rounded border-slate-300 focus:ring-sky-500 cursor-pointer shrink-0"
+            />
+            <label htmlFor="smartMergeAviaBit" className="text-xs text-slate-800 dark:text-slate-200 font-bold cursor-pointer leading-tight">
+              Умное слияние с сохранением введенных весов, чекбоксов и заметок переходящих рейсов
+            </label>
           </div>
 
           {/* Сообщения об ошибке / успехе */}

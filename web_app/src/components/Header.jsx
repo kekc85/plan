@@ -13,7 +13,11 @@ import {
   Clock,
   Globe,
   Zap,
-  FileSpreadsheet
+  User,
+  Shield,
+  ArrowRightLeft,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 import { formatValidDateInterval } from '../utils/validators';
 
@@ -29,7 +33,12 @@ export default function Header({
   setSearchQuery,
   isDark,
   setIsDark,
-  lastSaved
+  lastSaved,
+  currentUser,
+  onOpenLoginModal,
+  onOpenAdminModal,
+  onOpenHandoverModal,
+  onLogout
 }) {
   const [utcTime, setUtcTime] = useState('');
   const [mskTime, setMskTime] = useState('');
@@ -66,21 +75,18 @@ export default function Header({
         });
         setMskTime(mskTimeFormatter.format(now));
       } catch (e) {
-        const mskDate = new Date(now.getTime() + 3 * 3600 * 1000);
-        const pad = (n) => String(n).padStart(2, '0');
-        setCurrentDateStr(`${pad(mskDate.getUTCDate())}.${pad(mskDate.getUTCMonth() + 1)}.${mskDate.getUTCFullYear()}`);
-        setMskTime(`${pad(mskDate.getUTCHours())}:${pad(mskDate.getUTCMinutes())}:${pad(mskDate.getUTCSeconds())}`);
+        setMskTime(now.toLocaleTimeString('ru-RU'));
       }
     };
 
     updateClocks();
-    const timer = setInterval(updateClocks, 1000);
-    return () => clearInterval(timer);
+    const interval = setInterval(updateClocks, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleDateChange = (e) => {
-    const val = e.target.value;
-    const formatted = formatValidDateInterval(val);
+    const rawVal = e.target.value;
+    const formatted = formatValidDateInterval(rawVal);
     setShiftInfo(prev => ({
       ...prev,
       date_interval: formatted,
@@ -100,33 +106,33 @@ export default function Header({
     <header className="bg-white/95 dark:bg-slate-950/95 border-b border-slate-200 dark:border-slate-800 backdrop-blur-md sticky top-0 z-30 px-2.5 sm:px-4 lg:px-6 py-2 no-print shadow-sm">
       <div className="max-w-[1920px] mx-auto flex flex-col gap-2.5">
         
-        {/* Row 1: Brand + Clocks + Quick Actions */}
+        {/* Row 1: Brand + Clocks + User Profile + Quick Toggles */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           
           {/* Бренд */}
           <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 shadow-sm shadow-sky-500/10">
-              <Plane className="w-4 h-4 sm:w-5 sm:h-5 rotate-45" />
+            <div className="bg-sky-600 p-1.5 rounded-xl text-white shadow-md shadow-sky-500/20 flex items-center justify-center">
+              <Plane className="w-5 h-5 rotate-45" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
-                  СУТОЧНЫЙ ПЛАН
-                  <span className="text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
-                    ЦЕНТРОВКА
-                  </span>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-extrabold tracking-tight text-slate-950 dark:text-white leading-none">
+                  AEROPLAN W&B
                 </h1>
+                <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 bg-sky-500/10 text-sky-700 dark:text-sky-400 rounded-md border border-sky-500/20">
+                  Центровка
+                </span>
               </div>
-              <p className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 leading-none mt-0.5 font-medium hidden xs:block">
-                Группа центровки и загрузки ВС
+              <p className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold leading-tight">
+                Электронный суточный план
               </p>
             </div>
           </div>
 
-          {/* ТЕКУЩЕЕ ЧИСЛО КРУПНО, ЧАСЫ UTC И МСК */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            {/* ТЕКУЩЕЕ ЧИСЛО КРУПНО */}
-            <div className="flex items-center gap-1.5 bg-gradient-to-r from-sky-50 to-blue-50 dark:from-slate-900 dark:to-slate-850 border border-sky-300 dark:border-sky-500/40 rounded-xl px-2 sm:px-3 py-1 shadow-sm">
+          {/* Часы и Дата */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* ТЕКУЩЕЕ ЧИСЛО (МСК) */}
+            <div className="flex items-center gap-1 bg-sky-50/90 dark:bg-slate-900/90 border border-sky-300 dark:border-sky-500/40 rounded-lg px-2 py-1 shadow-sm">
               <Calendar className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
               <div className="flex flex-col">
                 <span className="text-[8px] sm:text-[9px] uppercase font-extrabold text-sky-800 dark:text-sky-400 tracking-wider leading-none">ЧИСЛО (МСК)</span>
@@ -159,8 +165,66 @@ export default function Header({
             </div>
           </div>
 
-          {/* Quick icon toggles */}
-          <div className="flex items-center gap-1">
+          {/* User profile & Action toggles */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {currentUser ? (
+              <div className="flex items-center gap-1.5">
+                {/* Бейдж пользователя */}
+                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-2.5 py-1 text-xs">
+                  <div className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold text-[10px]">
+                    {currentUser.full_name?.charAt(0) || '👤'}
+                  </div>
+                  <div className="flex flex-col leading-none">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                      {currentUser.full_name || currentUser.username}
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-400">
+                      {currentUser.role === 'admin' ? 'Администратор' : 'Диспетчер'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Кнопка Админ панели (для роли admin) */}
+                {currentUser.role === 'admin' && (
+                  <button
+                    onClick={onOpenAdminModal}
+                    className="flex items-center gap-1 bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-purple-300 dark:border-purple-800 shadow-sm transition-all"
+                    title="Управление учетными записями диспетчеров"
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Учётные записи</span>
+                  </button>
+                )}
+
+                {/* Кнопка Передать смену */}
+                <button
+                  onClick={onOpenHandoverModal}
+                  className="flex items-center gap-1 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-indigo-300 dark:border-indigo-800 shadow-sm transition-all"
+                  title="Зафиксировать передачу дежурства по смене"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Сдать смену</span>
+                </button>
+
+                {/* Кнопка Выход */}
+                <button
+                  onClick={onLogout}
+                  className="p-1.5 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  title="Выйти из системы"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onOpenLoginModal}
+                className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-extrabold px-3 py-1.5 rounded-xl shadow-sm transition-all"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Войти</span>
+              </button>
+            )}
+
             {/* Печать А4 */}
             <button
               onClick={() => window.print()}
@@ -291,4 +355,3 @@ export default function Header({
     </header>
   );
 }
-

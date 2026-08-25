@@ -5,11 +5,22 @@ import SummaryStats from './components/SummaryStats';
 import ShiftTable from './components/ShiftTable';
 import NewFlightModal from './components/NewFlightModal';
 import AviaBitFetchModal from './components/AviaBitFetchModal';
+import LoginModal from './components/LoginModal';
+import AdminModal from './components/AdminModal';
+import HandoverModal from './components/HandoverModal';
 import { INITIAL_FLIGHTS } from './utils/mockData';
 import { exportShiftToExcel } from './utils/excelExport';
 import { parseExcelToFlights } from './utils/excelImport';
 import { playReleaseAlertSound, initAudioUnlock } from './utils/audioAlert';
 import { sortFlightsChronologically, isFlightReleaseOverdue } from './utils/validators';
+import { 
+  getStoredUser, 
+  authGetMe, 
+  authLogout, 
+  fetchCurrentShift, 
+  saveShift, 
+  smartMergeSchedules 
+} from './utils/api';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Bell, CheckCircle2, X, Volume2 } from 'lucide-react';
 
@@ -26,6 +37,11 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAviaBitModalOpen, setIsAviaBitModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
+
+  const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [lastSaved, setLastSaved] = useState('');
 
   // Notifications for flights ready to be released
@@ -74,6 +90,50 @@ export default function App() {
     return INITIAL_FLIGHTS;
   });
 
+  // Автозагрузка с сервера SQLite при старте
+  useEffect(() => {
+    fetchCurrentShift()
+      .then((data) => {
+        if (data) {
+          if (data.flights && data.flights.length > 0) {
+            setFlights(data.flights);
+          }
+          if (data.shiftInfo) {
+            setShiftInfo(prev => ({
+              ...prev,
+              ...data.shiftInfo
+            }));
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Initial server sync note:', err.message);
+      });
+  }, []);
+
+  // Проверка сессии пользователя и слушатель события истечения сессии
+  useEffect(() => {
+    if (currentUser) {
+      authGetMe()
+        .then((res) => {
+          if (res && res.user) {
+            setCurrentUser(res.user);
+          }
+        })
+        .catch(() => {
+          authLogout();
+          setCurrentUser(null);
+        });
+    }
+
+    const handleAuthExpired = () => {
+      setCurrentUser(null);
+      setIsLoginModalOpen(true);
+    };
+    window.addEventListener('aeroplan_auth_expired', handleAuthExpired);
+    return () => window.removeEventListener('aeroplan_auth_expired', handleAuthExpired);
+  }, []);
+
   // Toggle dark class on root document
   useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY}_theme`, isDark ? 'dark' : 'light');
@@ -86,215 +146,268 @@ export default function App() {
     }
   }, [isDark]);
 
-  // Auto-save to LocalStorage on every change
+  // Auto-save to LocalStorage AND Database API (debounced)
   useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY}_flights`, JSON.stringify(flights));
     localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(shiftInfo));
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
     setLastSaved(timeStr);
+
+    const timer = setTimeout(() => {
+      saveShift(shiftInfo, flights).catch(() => {});
+    }, 1200);
+
+    return () => clearTimeout(timer);
   }, [flights, shiftInfo]);
 
   const initialSuppressionDoneRef = React.useRef(false);
 
   // При первой загрузке страницы: подавляем всплывающие окна для рейсов, чье время УЖЕ прошло в прошлом
   useEffect(() => {
-    if (!initialSuppressionDoneRef.current && flights && flights.length > 0) {
-      const pastAlerts = {};
-      for (const flight of flights) {
-        if (isFlightReleaseOverdue(flight)) {
-          const alertKey = `${flight.id}_${flight.release_time || ''}`;
-          pastAlerts[alertKey] = true;
-          playedAlertsRef.current[alertKey] = true;
-        }
+    if (initialSuppressionDoneRef.current || flights.length === 0) return;
+
+    const initialDismissed = {};
+    flights.forEach((flight) => {
+      if (isFlightReleaseOverdue(flight)) {
+        initialDismissed[flight.id] = true;
+        playedAlertsRef.current[flight.id] = true;
       }
-      setDismissedAlerts(prev => ({ ...pastAlerts, ...prev }));
-      initialSuppressionDoneRef.current = true;
-    }
+    });
+
+    setDismissedAlerts((prev) => ({ ...prev, ...initialDismissed }));
+    initialSuppressionDoneRef.current = true;
   }, [flights]);
 
-  // Проверка наступления времени выпуска рейсов (в реальном времени)
+  // Таймер проверки рейсов на выпуск (-40 минут)
   useEffect(() => {
-    const checkReleaseAlerts = () => {
+    const checkAlerts = () => {
       const now = new Date();
-      
-      // 1. Локальное время браузера
-      const localTotal = now.getHours() * 60 + now.getMinutes();
+      const currentHours = now.getHours();
+      const currentMins = now.getMinutes();
+      const currentTimeVal = currentHours * 60 + currentMins;
 
-      // 2. Московское время (МСК)
-      let mskTotal = localTotal;
-      try {
-        const mskDateStr = now.toLocaleString("en-US", { timeZone: "Europe/Moscow" });
-        const mskDate = new Date(mskDateStr);
-        mskTotal = mskDate.getHours() * 60 + mskDate.getMinutes();
-      } catch (e) {}
-
-      for (const flight of flights) {
-        // Пропускаем уже выпущенные или закрытые рейсы
-        if (flight.status === 'released' || flight.status === 'closed' || flight.szv_sent || flight.ldm_sent) {
+      for (const f of flights) {
+        if (f.status === 'released' || f.status === 'closed' || f.szv_sent || f.ldm_sent) {
           continue;
         }
 
-        const relTime = flight.release_time || '';
-        if (!relTime || !relTime.includes(':')) continue;
+        if (dismissedAlerts[f.id]) {
+          continue;
+        }
 
-        const parts = relTime.split(':').map(p => parseInt(p.trim(), 10));
-        if (isNaN(parts[0]) || isNaN(parts[1])) continue;
+        if (!f.release_time || !f.release_time.includes(':')) {
+          continue;
+        }
 
-        const releaseTotal = parts[0] * 60 + parts[1];
+        const [rH, rM] = f.release_time.split(':').map(Number);
+        const releaseTimeVal = rH * 60 + rM;
 
-        // Разница в минутах
-        const diffMsk = mskTotal - releaseTotal;
-        const diffLocal = localTotal - releaseTotal;
-
-        // Всплывающее окно и звук активируются только в момент наступления времени выпуска (окно до 2 минут)
-        const isDueNow = (diffMsk >= 0 && diffMsk <= 2) || (diffLocal >= 0 && diffLocal <= 2);
-        const alertKey = `${flight.id}_${relTime}`;
-
-        if (isDueNow && !dismissedAlerts[alertKey] && !playedAlertsRef.current[alertKey]) {
-          setActiveAlert(flight);
-          playedAlertsRef.current[alertKey] = true;
-          playReleaseAlertSound();
+        if (currentTimeVal >= releaseTimeVal && currentTimeVal <= releaseTimeVal + 40) {
+          if (!playedAlertsRef.current[f.id]) {
+            playedAlertsRef.current[f.id] = true;
+            playReleaseAlertSound();
+          }
+          setActiveAlert(f);
           break;
         }
       }
     };
 
-    checkReleaseAlerts();
-    const interval = setInterval(checkReleaseAlerts, 1000);
+    checkAlerts();
+    const interval = setInterval(checkAlerts, 10000);
     return () => clearInterval(interval);
   }, [flights, dismissedAlerts]);
 
-  // Быстрый выпуск рейса из всплывающего окна
-  const handleQuickRelease = (flightId) => {
-    setFlights(prev => prev.map(f => {
-      if (f.id === flightId) {
-        return {
-          ...f,
-          status: 'released',
-          szv_sent: true,
-          lir_sent: true
-        };
-      }
-      return f;
-    }));
-    setActiveAlert(null);
-  };
-
+  // Закрыть всплывающее оповещение
   const handleDismissAlert = (flight) => {
     if (!flight) return;
-    const alertKey = `${flight.id}_${flight.release_time}`;
-    setDismissedAlerts(prev => ({ ...prev, [alertKey]: true }));
+    setDismissedAlerts(prev => ({ ...prev, [flight.id]: true }));
     setActiveAlert(null);
   };
 
-  // Обработка данных, полученных напрямую из AviaBit
-  const handleAviaBitScheduleLoaded = (fetchedFlights, shiftInterval) => {
-    // Для всех рейсов, чье время выпуска уже в прошлом, подавляем всплывающие окна
-    const pastAlerts = {};
-    for (const flight of fetchedFlights) {
-      if (isFlightReleaseOverdue(flight)) {
-        const alertKey = `${flight.id}_${flight.release_time || ''}`;
-        pastAlerts[alertKey] = true;
-        playedAlertsRef.current[alertKey] = true;
-      }
-    }
-    setDismissedAlerts(prev => ({ ...pastAlerts, ...prev }));
-    setFlights(fetchedFlights);
-    if (shiftInterval) {
-      setShiftInfo(prev => ({
-        ...prev,
-        date_interval: shiftInterval,
-        date: shiftInterval
-      }));
-    }
-  };
-
-  // Обработка импорта файла Excel
-  const handleImportExcelFile = async (file) => {
-    try {
-      const importedFlights = await parseExcelToFlights(file);
-      if (!importedFlights || importedFlights.length === 0) {
-        alert('В выбранном файле Excel не найдено подходящих строк рейсов.');
-        return;
-      }
-      const pastAlerts = {};
-      for (const flight of importedFlights) {
-        if (isFlightReleaseOverdue(flight)) {
-          const alertKey = `${flight.id}_${flight.release_time || ''}`;
-          pastAlerts[alertKey] = true;
-          playedAlertsRef.current[alertKey] = true;
+  // Быстрый выпуск рейса из всплывающего окна
+  const handleQuickRelease = (flightId) => {
+    setFlights(prev =>
+      prev.map(f => {
+        if (f.id === flightId) {
+          return {
+            ...f,
+            szv_sent: true,
+            status: 'released'
+          };
         }
-      }
-      setDismissedAlerts(prev => ({ ...pastAlerts, ...prev }));
-      setFlights(importedFlights);
-      alert(`Успешно импортировано ${importedFlights.length} рейсов из файла Excel!`);
-    } catch (err) {
-      console.error(err);
-      alert(`Ошибка чтения Excel файла: ${err.message}`);
-    }
+        return f;
+      })
+    );
+    setDismissedAlerts(prev => ({ ...prev, [flightId]: true }));
+    setActiveAlert(null);
   };
 
-  // Reorder via Drag-and-Drop
+  // Drag and Drop: перестановка строк
   const handleReorderFlights = (activeId, overId) => {
     setFlights((items) => {
-      const oldIndex = items.findIndex(item => item.id === activeId);
-      const newIndex = items.findIndex(item => item.id === overId);
-      return arrayMove(items, oldIndex, newIndex);
+      const oldIndex = items.findIndex((item) => item.id === activeId);
+      const newIndex = items.findIndex((item) => item.id === overId);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        return arrayMove(items, oldIndex, newIndex);
+      }
+      return items;
     });
   };
 
-  // Move up/down by arrow buttons
+  // Перемещение вверх стрелочкой
   const handleMoveUp = (index) => {
-    if (index === 0) return;
+    if (index <= 0) return;
     setFlights((items) => arrayMove(items, index, index - 1));
   };
 
+  // Перемещение вниз стрелочкой
   const handleMoveDown = (index) => {
     if (index >= flights.length - 1) return;
     setFlights((items) => arrayMove(items, index, index + 1));
   };
 
-  // Update a single flight field with optional auto-sort
-  const handleUpdateFlight = (id, updatedFields, shouldSort = false) => {
-    setFlights(prev => {
-      const updated = prev.map(f => (f.id === id ? { ...f, ...updatedFields } : f));
-      if (shouldSort) {
-        return sortFlightsChronologically(updated);
-      }
-      return updated;
-    });
+  // Обновление отдельного поля рейса
+  const handleUpdateFlight = (id, updatedFields) => {
+    setFlights(prev =>
+      prev.map(f => {
+        if (f.id === id) {
+          const merged = { ...f, ...updatedFields };
+
+          const isOrenburg = (merged.route_airports || '').toUpperCase().includes('REN') ||
+                             (merged.route_city || '').toUpperCase().includes('ОРЕНБУРГ');
+
+          if (updatedFields.astra_times_sent !== undefined || updatedFields.ldm_sent !== undefined || updatedFields.szv_sent !== undefined || updatedFields.lir_sent !== undefined) {
+            if (isOrenburg) {
+              if (merged.astra_times_sent) {
+                merged.status = 'closed';
+              } else if (merged.ldm_sent) {
+                merged.status = 'ldm_sent';
+              } else if (merged.szv_sent) {
+                merged.status = 'released';
+              } else if (merged.lir_sent) {
+                merged.status = 'prepared';
+              } else {
+                merged.status = 'pending';
+              }
+            } else {
+              if (merged.ldm_sent) {
+                merged.status = 'closed';
+              } else if (merged.szv_sent) {
+                merged.status = 'released';
+              } else if (merged.lir_sent) {
+                merged.status = 'prepared';
+              } else {
+                merged.status = 'pending';
+              }
+            }
+          }
+
+          return merged;
+        }
+        return f;
+      })
+    );
   };
 
-  // Add new flight with chronological auto-sorting
-  const handleAddFlight = (newFlight) => {
-    const flightWithGalley = {
-      galley: 'D',
-      ...newFlight
-    };
-    setFlights(prev => sortFlightsChronologically([flightWithGalley, ...prev]));
-  };
-
-  // Delete flight
+  // Удаление рейса
   const handleDeleteFlight = (id) => {
-    const flight = flights.find(f => f.id === id);
-    const flightName = flight ? flight.flight : 'рейс';
-    if (window.confirm(`Удалить ${flightName} из журнала смены?`)) {
-      setFlights(prev => prev.filter(f => f.id !== id));
+    setFlights(prev => prev.filter(f => f.id !== id));
+  };
+
+  // Добавление нового рейса
+  const handleAddFlight = (newFlightData) => {
+    const newFlight = {
+      id: `flight_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      ...newFlightData
+    };
+    setFlights(prev => sortFlightsChronologically([...prev, newFlight]));
+  };
+
+  // Загрузка расписания из AviaBit
+  const handleAviaBitScheduleLoaded = (loadedFlights, newShiftInfo) => {
+    setFlights(loadedFlights);
+    if (newShiftInfo) {
+      setShiftInfo(prev => ({
+        ...prev,
+        ...newShiftInfo
+      }));
     }
   };
 
-  // Reset shift
-  const handleResetShift = () => {
-    if (window.confirm('Сбросить журнал смены к исходному демонстрационному расписанию?')) {
-      setFlights(INITIAL_FLIGHTS);
-      setDismissedAlerts({});
+  // Импорт из файла Excel
+  const handleImportExcelFile = async (file) => {
+    try {
+      const parsedData = await parseExcelToFlights(file);
+      if (parsedData.flights && parsedData.flights.length > 0) {
+        // Умное слияние с текущими данными
+        let finalFlights = parsedData.flights;
+        if (flights && flights.length > 0) {
+          try {
+            const mergeRes = await smartMergeSchedules(flights, parsedData.flights);
+            if (mergeRes && mergeRes.flights) {
+              finalFlights = mergeRes.flights;
+            }
+          } catch {
+            finalFlights = parsedData.flights;
+          }
+        }
+
+        setFlights(finalFlights);
+        if (parsedData.shiftInfo?.date_interval) {
+          setShiftInfo(prev => ({
+            ...prev,
+            date_interval: parsedData.shiftInfo.date_interval,
+            date: parsedData.shiftInfo.date_interval
+          }));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Ошибка при чтении Excel файла: ' + err.message);
     }
   };
 
-  // Export to Excel
+  // Экспорт в файл Excel
   const handleExportExcel = () => {
     exportShiftToExcel(flights, shiftInfo);
+  };
+
+  // Сброс журнала смены
+  const handleResetShift = () => {
+    if (window.confirm('Сбросить весь суточный план к началу? Все несохраненные данные будут удалены.')) {
+      setFlights([]);
+      localStorage.removeItem(`${STORAGE_KEY}_flights`);
+    }
+  };
+
+  // Передача смены
+  const handleHandoverSuccess = (newDispatcherName, archiveClosed) => {
+    setShiftInfo(prev => ({
+      ...prev,
+      dispatcher: newDispatcherName
+    }));
+    if (archiveClosed) {
+      setFlights(prev => prev.filter(f => f.status !== 'closed'));
+    }
+  };
+
+  // Вход пользователя
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    if (user.full_name) {
+      setShiftInfo(prev => ({
+        ...prev,
+        dispatcher: user.full_name
+      }));
+    }
+  };
+
+  // Выход пользователя
+  const handleLogout = () => {
+    authLogout();
+    setCurrentUser(null);
   };
 
   // Filter flights by search query
@@ -327,6 +440,11 @@ export default function App() {
         isDark={isDark}
         setIsDark={setIsDark}
         lastSaved={lastSaved}
+        currentUser={currentUser}
+        onOpenLoginModal={() => setIsLoginModalOpen(true)}
+        onOpenAdminModal={() => setIsAdminModalOpen(true)}
+        onOpenHandoverModal={() => setIsHandoverModalOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}
@@ -338,7 +456,7 @@ export default function App() {
             Суточный план Диспетчера группы центровки
           </h1>
           <p className="text-sm">
-            Смена: <strong>{shiftInfo.date_interval || shiftInfo.date} (09:00 - 09:00)</strong> | Диспетчер: <strong>{shiftInfo.dispatcher || '—'}</strong>
+            Смена: <strong>{shiftInfo.date_interval || shiftInfo.date} (09:00 - 09:00)</strong> | Диспетчер: <strong>{shiftInfo.dispatcher || currentUser?.full_name || '—'}</strong>
           </p>
         </div>
 
@@ -414,11 +532,36 @@ export default function App() {
         </div>
       )}
 
+      {/* Модальное окно авторизации */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
+
+      {/* Панель администратора (управление учетными записями) */}
+      <AdminModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        currentUser={currentUser}
+      />
+
+      {/* Модальное окно передачи смены */}
+      <HandoverModal
+        isOpen={isHandoverModalOpen}
+        onClose={() => setIsHandoverModalOpen(false)}
+        flights={flights}
+        shiftInfo={shiftInfo}
+        currentUser={currentUser}
+        onHandoverSuccess={handleHandoverSuccess}
+      />
+
       {/* Модальное окно прямой загрузки из AviaBit */}
       <AviaBitFetchModal
         isOpen={isAviaBitModalOpen}
         onClose={() => setIsAviaBitModalOpen(false)}
         onScheduleLoaded={handleAviaBitScheduleLoaded}
+        currentFlights={flights}
       />
 
       {/* Add Flight Modal */}
