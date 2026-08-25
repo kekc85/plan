@@ -201,20 +201,15 @@ export function sortFlightsChronologically(flights, baseHour = 8) {
   });
 }
 
-// Определение, просрочено ли время выпуска рейса (действие не выполнено)
-export function isFlightReleaseOverdue(flight) {
-  if (!flight) return false;
-  // Если рейс уже выпущен или закрыт или отправлен СЗВ/LDM - не просрочен
-  if (flight.status === 'released' || flight.status === 'closed' || flight.szv_sent || flight.ldm_sent) {
-    return false;
-  }
+// Вычисление точной даты и времени выпуска ВС с учетом перехода через полночь (в часовом поясе МСК)
+export function getFlightReleaseDateTime(flight) {
+  if (!flight) return null;
   const relTime = flight.release_time || '';
-  if (!relTime || !relTime.includes(':')) return false;
+  const flTime = flight.time || '';
+  if (!relTime || !relTime.includes(':')) return null;
 
-  const parts = relTime.split(':').map(Number);
-  const rH = parts[0];
-  const rM = parts[1];
-  if (isNaN(rH) || isNaN(rM)) return false;
+  const [rH, rM] = relTime.split(':').map(Number);
+  if (isNaN(rH) || isNaN(rM)) return null;
 
   const now = new Date();
   let mskNow = now;
@@ -223,33 +218,73 @@ export function isFlightReleaseOverdue(flight) {
     mskNow = new Date(mskStr);
   } catch (e) {}
 
-  const currentDay = mskNow.getDate();
-  const currentMonth = mskNow.getMonth() + 1;
-  const currentTotalMins = mskNow.getHours() * 60 + mskNow.getMinutes();
+  const currentYear = mskNow.getFullYear();
+  let day = mskNow.getDate();
+  let month = mskNow.getMonth(); // 0-11
 
-  // Если у рейса указана дата (например 25.08)
   const dStr = flight.flight_date || flight.date || '';
   if (dStr && dStr.includes('.')) {
     const dParts = dStr.split('.').map(Number);
-    const fDay = dParts[0];
-    const fMonth = dParts[1];
-    if (!isNaN(fDay) && !isNaN(fMonth)) {
-      if (fMonth < currentMonth || (fMonth === currentMonth && fDay < currentDay)) {
-        return true; // Прошедшая дата
-      }
-      if (fMonth > currentMonth || (fMonth === currentMonth && fDay > currentDay)) {
-        return false; // Будущая дата
-      }
-      return currentTotalMins >= (rH * 60 + rM);
+    if (!isNaN(dParts[0]) && !isNaN(dParts[1])) {
+      day = dParts[0];
+      month = dParts[1] - 1;
     }
   }
 
-  // Если дата не указана (в рамках суточной смены 09:00 - 09:00, база 8:00)
-  const releaseMins = rH * 60 + rM;
-  const normNow = (currentTotalMins - 8 * 60 + 1440) % 1440;
-  const normRel = (releaseMins - 8 * 60 + 1440) % 1440;
+  // Если время вылета указано, и время выпуска больше времени вылета (например вылет 0:10, а выпуск 23:30),
+  // значит выпуск происходит накануне вечером (day - 1)!
+  let releaseDate = new Date(currentYear, month, day, rH, rM, 0, 0);
+  if (flTime && flTime.includes(':')) {
+    const [fH] = flTime.split(':').map(Number);
+    if (!isNaN(fH) && fH < rH) {
+      releaseDate.setDate(releaseDate.getDate() - 1);
+    }
+  }
 
-  return normNow >= normRel;
+  return releaseDate;
+}
+
+// Определение, наступило ли активное окно всплывающего оповещения о выпуске (от 0 до +40 минут от времени выпуска)
+export function isFlightInAlertWindow(flight) {
+  if (!flight) return false;
+  if (flight.status === 'released' || flight.status === 'closed' || flight.szv_sent || flight.ldm_sent) {
+    return false;
+  }
+  const relDt = getFlightReleaseDateTime(flight);
+  if (!relDt) return false;
+
+  const now = new Date();
+  let mskNow = now;
+  try {
+    const mskStr = now.toLocaleString("en-US", { timeZone: "Europe/Moscow" });
+    mskNow = new Date(mskStr);
+  } catch (e) {}
+
+  const diffMs = mskNow.getTime() - relDt.getTime();
+  const diffMins = diffMs / 60000;
+
+  // Оповещение активно ТОЛЬКО если наступило время выпуска (diffMins >= 0) и прошло не более 40 минут (diffMins <= 40)
+  return diffMins >= 0 && diffMins <= 40;
+}
+
+// Определение, просрочено ли время выпуска рейса (действие не выполнено)
+export function isFlightReleaseOverdue(flight) {
+  if (!flight) return false;
+  // Если рейс уже выпущен или закрыт или отправлен СЗВ/LDM - не просрочен
+  if (flight.status === 'released' || flight.status === 'closed' || flight.szv_sent || flight.ldm_sent) {
+    return false;
+  }
+  const relDt = getFlightReleaseDateTime(flight);
+  if (!relDt) return false;
+
+  const now = new Date();
+  let mskNow = now;
+  try {
+    const mskStr = now.toLocaleString("en-US", { timeZone: "Europe/Moscow" });
+    mskNow = new Date(mskStr);
+  } catch (e) {}
+
+  return mskNow.getTime() >= relDt.getTime();
 }
 
 // Проверка, вылетает ли рейс из Оренбурга (REN)

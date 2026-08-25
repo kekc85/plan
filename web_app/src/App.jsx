@@ -13,7 +13,7 @@ import { INITIAL_FLIGHTS } from './utils/mockData';
 import { exportShiftToExcel } from './utils/excelExport';
 import { parseExcelToFlights } from './utils/excelImport';
 import { playReleaseAlertSound, initAudioUnlock } from './utils/audioAlert';
-import { sortFlightsChronologically, isFlightReleaseOverdue } from './utils/validators';
+import { sortFlightsChronologically, isFlightReleaseOverdue, isFlightInAlertWindow } from './utils/validators';
 import { 
   getStoredUser, 
   authGetMe, 
@@ -50,9 +50,15 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [lastSaved, setLastSaved] = useState('');
 
-  // Notifications for flights ready to be released
   const [activeAlert, setActiveAlert] = useState(null);
-  const [dismissedAlerts, setDismissedAlerts] = useState({});
+  const [dismissedAlerts, setDismissedAlerts] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(`${STORAGE_KEY}_dismissed_alerts`);
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
   const playedAlertsRef = React.useRef({});
 
   // Разблокировка Web Audio на первый клик пользователя
@@ -199,11 +205,6 @@ export default function App() {
   // Таймер проверки рейсов на выпуск (-40 минут)
   useEffect(() => {
     const checkAlerts = () => {
-      const now = new Date();
-      const currentHours = now.getHours();
-      const currentMins = now.getMinutes();
-      const currentTimeVal = currentHours * 60 + currentMins;
-
       for (const f of flights) {
         if (f.status === 'released' || f.status === 'closed' || f.szv_sent || f.ldm_sent) {
           continue;
@@ -213,14 +214,7 @@ export default function App() {
           continue;
         }
 
-        if (!f.release_time || !f.release_time.includes(':')) {
-          continue;
-        }
-
-        const [rH, rM] = f.release_time.split(':').map(Number);
-        const releaseTimeVal = rH * 60 + rM;
-
-        if (currentTimeVal >= releaseTimeVal && currentTimeVal <= releaseTimeVal + 40) {
+        if (isFlightInAlertWindow(f)) {
           if (!playedAlertsRef.current[f.id]) {
             playedAlertsRef.current[f.id] = true;
             playReleaseAlertSound();
@@ -239,7 +233,13 @@ export default function App() {
   // Закрыть всплывающее оповещение
   const handleDismissAlert = (flight) => {
     if (!flight) return;
-    setDismissedAlerts(prev => ({ ...prev, [flight.id]: true }));
+    setDismissedAlerts(prev => {
+      const updated = { ...prev, [flight.id]: true };
+      try {
+        sessionStorage.setItem(`${STORAGE_KEY}_dismissed_alerts`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
     setActiveAlert(null);
   };
 
@@ -257,7 +257,13 @@ export default function App() {
         return f;
       })
     );
-    setDismissedAlerts(prev => ({ ...prev, [flightId]: true }));
+    setDismissedAlerts(prev => {
+      const updated = { ...prev, [flightId]: true };
+      try {
+        sessionStorage.setItem(`${STORAGE_KEY}_dismissed_alerts`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
     setActiveAlert(null);
   };
 
