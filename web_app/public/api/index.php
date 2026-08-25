@@ -268,6 +268,17 @@ if ($route === '/auth/me') {
 }
 
 // ----------------------------------------------------
+// ЭНДПОИНТ: /users/active (Список активных пользователей)
+// ----------------------------------------------------
+if ($route === '/users/active') {
+    getAuthUser();
+    $db = getDb();
+    $stmt = $db->query("SELECT id, username, full_name, role FROM plan_users WHERE is_active = 1 ORDER BY full_name ASC, username ASC");
+    echo json_encode(['users' => $stmt->fetchAll()]);
+    exit;
+}
+
+// ----------------------------------------------------
 // ЭНДПОИНТ: /shift/current
 // ----------------------------------------------------
 if ($route === '/shift/current') {

@@ -249,6 +249,17 @@ def get_me(current_user: dict = Depends(get_current_user)):
     return {"user": current_user}
 
 
+@app.get("/api/users/active")
+def get_active_users(current_user: dict = Depends(get_current_user)):
+    """Возвращает список всех активных пользователей для выбора при передаче смены"""
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, full_name, role FROM plan_users WHERE is_active = 1 ORDER BY full_name ASC, username ASC;")
+    users = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return {"users": users}
+
+
 @app.post("/api/auth/change_password")
 def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
     """Смена собственного пароля пользователя"""

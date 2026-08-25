@@ -78,6 +78,10 @@ export async function authGetMe() {
   return request('/auth/me');
 }
 
+export async function getActiveUsers() {
+  return request('/users/active');
+}
+
 export async function authChangePassword(oldPassword, newPassword) {
   return request('/auth/change_password', {
     method: 'POST',
