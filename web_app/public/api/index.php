@@ -719,14 +719,21 @@ if ($route === '/fetch_schedule') {
     $diag = [];
     if ($airline === 'both' || $airline === 'nordwind') {
         $nw = fetchAviaBitSchedule('https://aviabit.nordwindairlines.ru', $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'nordwind', $diag);
-        if (!empty($nw)) $rawFlights = array_merge($rawFlights, $nw);
+        if (!empty($nw)) {
+            foreach ($nw as &$f) { $f['_airline'] = 'nordwind'; }
+            $rawFlights = array_merge($rawFlights, $nw);
+        }
     }
     if ($airline === 'both' || $airline === 'ikar') {
         $ik = fetchAviaBitSchedule('https://aviabit.ikar.aero', $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'ikar', $diag);
-        if (!empty($ik)) $rawFlights = array_merge($rawFlights, $ik);
+        if (!empty($ik)) {
+            foreach ($ik as &$f) { $f['_airline'] = 'ikar'; }
+            $rawFlights = array_merge($rawFlights, $ik);
+        }
     }
 
-    $processed = [];
+    // 1. Предварительная фильтрация кандидатов
+    $candidates = [];
     $seenKeys = [];
 
     foreach ($rawFlights as $idx => $fl) {
@@ -764,6 +771,76 @@ if ($route === '/fetch_schedule') {
         if (isset($seenKeys[$key])) continue;
         $seenKeys[$key] = true;
 
+        $fl['_clean_flight'] = $flClean;
+        $fl['_flight_date'] = $flightDate;
+        $fl['_time_str'] = $timeStr;
+        $candidates[] = $fl;
+    }
+
+    // 2. Параллельная загрузка оперативной информации (пассажиры, загрузка, экипаж)
+    $preliminaries = [];
+    if (!empty($candidates)) {
+        $mh = curl_multi_init();
+        $handles = [];
+        $defaultCookies = [
+            'nordwind' => 's%3ArghcgrAycdgvsI__Q2iZay-vUij_Yaze.uyVqX6K71%2FcuQ7tYDw%2BH91oWDKhclzgYq6w6HGSqvsM',
+            'ikar' => 's%3AS9kWveGtvxwmmq_YoZv0H6tOW0GW9a2O.MscjJmSqUjyniNClfqtbf61hqLGMwCfjXRuFNW6USUw'
+        ];
+
+        foreach ($candidates as $c) {
+            $pfId = $c['pfRecordId'] ?? null;
+            if (!$pfId) continue;
+            $airlineName = $c['_airline'] ?? 'nordwind';
+            $baseUrl = ($airlineName === 'ikar') ? 'https://aviabit.ikar.aero' : 'https://aviabit.nordwindairlines.ru';
+            $cookieVal = getAviaBitCookie($airlineName, $defaultCookies[$airlineName] ?? '');
+            $url = "$baseUrl/api/preliminary-crew-load?planFlightId=$pfId&eng=false";
+
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Origin: $baseUrl",
+                "Referer: $baseUrl/plan-flight",
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+                'Accept: application/json, text/plain, */*',
+                "Cookie: connect.sid=$cookieVal"
+            ]);
+            curl_multi_add_handle($mh, $ch);
+            $handles[$pfId] = $ch;
+        }
+
+        $running = null;
+        do {
+            curl_multi_exec($mh, $running);
+            curl_multi_select($mh);
+        } while ($running > 0);
+
+        foreach ($handles as $pfId => $ch) {
+            $resp = curl_multi_getcontent($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            if ($code === 200 && $resp) {
+                $json = json_decode($resp, true);
+                if (is_array($json)) {
+                    $preliminaries[$pfId] = $json;
+                }
+            }
+            curl_multi_remove_handle($mh, $ch);
+            curl_close($ch);
+        }
+        curl_multi_close($mh);
+    }
+
+    // 3. Формирование итогового списка рейсов
+    $processed = [];
+    foreach ($candidates as $idx => $fl) {
+        $flClean = $fl['_clean_flight'];
+        $flightDate = $fl['_flight_date'];
+        $timeStr = $fl['_time_str'];
+        $dep = strtoupper(trim($fl['airPortTOCode'] ?? ''));
+        $arr = strtoupper(trim($fl['airPortLACode'] ?? ''));
+        $pfId = $fl['pfRecordId'] ?? null;
+
         $tailRaw = trim($fl['pln'] ?? '');
         $tail = str_replace(['RA-', 'RA', '-'], '', $tailRaw);
         $layout = trim($fl['prePlaneComponovkaInfo'] ?? '');
@@ -778,7 +855,81 @@ if ($route === '/fetch_schedule') {
             $relTime = sprintf('%02d:%02d', $relH, $relM);
         }
 
-        $cityName = $iataCities[$arr] ?? $arr;
+        $operData = $preliminaries[$pfId] ?? [];
+        $preliminaryList = $operData['preliminary'] ?? [];
+        $loadList = $operData['load'] ?? [];
+        $crewList = $operData['crew'] ?? [];
+
+        // Извлекаем количество пассажиров: Взрослые (ADT) + РБ (CHD), без младенцев РМ (Inf)
+        $paxRaw = '';
+        if (!empty($preliminaryList) && is_array($preliminaryList)) {
+            $leg0 = $preliminaryList[0] ?? [];
+            if (is_array($leg0)) {
+                $paxRaw = trim($leg0['prePassengerInfo'] ?? '');
+                if (empty($layout)) {
+                    $layout = trim($leg0['prePlaneComponovkaInfo'] ?? '');
+                }
+            }
+        }
+
+        $paxCount = '';
+        if (!empty($loadList) && is_array($loadList)) {
+            $ld0 = $loadList[0] ?? [];
+            if (is_array($ld0) && (isset($ld0['ADT']) || isset($ld0['CHD']))) {
+                $adt = (int)($ld0['ADT'] ?? 0);
+                $chd = (int)($ld0['CHD'] ?? 0);
+                $paxCount = (string)($adt + $chd);
+            }
+        }
+        if ($paxCount === '' && !empty($paxRaw)) {
+            $parts = explode('/', $paxRaw);
+            if (count($parts) >= 2) {
+                $adt = (int)trim($parts[0]);
+                $chd = (int)trim($parts[1]);
+                $paxCount = (string)($adt + $chd);
+            } elseif (count($parts) === 1 && is_numeric(trim($parts[0]))) {
+                $paxCount = (string)(int)trim($parts[0]);
+            } else {
+                $paxCount = trim($paxRaw);
+            }
+        }
+
+        // Условие для SVO: рейсы из SVO включаются только если пассажиров 0 (пустые)
+        if ($dep === 'SVO') {
+            $paxInt = is_numeric($paxCount) ? (int)$paxCount : 0;
+            if ($paxInt > 0) continue;
+        }
+
+        // Экипаж: Летный / Салон / ИТС / Пасс
+        $cockpit = 0; $cabin = 0; $its = 0; $paxCrew = 0;
+        if (!empty($crewList) && is_array($crewList)) {
+            foreach ($crewList as $cr) {
+                if (!empty($cr['isAirport'])) continue;
+                $ctype = $cr['crewType'] ?? -1;
+                if ($ctype === 0) $cockpit++;
+                elseif ($ctype === 1) $cabin++;
+                elseif ($ctype === 2) $its++;
+                elseif ($ctype === 4) $paxCrew++;
+            }
+        }
+        $crewStr = ($cockpit > 0 || $cabin > 0 || $its > 0 || $paxCrew > 0) ? "{$cockpit}/{$cabin}/{$its}/{$paxCrew}" : '';
+
+        // Город прилёта (назначения)
+        $cityName = $iataCities[$arr] ?? '';
+        if (empty($cityName) && !empty($preliminaryList) && is_array($preliminaryList) && count($preliminaryList) > 1) {
+            $leg1 = $preliminaryList[1] ?? [];
+            $rawName = trim($leg1['airportName'] ?? '');
+            if (strpos($rawName, '(') !== false) {
+                $rawName = trim(explode('(', $rawName)[0]);
+            }
+            if (!empty($rawName)) {
+                $cityName = $rawName;
+            }
+        }
+        if (empty($cityName)) {
+            $cityName = $arr;
+        }
+
         $airports = "{$dep}-{$arr}";
 
         $processed[] = [
@@ -791,8 +942,8 @@ if ($route === '/fetch_schedule') {
             'release_time' => $relTime,
             'ac_num' => $tail,
             'ac_config' => $layout,
-            'pax' => '',
-            'crew' => '',
+            'pax' => $paxCount,
+            'crew' => $crewStr,
             'fuel_block' => '',
             'fuel_trip' => '',
             'fuel_taxi' => '',

@@ -374,12 +374,19 @@ def parse_crew(crew_xml_str: str) -> tuple:
     return cockpit, cabin, its, pax
 
 
-def parse_pax_count(pax_str: str) -> str:
+def parse_pax_count(pax_str: str, load_list: list = None) -> str:
     """
     Парсинг количества пассажиров (PAX, NOTES).
     Берется сумма первых двух чисел (взрослые + ребенок большой РБ),
     третья цифра (ребенок маленький РМ / инфант без места) не учитывается.
     """
+    if load_list and isinstance(load_list, list) and len(load_list) > 0:
+        leg0 = load_list[0]
+        if isinstance(leg0, dict) and ("ADT" in leg0 or "CHD" in leg0):
+            adt = int(leg0.get("ADT") or 0)
+            chd = int(leg0.get("CHD") or 0)
+            return str(adt + chd)
+
     if not pax_str:
         return ""
     parts = str(pax_str).strip().split("/")
@@ -521,6 +528,7 @@ def process_flights(
 
         oper_data = preliminaries.get(pf_id, {})
         preliminary_list = oper_data.get("preliminary", [])
+        load_list = oper_data.get("load", [])
         if preliminary_list and isinstance(preliminary_list, list):
             leg0 = preliminary_list[0]
             if isinstance(leg0, dict):
@@ -529,7 +537,7 @@ def process_flights(
                 if not layout:
                     layout = (leg0.get("prePlaneComponovkaInfo") or "").strip()
 
-        pax_notes = parse_pax_count(pax_raw)
+        pax_notes = parse_pax_count(pax_raw, load_list)
 
         # Условие для SVO: рейсы с вылетом из SVO включаются ТОЛЬКО если пассажиров 0 (пустые/перегоночные)
         if dep == "SVO":
