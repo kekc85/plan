@@ -277,7 +277,7 @@ if ($route === '/auth/me') {
 if ($route === '/users/active') {
     getAuthUser();
     $db = getDb();
-    $stmt = $db->query("SELECT id, username, full_name, role FROM plan_users WHERE is_active = 1 ORDER BY full_name ASC, username ASC");
+    $stmt = $db->query("SELECT id, username, full_name, role FROM plan_users WHERE is_active = 1 AND LOWER(username) NOT IN ('dispatcher') ORDER BY full_name ASC, username ASC");
     echo json_encode(['users' => $stmt->fetchAll()]);
     exit;
 }

@@ -29,14 +29,24 @@ export default defineConfig({
     port: 5173,
     host: '127.0.0.1',
     proxy: {
-      '/plan/api': {
+      '/api/fetch_schedule': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/plan/api/fetch_schedule': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/plan/, ''),
       },
-      '/api': {
-        target: 'http://127.0.0.1:8000',
+      '/plan/api': {
+        target: 'https://boostandgo.ru',
         changeOrigin: true,
+        secure: true,
+      },
+      '/api': {
+        target: 'https://boostandgo.ru/plan',
+        changeOrigin: true,
+        secure: true,
       }
     }
   }

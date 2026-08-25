@@ -260,7 +260,7 @@ def get_active_users(current_user: dict = Depends(get_current_user)):
     """Возвращает список всех активных пользователей для выбора при передаче смены"""
     conn, engine = DatabaseConnection.get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, username, full_name, role FROM plan_users WHERE is_active = 1 ORDER BY full_name ASC, username ASC;")
+    cursor.execute("SELECT id, username, full_name, role FROM plan_users WHERE is_active = 1 AND LOWER(username) NOT IN ('dispatcher') ORDER BY full_name ASC, username ASC;")
     users = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return {"users": users}
