@@ -6,8 +6,12 @@
 // Базовый путь для API: локально '/api', на хостинге под подпутем window.location.pathname
 function getApiBaseUrl() {
   if (typeof window !== 'undefined') {
+    // В локальном режиме разработки всегда используем /api
+    if (window.location.port === '5173' || window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+      return '/api';
+    }
     const path = window.location.pathname;
-    if (path.includes('/plan/')) {
+    if (path.includes('/plan')) {
       return '/plan/api';
     }
   }
