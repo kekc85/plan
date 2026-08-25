@@ -102,7 +102,9 @@ IATA_CITIES = {
     "FRU": "Бишкек",
     "EVN": "Ереван",
     "GYD": "Баку",
-    "TBS": "Тбилиси"
+    "TBS": "Тбилиси",
+    "NJC": "Нижневартовск",
+    "OSW": "Орск"
 }
 DEPARTURE_CITIES = IATA_CITIES
 
