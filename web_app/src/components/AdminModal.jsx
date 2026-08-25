@@ -238,7 +238,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                     type="text"
                     value={newFullName}
                     onChange={(e) => setNewFullName(e.target.value)}
-                    placeholder="Например: Наталья Самарина"
+                    placeholder="Например: Иванов Иван Иванович"
                     className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500"
                     required
                   />
@@ -252,7 +252,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                     type="text"
                     value={newUsername}
                     onChange={(e) => setNewUsername(e.target.value)}
-                    placeholder="Например: samarina"
+                    placeholder="Например: ivanov"
                     className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500"
                     required
                   />

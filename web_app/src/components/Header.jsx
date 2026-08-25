@@ -276,15 +276,6 @@ export default function Header({
               </span>
             </div>
 
-            {/* Диспетчер */}
-            <input
-              type="text"
-              value={shiftInfo.dispatcher || ''}
-              onChange={(e) => setShiftInfo(prev => ({ ...prev, dispatcher: e.target.value }))}
-              placeholder="ФИО Диспетчера..."
-              className="bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none w-28 sm:w-36 placeholder:text-slate-400 font-medium shadow-sm grow sm:grow-0"
-            />
-
             {/* Поиск рейса */}
             <div className="relative flex items-center grow sm:grow-0">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
@@ -293,7 +284,7 @@ export default function Header({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Поиск рейса..."
-                className="bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none w-full sm:w-28 sm:focus:w-40 transition-all placeholder:text-slate-400 font-medium shadow-sm"
+                className="bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none w-full sm:w-36 sm:focus:w-48 transition-all placeholder:text-slate-400 font-medium shadow-sm"
               />
             </div>
           </div>
