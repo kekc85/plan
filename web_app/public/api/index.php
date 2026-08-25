@@ -529,7 +529,7 @@ if ($route === '/shift/handover') {
 // ----------------------------------------------------
 // ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ЗАПРОСА К AVIABIT С АВТОРИЗАЦИЕЙ
 // ----------------------------------------------------
-function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTsMs, $templateName = 'WBGarantiya') {
+function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTsMs, $templateName = 'WBGarantiya', &$diag = []) {
     $origin = rtrim($baseUrl, '/');
     $referer = $origin . '/plan-flight';
     $cookieFile = sys_get_temp_dir() . '/avb_sess_' . md5($origin . $username) . '.txt';
@@ -593,8 +593,12 @@ function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTs
         curl_setopt($ch, CURLOPT_TIMEOUT, 20);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_exec($ch);
+        $authRes = curl_exec($ch);
+        $authCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $authErr = curl_error($ch);
         curl_close($ch);
+
+        $diag[] = "$origin auth_code: $authCode, err: $authErr, resp: " . substr($authRes, 0, 120);
 
         // Получаем templateId
         $chT = curl_init("$origin/api/filter-template?code=1001");
@@ -627,7 +631,11 @@ function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTs
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     $schedRes = curl_exec($ch);
+    $schedCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $schedErr = curl_error($ch);
     curl_close($ch);
+
+    $diag[] = "$origin sched_code: $schedCode, err: $schedErr, len: " . strlen($schedRes);
 
     if ($schedRes) {
         $data = json_decode($schedRes, true);
@@ -695,12 +703,13 @@ if ($route === '/fetch_schedule') {
     $avbPass = 'SoLnCeVo1985';
 
     $rawFlights = [];
+    $diag = [];
     if ($airline === 'both' || $airline === 'nordwind') {
-        $nw = fetchAviaBitSchedule('https://aviabit.nordwindairlines.ru', $avbUser, $avbPass, $tsStartMs, $tsEndMs);
+        $nw = fetchAviaBitSchedule('https://aviabit.nordwindairlines.ru', $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'WBGarantiya', $diag);
         if (!empty($nw)) $rawFlights = array_merge($rawFlights, $nw);
     }
     if ($airline === 'both' || $airline === 'ikar') {
-        $ik = fetchAviaBitSchedule('https://aviabit.ikar.aero', $avbUser, $avbPass, $tsStartMs, $tsEndMs);
+        $ik = fetchAviaBitSchedule('https://aviabit.ikar.aero', $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'WBGarantiya', $diag);
         if (!empty($ik)) $rawFlights = array_merge($rawFlights, $ik);
     }
 
@@ -794,6 +803,7 @@ if ($route === '/fetch_schedule') {
         'success' => true,
         'count' => count($processed),
         'flights' => $processed,
+        'diag' => $diag,
         'interval_info' => "{$dateFrom} {$timeFrom} — {$dateTo} {$timeTo}"
     ]);
     exit;
