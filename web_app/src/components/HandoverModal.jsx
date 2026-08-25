@@ -71,7 +71,12 @@ export default function HandoverModal({
       });
 
       if (res && res.success) {
-        onHandoverSuccess(finalIncoming.trim(), archiveClosed);
+        onHandoverSuccess(finalIncoming.trim(), archiveClosed, {
+          handed_over_by: currentDispatcher,
+          accepted_by: finalIncoming.trim(),
+          notes: notes.trim(),
+          handover_time: new Date().toISOString()
+        });
         onClose();
       }
     } catch (err) {

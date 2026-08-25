@@ -418,14 +418,29 @@ def get_current_shift():
 
     shift_info = {}
     shift_id = None
+    shift_info = None
     if shift:
         shift_dict = dict(shift)
         shift_id = shift_dict["id"]
+
+        cursor.execute("SELECT * FROM plan_handover_logs ORDER BY id DESC LIMIT 1;")
+        last_handover = cursor.fetchone()
+        handover_data = None
+        if last_handover:
+            lh = dict(last_handover)
+            handover_data = {
+                "handed_over_by": lh.get("handed_over_by"),
+                "accepted_by": lh.get("accepted_by"),
+                "handover_time": lh.get("handover_time"),
+                "notes": lh.get("notes") or ""
+            }
+
         shift_info = {
             "id": shift_dict["id"],
             "date_interval": shift_dict["date_interval"],
             "dispatcher": shift_dict["dispatcher_name"],
-            "status": shift_dict["status"]
+            "status": shift_dict["status"],
+            "handover": handover_data
         }
 
     # Получаем все рейсы для текущей смены

@@ -22,7 +22,7 @@ import {
   smartMergeSchedules 
 } from './utils/api';
 import { arrayMove } from '@dnd-kit/sortable';
-import { Bell, CheckCircle2, X, Volume2 } from 'lucide-react';
+import { Bell, CheckCircle2, X, Volume2, MessageSquare } from 'lucide-react';
 
 const STORAGE_KEY = 'aviabit_shift_journal_v4';
 
@@ -40,6 +40,7 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
+  const [isHandoverNotesDismissed, setIsHandoverNotesDismissed] = useState(false);
 
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [lastSaved, setLastSaved] = useState('');
@@ -383,11 +384,13 @@ export default function App() {
   };
 
   // Передача смены
-  const handleHandoverSuccess = (newDispatcherName, archiveClosed) => {
+  const handleHandoverSuccess = (newDispatcherName, archiveClosed, handoverData) => {
     setShiftInfo(prev => ({
       ...prev,
-      dispatcher: newDispatcherName
+      dispatcher: newDispatcherName,
+      handover: handoverData || prev.handover
     }));
+    setIsHandoverNotesDismissed(false);
     if (archiveClosed) {
       setFlights(prev => prev.filter(f => f.status !== 'closed'));
     }
@@ -473,6 +476,45 @@ export default function App() {
             Смена: <strong>{shiftInfo.date_interval || shiftInfo.date} (09:00 - 09:00)</strong> | Диспетчер: <strong>{shiftInfo.dispatcher || currentUser?.full_name || '—'}</strong>
           </p>
         </div>
+
+        {/* Карточка особых замечаний по смене (переданных сменщиком) */}
+        {shiftInfo?.handover?.notes && shiftInfo.handover.notes.trim() && !isHandoverNotesDismissed && (
+          <div className="mb-3.5 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-amber-500/5 dark:from-amber-950/40 dark:via-amber-900/20 dark:to-transparent border-2 border-amber-400/60 dark:border-amber-500/50 rounded-2xl p-3.5 shadow-md backdrop-blur-md flex items-start gap-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="p-2 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl flex-shrink-0 shadow-sm mt-0.5">
+              <MessageSquare className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-xs uppercase tracking-wider text-amber-900 dark:text-amber-300">
+                    📌 Особые замечания по смене
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    (Сдал: {shiftInfo.handover.handed_over_by || 'Предыдущий диспетчер'})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {shiftInfo.handover.handover_time && (
+                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono">
+                      {new Date(shiftInfo.handover.handover_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsHandoverNotesDismissed(true)}
+                    className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 rounded-lg transition-colors cursor-pointer"
+                    title="Скрыть замечания"
+                  >
+                    Ознакомлен ✕
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs font-bold text-slate-900 dark:text-slate-100 whitespace-pre-wrap leading-relaxed bg-white/70 dark:bg-slate-900/70 p-2.5 rounded-xl border border-amber-200 dark:border-amber-900/40 shadow-inner">
+                {shiftInfo.handover.notes}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Summary Metric Tiles */}
         <SummaryStats flights={flights} />

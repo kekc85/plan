@@ -294,11 +294,23 @@ if ($route === '/shift/current') {
 
     $shiftInfo = null;
     if ($shift) {
+        $lastHandover = $db->query("SELECT * FROM plan_handover_logs ORDER BY id DESC LIMIT 1")->fetch();
+        $handoverData = null;
+        if ($lastHandover) {
+            $handoverData = [
+                'handed_over_by' => $lastHandover['handed_over_by'],
+                'accepted_by' => $lastHandover['accepted_by'],
+                'handover_time' => $lastHandover['handover_time'],
+                'notes' => $lastHandover['notes'] ?? ''
+            ];
+        }
+
         $shiftInfo = [
             'id' => (int)$shift['id'],
             'date_interval' => $shift['date_interval'],
             'dispatcher' => $shift['dispatcher_name'],
-            'status' => $shift['status']
+            'status' => $shift['status'],
+            'handover' => $handoverData
         ];
     }
 
