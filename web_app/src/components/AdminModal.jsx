@@ -348,7 +348,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                               {/* ФИО */}
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1 whitespace-nowrap">
                                   ФИО диспетчера
                                 </label>
                                 <input
@@ -361,7 +361,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
 
                               {/* Логин */}
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1 whitespace-nowrap">
                                   Логин
                                 </label>
                                 <input
@@ -374,22 +374,22 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
 
                               {/* Новый пароль */}
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                                  Новый пароль (оставьте пустым если не менять)
+                                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1 whitespace-nowrap">
+                                  Новый пароль
                                 </label>
                                 <div className="relative flex items-center">
                                   <input
-                                    type={showEditPassword ? "text" : "password"}
+                                    type={showEditPassword ? 'text' : 'password'}
                                     value={editNewPassword}
                                     onChange={(e) => setEditNewPassword(e.target.value)}
-                                    placeholder="••••••••"
+                                    placeholder="Не менять (пусто)"
                                     className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-2.5 pr-8 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
                                   />
                                   <button
                                     type="button"
                                     onClick={() => setShowEditPassword(!showEditPassword)}
                                     className="absolute right-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                                    title={showEditPassword ? "Скрыть" : "Показать"}
+                                    tabIndex={-1}
                                   >
                                     {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                                   </button>
@@ -398,13 +398,13 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
 
                               {/* Роль */}
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1 whitespace-nowrap">
                                   Роль
                                 </label>
                                 <select
                                   value={editRole}
                                   onChange={(e) => setEditRole(e.target.value)}
-                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
                                 >
                                   <option value="dispatcher">Диспетчер</option>
                                   <option value="admin">Администратор</option>

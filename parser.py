@@ -403,6 +403,11 @@ def process_flights(
     if preliminaries is None:
         preliminaries = {}
 
+    if start_dt_msk and start_dt_msk.tzinfo is None:
+        start_dt_msk = start_dt_msk.replace(tzinfo=MSK_TZ)
+    if end_dt_msk and end_dt_msk.tzinfo is None:
+        end_dt_msk = end_dt_msk.replace(tzinfo=MSK_TZ)
+
     # Дедупликация и фильтрация рейсов (исключаем резервы ~РЕЗ с красной буквой R)
     seen_keys = set()
     unique_candidates = []

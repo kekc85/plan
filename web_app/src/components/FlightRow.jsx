@@ -218,7 +218,7 @@ export default function FlightRow({
     >
       {/* 1. Drag Handle & Index */}
       <td
-        className={`sticky left-0 z-20 py-2.5 px-1 text-center whitespace-nowrap no-print w-8 min-w-[32px] bg-inherit hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155] ${
+        className={`sticky left-0 z-20 py-2.5 px-1 text-center whitespace-nowrap no-print w-8 min-w-[32px] bg-inherit hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155] rounded-l-2xl ${
           isOverdue ? 'border-l-4 border-l-rose-600 border-t-2 border-b-2 border-rose-500' : ''
         }`}
         title="Хватайте и перетаскивайте в любое место"
@@ -704,7 +704,7 @@ export default function FlightRow({
       </td>
 
       {/* 20. Действия */}
-      <td className={`py-2.5 px-1 text-center whitespace-nowrap no-print ${
+      <td className={`py-2.5 px-1 text-center whitespace-nowrap no-print rounded-r-2xl ${
         isOverdue ? 'border-r-4 border-r-rose-600 border-t-2 border-b-2 border-rose-500' : ''
       }`}>
         <div className="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">

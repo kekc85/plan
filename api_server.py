@@ -687,12 +687,12 @@ def fetch_schedule(req: FetchScheduleRequest):
     """
     try:
         dt_from = parse_date_arg(req.date_from)
-        t_from = parse_time_arg(req.time_from)
+        h_from, m_from = parse_time_arg(req.time_from, default_h=8, default_m=0)
         dt_to = parse_date_arg(req.date_to)
-        t_to = parse_time_arg(req.time_to)
+        h_to, m_to = parse_time_arg(req.time_to, default_h=14, default_m=0)
 
-        start_dt = dt_from.replace(hour=t_from.hour, minute=t_from.minute, second=0, microsecond=0)
-        end_dt = dt_to.replace(hour=t_to.hour, minute=t_to.minute, second=0, microsecond=0)
+        start_dt = dt_from.replace(hour=h_from, minute=m_from, second=0, microsecond=0, tzinfo=MSK_TZ)
+        end_dt = dt_to.replace(hour=h_to, minute=m_to, second=0, microsecond=0, tzinfo=MSK_TZ)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
 
@@ -702,25 +702,33 @@ def fetch_schedule(req: FetchScheduleRequest):
     # Nordwind
     if req.airline in ("both", "nordwind"):
         try:
-            client_nw = AviaBitClient(base_url=BASE_URL_NORDWIND)
-            flights_nw = client_nw.fetch_schedule(start_dt, end_dt, filter_name=req.filter_name)
-            all_raw_flights.extend(flights_nw)
+            client_nw = AviaBitClient(base_url=BASE_URL_NORDWIND, session_filename=".session.json", name="Nordwind")
+            client_nw.login()
+            t_id = client_nw.get_template_id(req.filter_name)
+            flights_nw = client_nw.fetch_schedule(start_dt, end_dt, template_id=t_id)
+            for fl in flights_nw:
+                fl["_client"] = client_nw
+                all_raw_flights.append(fl)
         except Exception as e:
             errors.append(f"Ошибка Nordwind: {str(e)}")
 
     # Икар
     if req.airline in ("both", "ikar"):
         try:
-            client_ik = AviaBitClient(base_url=BASE_URL_IKAR)
-            flights_ik = client_ik.fetch_schedule(start_dt, end_dt, filter_name=req.filter_name)
-            all_raw_flights.extend(flights_ik)
+            client_ik = AviaBitClient(base_url=BASE_URL_IKAR, session_filename=".session_ikar.json", name="Икар")
+            client_ik.login()
+            t_id = client_ik.get_template_id(req.filter_name)
+            flights_ik = client_ik.fetch_schedule(start_dt, end_dt, template_id=t_id)
+            for fl in flights_ik:
+                fl["_client"] = client_ik
+                all_raw_flights.append(fl)
         except Exception as e:
             errors.append(f"Ошибка Икар: {str(e)}")
 
     if not all_raw_flights and errors:
         raise HTTPException(status_code=502, detail="; ".join(errors))
 
-    processed_rows = process_flights(all_raw_flights, start_dt, end_dt)
+    processed_rows = process_flights(all_raw_flights, start_dt_msk=start_dt, end_dt_msk=end_dt)
 
     result_flights = []
     for idx, row in enumerate(processed_rows):
