@@ -17,6 +17,7 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
   const [timeTo, setTimeTo] = useState('14:00');
   const [airline, setAirline] = useState('both'); // "both", "nordwind", "ikar"
   const [useSmartMerge, setUseSmartMerge] = useState(true);
+  const [activePreset, setActivePreset] = useState('today');
   
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -33,6 +34,7 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
     setDateTo(formatD(d2));
     setTimeFrom('08:00');
     setTimeTo('14:00');
+    setActivePreset('today');
     setErrorMsg('');
   };
 
@@ -45,6 +47,7 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
     setDateTo(formatD(d2));
     setTimeFrom('08:00');
     setTimeTo('14:00');
+    setActivePreset('tomorrow');
     setErrorMsg('');
   };
 
@@ -132,14 +135,22 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
             <button
               type="button"
               onClick={setPresetToday}
-              className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-sky-950/50 hover:text-sky-600 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
+              className={`text-xs px-3 py-1.5 rounded-xl transition-all duration-150 ${
+                activePreset === 'today'
+                  ? 'bg-sky-600 text-white font-extrabold border-2 border-sky-400 shadow-md shadow-sky-600/30 ring-2 ring-sky-500/20'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-750'
+              }`}
             >
               Смена Сегодня (08:00 - 14:00)
             </button>
             <button
               type="button"
               onClick={setPresetTomorrow}
-              className="text-xs bg-slate-100 dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-sky-950/50 hover:text-sky-600 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
+              className={`text-xs px-3 py-1.5 rounded-xl transition-all duration-150 ${
+                activePreset === 'tomorrow'
+                  ? 'bg-sky-600 text-white font-extrabold border-2 border-sky-400 shadow-md shadow-sky-600/30 ring-2 ring-sky-500/20'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-750'
+              }`}
             >
               Смена Завтра
             </button>
@@ -157,7 +168,10 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
                 <input
                   type="text"
                   value={dateFrom}
-                  onChange={(e) => setDateFrom(formatValidDateInterval(e.target.value))}
+                  onChange={(e) => {
+                    setDateFrom(formatValidDateInterval(e.target.value));
+                    setActivePreset('custom');
+                  }}
                   placeholder="25.08.2026"
                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
                   required
@@ -168,7 +182,10 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
                 <input
                   type="text"
                   value={timeFrom}
-                  onChange={(e) => setTimeFrom(formatValidTime(e.target.value))}
+                  onChange={(e) => {
+                    setTimeFrom(formatValidTime(e.target.value));
+                    setActivePreset('custom');
+                  }}
                   placeholder="08:00"
                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
                   required
@@ -189,7 +206,10 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
                 <input
                   type="text"
                   value={dateTo}
-                  onChange={(e) => setDateTo(formatValidDateInterval(e.target.value))}
+                  onChange={(e) => {
+                    setDateTo(formatValidDateInterval(e.target.value));
+                    setActivePreset('custom');
+                  }}
                   placeholder="26.08.2026"
                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
                   required
@@ -200,7 +220,10 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
                 <input
                   type="text"
                   value={timeTo}
-                  onChange={(e) => setTimeTo(formatValidTime(e.target.value))}
+                  onChange={(e) => {
+                    setTimeTo(formatValidTime(e.target.value));
+                    setActivePreset('custom');
+                  }}
                   placeholder="14:00"
                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
                   required

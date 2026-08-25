@@ -192,10 +192,12 @@ export default function FlightRow({
   };
 
   const activeRowTheme = isOverdue
-    ? 'bg-rose-50/95 dark:bg-rose-950/40 hover:bg-rose-100/90 dark:hover:bg-rose-950/60 text-slate-950 dark:text-rose-100'
+    ? 'bg-rose-50/95 dark:bg-rose-950/40 hover:bg-rose-100/90 dark:hover:bg-rose-950/60 text-slate-950 dark:text-rose-100 shadow-sm'
     : rowStatusTheme[currentStatus];
 
-  const overdueBorderTopBottom = isOverdue ? 'border-t-2 border-b-2 border-rose-500' : '';
+  const overdueBorderTopBottom = isOverdue
+    ? 'border-t-2 border-b-2 border-rose-500'
+    : 'border-t border-b border-slate-200/80 dark:border-slate-800/80';
 
   const statusBadgeStyle = {
     pending: 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-600 font-semibold',
@@ -212,14 +214,14 @@ export default function FlightRow({
       style={style}
       {...attributes}
       {...listeners}
-      className={`group border-b border-slate-200 dark:border-slate-800/80 transition-all duration-150 ${activeRowTheme} cursor-grab active:cursor-grabbing ${
+      className={`group transition-all duration-150 ${activeRowTheme} cursor-grab active:cursor-grabbing rounded-2xl ${
         isDragging ? 'shadow-2xl ring-2 ring-sky-400 z-50 opacity-90' : ''
       }`}
     >
       {/* 1. Drag Handle & Index */}
       <td
         className={`sticky left-0 z-20 py-2.5 px-1 text-center whitespace-nowrap no-print w-8 min-w-[32px] bg-inherit hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155] rounded-l-2xl ${
-          isOverdue ? 'border-l-4 border-l-rose-600 border-t-2 border-b-2 border-rose-500' : ''
+          isOverdue ? 'border-l-2 border-l-rose-500 border-t-2 border-b-2 border-rose-500' : 'border-l border-t border-b border-slate-200/80 dark:border-slate-800/80'
         }`}
         title="Хватайте и перетаскивайте в любое место"
       >
@@ -705,7 +707,7 @@ export default function FlightRow({
 
       {/* 20. Действия */}
       <td className={`py-2.5 px-1 text-center whitespace-nowrap no-print rounded-r-2xl ${
-        isOverdue ? 'border-r-4 border-r-rose-600 border-t-2 border-b-2 border-rose-500' : ''
+        isOverdue ? 'border-r-2 border-r-rose-500 border-t-2 border-b-2 border-rose-500' : 'border-r border-t border-b border-slate-200/80 dark:border-slate-800/80'
       }`}>
         <div className="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
           <button

@@ -46,8 +46,8 @@ export default function ShiftTable({
 
   return (
     <div className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl shadow-md dark:shadow-2xl backdrop-blur-md w-full">
-      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-175px)] w-full rounded-xl">
-        <table className="w-full text-left border-collapse text-xs">
+      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-175px)] w-full rounded-xl p-1">
+        <table className="w-full text-left border-separate border-spacing-y-1 text-xs">
           {/* Table Header */}
           <thead className="sticky top-0 z-30 shadow-sm">
             <tr className="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-b border-slate-300 dark:border-slate-700 select-none text-xs">
