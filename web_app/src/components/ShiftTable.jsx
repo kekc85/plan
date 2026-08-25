@@ -29,9 +29,6 @@ export default function ShiftTable({
       activationConstraint: {
         distance: 6,
       },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
     })
   );
 
