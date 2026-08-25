@@ -40,35 +40,35 @@ export default function ShiftTable({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl overflow-hidden shadow-md dark:shadow-2xl backdrop-blur-md w-full">
-      <div className="overflow-x-auto w-full">
+    <div className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl shadow-md dark:shadow-2xl backdrop-blur-md w-full">
+      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-175px)] w-full rounded-xl">
         <table className="w-full text-left border-collapse text-xs">
           {/* Table Header */}
-          <thead>
+          <thead className="sticky top-0 z-30 shadow-sm">
             <tr className="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-b border-slate-300 dark:border-slate-700 select-none text-xs">
-              <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-8 no-print">#</th>
-              <th className="py-3 px-1 font-extrabold tracking-wider uppercase w-20">№ Рейса</th>
-              <th className="py-3 px-1 font-extrabold tracking-wider uppercase w-20">Маршрут</th>
-              <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-20 text-amber-700 dark:text-amber-300">
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-8 no-print shadow-sm">#</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 font-extrabold tracking-wider uppercase w-20 shadow-sm">№ Рейса</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 font-extrabold tracking-wider uppercase w-20 shadow-sm">Маршрут</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-20 text-amber-700 dark:text-amber-300 shadow-sm">
                 Время<br/>
                 <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">Вып (-40)</span> / <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400">Вылет</span>
               </th>
-              <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-16">Номер ВС</th>
-              <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-14">Комп.</th>
-              <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-12">PAX</th>
-              <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-16">Экипаж<br/><span className="text-[10px] font-medium text-slate-500">Л/Б/И/П</span></th>
-              <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-[200px] text-sky-800 dark:text-sky-300">Топливо и Веса<br/><span className="text-[10px] font-medium text-slate-500">Block / Trip / Taxi / DOW / DOI / Кухня</span></th>
-              <th className="py-3 px-0.5 text-center font-extrabold tracking-wider uppercase w-15 min-w-[58px]">MTOW</th>
-              <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-14 text-indigo-700 dark:text-indigo-300">LIR</th>
-              <th className="py-3 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[70px]">Груз</th>
-              <th className="py-3 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[70px]">Почта</th>
-              <th className="py-3 px-1 font-extrabold tracking-wider uppercase min-w-[140px]">Багаж (особенности)</th>
-              <th className="py-3 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 text-amber-700 dark:text-amber-300">СЗВ</th>
-              <th className="py-3 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 text-emerald-700 dark:text-emerald-300">LDM</th>
-              <th className="py-3 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[85px] text-teal-700 dark:text-teal-300">Астра (REN)<br/><span className="text-[9px] font-medium text-slate-500">Времена</span></th>
-              <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-28">Статус</th>
-              <th className="py-3 px-1 font-extrabold tracking-wider uppercase min-w-[120px]">Примечания</th>
-              <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-14 no-print">Действия</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-16 shadow-sm">Номер ВС</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-14 shadow-sm">Комп.</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-12 shadow-sm">PAX</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-16 shadow-sm">Экипаж<br/><span className="text-[10px] font-medium text-slate-500">Л/Б/И/П</span></th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-[200px] text-sky-800 dark:text-sky-300 shadow-sm">Топливо и Веса<br/><span className="text-[10px] font-medium text-slate-500">Block / Trip / Taxi / DOW / DOI / Кухня</span></th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-0.5 text-center font-extrabold tracking-wider uppercase w-15 min-w-[58px] shadow-sm">MTOW</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-14 text-indigo-700 dark:text-indigo-300 shadow-sm">LIR</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[70px] shadow-sm">Груз</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[70px] shadow-sm">Почта</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 font-extrabold tracking-wider uppercase min-w-[140px] shadow-sm">Багаж (особенности)</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 text-amber-700 dark:text-amber-300 shadow-sm">СЗВ</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 text-emerald-700 dark:text-emerald-300 shadow-sm">LDM</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[85px] text-teal-700 dark:text-teal-300 shadow-sm">Астра (REN)<br/><span className="text-[9px] font-medium text-slate-500">Времена</span></th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-28 shadow-sm">Статус</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 font-extrabold tracking-wider uppercase min-w-[120px] shadow-sm">Примечания</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-14 no-print shadow-sm">Действия</th>
             </tr>
           </thead>
 
