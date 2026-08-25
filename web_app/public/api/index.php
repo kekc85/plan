@@ -958,7 +958,7 @@ if ($route === '/fetch_schedule') {
             'szv_sent' => false,
             'ldm_sent' => false,
             'astra_times_sent' => false,
-            'status' => 'prepared',
+            'status' => 'pending',
             'notes' => ''
         ];
     }

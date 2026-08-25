@@ -64,7 +64,7 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
   const handleStatusChange = (e) => {
     const newStatus = e.target.value;
     const updates = { status: newStatus };
-    if (newStatus === 'pending' || newStatus === 'in_progress' || newStatus === 'prepared') {
+    if (newStatus === 'pending' || newStatus === 'prepared') {
       updates.lir_sent = false;
       updates.szv_sent = false;
       updates.ldm_sent = false;
@@ -416,7 +416,6 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-900 dark:text-white font-bold focus:border-sky-500 focus:outline-none"
               >
                 <option value="pending">⚪ Ожидание</option>
-                <option value="in_progress">🟡 В работе</option>
                 <option value="prepared">🔵 Подготовлен</option>
                 <option value="lir_sent">🟣 LIR отправлен</option>
                 <option value="released">🟢 Выпущен</option>

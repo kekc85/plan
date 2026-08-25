@@ -798,7 +798,7 @@ def fetch_schedule(req: FetchScheduleRequest):
             "szv_sent": False,
             "ldm_sent": False,
             "astra_times_sent": False,
-            "status": "prepared",
+            "status": "pending",
             "notes": ""
         })
 

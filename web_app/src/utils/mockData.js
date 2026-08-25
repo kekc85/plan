@@ -137,7 +137,7 @@ export const INITIAL_FLIGHTS = [
     baggage: "",
     szv_sent: false,
     ldm_sent: false,
-    status: "in_progress",
+    status: "pending",
     notes: "100% загрузка"
   },
   {

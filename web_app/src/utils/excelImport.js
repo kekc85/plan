@@ -136,10 +136,8 @@ export function parseExcelToFlights(file) {
             status = 'released';
           } else if (lirSent || statusRaw.includes('lir')) {
             status = 'lir_sent';
-          } else if (statusRaw.includes('подготов')) {
+          } else if (statusRaw.includes('подготов') || statusRaw.includes('работ')) {
             status = 'prepared';
-          } else if (statusRaw.includes('работ')) {
-            status = 'in_progress';
           }
 
           const notes = String(r[18] || '').trim();

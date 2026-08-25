@@ -75,30 +75,45 @@ export default function FlightRow({
     handleCellChange('release_time', formatted);
   };
 
-  // Смена статуса из выпадающего списка
+  // Смена статуса из выпадающего списка (с двусторонней синхронизацией чек-боксов)
   const handleStatusSelectChange = (e) => {
     const newStatus = e.target.value;
     const updates = { status: newStatus };
 
-    if (newStatus === 'released') {
-      updates.szv_sent = true;
+    if (newStatus === 'pending') {
+      // Ожидание: все чекбоксы сброшены
+      updates.lir_sent = false;
+      updates.szv_sent = false;
+      updates.ldm_sent = false;
+      updates.astra_times_sent = false;
+    } else if (newStatus === 'prepared') {
+      // Подготовлен: данные внесены, чекбоксы еще не проставлены
+      updates.lir_sent = false;
+      updates.szv_sent = false;
+      updates.ldm_sent = false;
+      updates.astra_times_sent = false;
+    } else if (newStatus === 'lir_sent') {
+      // LIR отправлен: ставится чек-бокс LIR
       updates.lir_sent = true;
+      updates.szv_sent = false;
+      updates.ldm_sent = false;
+      updates.astra_times_sent = false;
+    } else if (newStatus === 'released') {
+      // Выпущен: ставится чек-бокс СЗВ (и LIR)
+      updates.lir_sent = true;
+      updates.szv_sent = true;
+      updates.ldm_sent = false;
+      updates.astra_times_sent = false;
     } else if (newStatus === 'closed') {
-      updates.ldm_sent = true;
-      updates.szv_sent = true;
+      // Закрыт: на обычных рейсах ставится LDM, на REN (Оренбург) - ставится Времена (Astra)
       updates.lir_sent = true;
+      updates.szv_sent = true;
       if (isRen) {
         updates.astra_times_sent = true;
-      }
-    } else if (newStatus === 'lir_sent') {
-      updates.lir_sent = true;
-      updates.szv_sent = false;
-      updates.ldm_sent = false;
-    } else if (newStatus === 'pending' || newStatus === 'in_progress' || newStatus === 'prepared') {
-      updates.szv_sent = false;
-      updates.ldm_sent = false;
-      if (newStatus === 'pending') {
-        updates.lir_sent = false;
+        updates.ldm_sent = true;
+      } else {
+        updates.ldm_sent = true;
+        updates.astra_times_sent = false;
       }
     }
 
@@ -111,9 +126,15 @@ export default function FlightRow({
     const nextVal = !flight.lir_sent;
     const updates = { lir_sent: nextVal };
     if (nextVal) {
-      updates.status = 'lir_sent';
-    } else if (flight.status === 'lir_sent') {
-      updates.status = 'prepared';
+      // Когда ставится LIR -> статус становится LIR отправлен (если рейс еще не выпущен/закрыт)
+      if (flight.status !== 'released' && flight.status !== 'closed') {
+        updates.status = 'lir_sent';
+      }
+    } else {
+      // Когда снимается LIR -> если статус был lir_sent, возвращаем в prepared
+      if (flight.status === 'lir_sent') {
+        updates.status = 'prepared';
+      }
     }
     onUpdateFlight(flight.id, updates);
   };
@@ -124,10 +145,16 @@ export default function FlightRow({
     const nextVal = !flight.szv_sent;
     const updates = { szv_sent: nextVal };
     if (nextVal) {
+      // Когда ставится СЗВ -> статус становится Выпущен, LIR также true
       updates.status = 'released';
       updates.lir_sent = true;
-    } else if (flight.status === 'released') {
-      updates.status = flight.lir_sent ? 'lir_sent' : 'prepared';
+    } else {
+      // Когда снимается СЗВ -> если был выпущен или закрыт, возвращаем в lir_sent (если lir_sent) или prepared
+      if (flight.status === 'released' || flight.status === 'closed') {
+        updates.status = flight.lir_sent ? 'lir_sent' : 'prepared';
+        updates.ldm_sent = false;
+        updates.astra_times_sent = false;
+      }
     }
     onUpdateFlight(flight.id, updates);
   };
@@ -142,14 +169,17 @@ export default function FlightRow({
     if (nextVal) {
       updates.lir_sent = true;
       updates.szv_sent = true;
-      // Для рейсов из Оренбурга (REN) статус закрывается ТОЛЬКО по чекбоксу "Времена"
+      // Для рейсов из Оренбурга (REN) при проставлении LDM статус НЕ меняется на closed, а остается 'released'
       if (isRen) {
         updates.status = flight.astra_times_sent ? 'closed' : 'released';
       } else {
+        // На обычных рейсах ставится 'closed'
         updates.status = 'closed';
       }
-    } else if (flight.status === 'closed') {
-      updates.status = flight.szv_sent ? 'released' : (flight.lir_sent ? 'lir_sent' : 'prepared');
+    } else {
+      if (flight.status === 'closed' && !isRen) {
+        updates.status = flight.szv_sent ? 'released' : (flight.lir_sent ? 'lir_sent' : 'prepared');
+      }
     }
     onUpdateFlight(flight.id, updates);
   };
@@ -164,9 +194,10 @@ export default function FlightRow({
       updates.status = 'closed';
       updates.lir_sent = true;
       updates.szv_sent = true;
-      updates.ldm_sent = true;
-    } else if (flight.status === 'closed') {
-      updates.status = flight.ldm_sent || flight.szv_sent ? 'released' : (flight.lir_sent ? 'lir_sent' : 'prepared');
+    } else {
+      if (flight.status === 'closed') {
+        updates.status = flight.szv_sent ? 'released' : (flight.lir_sent ? 'lir_sent' : 'prepared');
+      }
     }
     onUpdateFlight(flight.id, updates);
   };
@@ -184,7 +215,6 @@ export default function FlightRow({
   // Раздельные цветовые схемы для СВЕТЛОЙ и ТЕМНОЙ тем
   const rowStatusTheme = {
     pending: 'bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-900 dark:text-slate-100 border-l-4 border-l-slate-400 dark:border-l-slate-500',
-    in_progress: 'bg-amber-50/95 dark:bg-amber-950/75 hover:bg-amber-100/90 dark:hover:bg-amber-950/90 text-slate-950 dark:text-amber-100 border-l-4 border-l-amber-500 border-b border-b-amber-200 dark:border-b-amber-500/30',
     prepared: 'bg-sky-50/95 dark:bg-sky-950/80 hover:bg-sky-100/90 dark:hover:bg-sky-950/95 text-slate-950 dark:text-sky-100 border-l-4 border-l-sky-500 border-b border-b-sky-200 dark:border-b-sky-500/30',
     lir_sent: 'bg-indigo-50/95 dark:bg-indigo-950/85 hover:bg-indigo-100/90 dark:hover:bg-indigo-950/95 text-slate-950 dark:text-indigo-100 border-l-4 border-l-indigo-500 border-b border-b-indigo-200 dark:border-b-indigo-500/30',
     released: 'bg-emerald-50/95 dark:bg-emerald-950/80 hover:bg-emerald-100/90 dark:hover:bg-emerald-950/95 text-slate-950 dark:text-emerald-100 border-l-4 border-l-emerald-500 border-b border-b-emerald-200 dark:border-b-emerald-500/30',
@@ -193,7 +223,7 @@ export default function FlightRow({
 
   const activeRowTheme = isOverdue
     ? 'bg-rose-50/95 dark:bg-rose-950/40 hover:bg-rose-100/90 dark:hover:bg-rose-950/60 text-slate-950 dark:text-rose-100 shadow-sm'
-    : rowStatusTheme[currentStatus];
+    : (rowStatusTheme[currentStatus] || rowStatusTheme.pending);
 
   const overdueBorderTopBottom = isOverdue
     ? 'border-t-2 border-b-2 border-rose-500'
@@ -201,7 +231,6 @@ export default function FlightRow({
 
   const statusBadgeStyle = {
     pending: 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-600 font-semibold',
-    in_progress: 'bg-amber-100 dark:bg-amber-500/30 text-amber-900 dark:text-amber-200 border-amber-400 dark:border-amber-500 font-bold',
     prepared: 'bg-sky-100 dark:bg-sky-500/30 text-sky-900 dark:text-sky-200 border-sky-400 dark:border-sky-500 font-bold',
     lir_sent: 'bg-indigo-100 dark:bg-indigo-500/30 text-indigo-900 dark:text-indigo-200 border-indigo-400 dark:border-indigo-500 font-bold',
     released: 'bg-emerald-100 dark:bg-emerald-500/30 text-emerald-900 dark:text-emerald-200 border-emerald-400 dark:border-emerald-500 font-bold',
@@ -679,10 +708,9 @@ export default function FlightRow({
           onChange={handleStatusSelectChange}
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
-          className={`text-xs font-extrabold rounded-md px-2.5 py-1 border focus:outline-none cursor-pointer shadow-sm ${statusBadgeStyle[currentStatus]}`}
+          className={`text-xs font-extrabold rounded-md px-2.5 py-1 border focus:outline-none cursor-pointer shadow-sm ${statusBadgeStyle[currentStatus] || statusBadgeStyle.pending}`}
         >
           <option value="pending" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-300">⚪ Ожидание</option>
-          <option value="in_progress" className="bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-300">🟡 В работе</option>
           <option value="prepared" className="bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300">🔵 Подготовлен</option>
           <option value="lir_sent" className="bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300">🟣 LIR отправлен</option>
           <option value="released" className="bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300">🟢 Выпущен</option>
