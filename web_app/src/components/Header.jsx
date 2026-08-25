@@ -21,7 +21,6 @@ import {
   BookOpen
 } from 'lucide-react';
 import { formatValidDateInterval } from '../utils/validators';
-import DownloadManualModal from './DownloadManualModal';
 
 export default function Header({
   shiftInfo,
@@ -40,12 +39,12 @@ export default function Header({
   onOpenLoginModal,
   onOpenAdminModal,
   onOpenHandoverModal,
+  onOpenManualModal,
   onLogout
 }) {
   const [utcTime, setUtcTime] = useState('');
   const [mskTime, setMskTime] = useState('');
   const [currentDateStr, setCurrentDateStr] = useState('');
-  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   // Идущие часы UTC, МСК и текущая дата (каждую секунду)
@@ -345,7 +344,7 @@ export default function Header({
             {/* КНОПКА 5: ИНСТРУКЦИЯ ДЛЯ ДИСПЕТЧЕРА */}
             <button
               type="button"
-              onClick={() => setIsManualModalOpen(true)}
+              onClick={onOpenManualModal}
               className="flex items-center gap-1 bg-sky-100 hover:bg-sky-200 dark:bg-sky-950/80 dark:hover:bg-sky-900 text-sky-800 dark:text-sky-300 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-sky-300 dark:border-sky-700/80 shadow-sm transition-all active:scale-95 cursor-pointer"
               title="Открыть меню скачивания руководства пользователя (.docx)"
             >
@@ -357,12 +356,6 @@ export default function Header({
         </div>
 
       </div>
-
-      {/* Модальное окно скачивания руководства пользователя с выбором пути */}
-      <DownloadManualModal
-        isOpen={isManualModalOpen}
-        onClose={() => setIsManualModalOpen(false)}
-      />
     </header>
   );
 }

@@ -8,6 +8,7 @@ import AviaBitFetchModal from './components/AviaBitFetchModal';
 import LoginModal from './components/LoginModal';
 import AdminModal from './components/AdminModal';
 import HandoverModal from './components/HandoverModal';
+import DownloadManualModal from './components/DownloadManualModal';
 import { INITIAL_FLIGHTS } from './utils/mockData';
 import { exportShiftToExcel } from './utils/excelExport';
 import { parseExcelToFlights } from './utils/excelImport';
@@ -40,6 +41,7 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isHandoverNotesDismissed, setIsHandoverNotesDismissed] = useState(false);
 
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
@@ -461,6 +463,7 @@ export default function App() {
         onOpenLoginModal={() => setIsLoginModalOpen(true)}
         onOpenAdminModal={() => setIsAdminModalOpen(true)}
         onOpenHandoverModal={() => setIsHandoverModalOpen(true)}
+        onOpenManualModal={() => setIsManualModalOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -625,6 +628,12 @@ export default function App() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAdd={handleAddFlight}
+      />
+
+      {/* Модальное окно скачивания руководства пользователя */}
+      <DownloadManualModal
+        isOpen={isManualModalOpen}
+        onClose={() => setIsManualModalOpen(false)}
       />
     </div>
   );
