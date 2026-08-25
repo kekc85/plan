@@ -127,15 +127,22 @@ export default function FlightRow({
     onUpdateFlight(flight.id, updates);
   };
 
+  const isRen = isRenDeparture(flight);
+
   // Чекбокс LDM -> синхронизация
   const handleToggleLdm = (e) => {
     if (e) e.stopPropagation();
     const nextVal = !flight.ldm_sent;
     const updates = { ldm_sent: nextVal };
     if (nextVal) {
-      updates.status = 'closed';
       updates.lir_sent = true;
       updates.szv_sent = true;
+      // Для рейсов из Оренбурга (REN) статус закрывается ТОЛЬКО по чекбоксу "Времена"
+      if (isRen) {
+        updates.status = flight.astra_times_sent ? 'closed' : 'released';
+      } else {
+        updates.status = 'closed';
+      }
     } else if (flight.status === 'closed') {
       updates.status = flight.szv_sent ? 'released' : (flight.lir_sent ? 'lir_sent' : 'prepared');
     }
@@ -146,7 +153,17 @@ export default function FlightRow({
   const handleToggleAstraTimes = (e) => {
     if (e) e.stopPropagation();
     const nextVal = !flight.astra_times_sent;
-    onUpdateFlight(flight.id, { astra_times_sent: nextVal });
+    const updates = { astra_times_sent: nextVal };
+    if (nextVal) {
+      // На рейсах из Оренбурга статус меняется на "Закрыт" именно при установке чекбокса "Времена"
+      updates.status = 'closed';
+      updates.lir_sent = true;
+      updates.szv_sent = true;
+      updates.ldm_sent = true;
+    } else if (flight.status === 'closed') {
+      updates.status = flight.ldm_sent || flight.szv_sent ? 'released' : (flight.lir_sent ? 'lir_sent' : 'prepared');
+    }
+    onUpdateFlight(flight.id, updates);
   };
 
   const handleCheckboxKeyDown = (e, toggleFn) => {
@@ -158,7 +175,6 @@ export default function FlightRow({
 
   const currentStatus = flight.status || 'pending';
   const isOverdue = isFlightReleaseOverdue(flight);
-  const isRen = isRenDeparture(flight);
 
   // Раздельные цветовые схемы для СВЕТЛОЙ и ТЕМНОЙ тем
   const rowStatusTheme = {
