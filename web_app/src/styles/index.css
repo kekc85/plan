@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans text-slate-900 dark:text-slate-100 bg-slate-100 dark:bg-slate-950;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    touch-action: manipulation;
+  }
+
+  input, select, textarea, button {
+    @apply transition-colors duration-150 font-sans;
+  }
+}
+
+/* Оптимизация горизонтальной раскладки планшетов и смартфонов (Landscape Mode) */
+@media screen and (orientation: landscape) and (max-height: 600px) {
+  header {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+  }
+  main {
+    padding: 6px !important;
+  }
+}
+
+/* Custom scrollbars & smooth touch scrolling */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-slate-200 dark:bg-slate-900;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-400 dark:bg-slate-700 rounded-full hover:bg-slate-500 dark:hover:bg-slate-600;
+}
+
+/* Полная оптимизация печати под Альбомный А4 на 1 страницу по ширине */
+@page {
+  size: A4 landscape;
+  margin: 6mm 4mm 6mm 4mm;
+}
+
+@media print {
+  html, body {
+    background: white !important;
+    color: black !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 8.5pt !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  table {
+    width: 100% !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
+    font-size: 7.5pt !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    padding: 3px 2px !important;
+    font-size: 7pt !important;
+    border: 1px solid #94a3b8 !important;
+  }
+
+  td {
+    padding: 2px 2px !important;
+    border: 1px solid #cbd5e1 !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  input, select, textarea {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 7.5pt !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Compact fuel cell in print */
+  td div {
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    width: auto !important;
+  }
+}
