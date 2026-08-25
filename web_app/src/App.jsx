@@ -296,38 +296,7 @@ export default function App() {
     setFlights(prev =>
       prev.map(f => {
         if (f.id === id) {
-          const merged = { ...f, ...updatedFields };
-
-          const isOrenburg = (merged.route_airports || '').toUpperCase().includes('REN') ||
-                             (merged.route_city || '').toUpperCase().includes('ОРЕНБУРГ');
-
-          if (updatedFields.astra_times_sent !== undefined || updatedFields.ldm_sent !== undefined || updatedFields.szv_sent !== undefined || updatedFields.lir_sent !== undefined) {
-            if (isOrenburg) {
-              if (merged.astra_times_sent) {
-                merged.status = 'closed';
-              } else if (merged.ldm_sent) {
-                merged.status = 'ldm_sent';
-              } else if (merged.szv_sent) {
-                merged.status = 'released';
-              } else if (merged.lir_sent) {
-                merged.status = 'prepared';
-              } else {
-                merged.status = 'pending';
-              }
-            } else {
-              if (merged.ldm_sent) {
-                merged.status = 'closed';
-              } else if (merged.szv_sent) {
-                merged.status = 'released';
-              } else if (merged.lir_sent) {
-                merged.status = 'prepared';
-              } else {
-                merged.status = 'pending';
-              }
-            }
-          }
-
-          return merged;
+          return { ...f, ...updatedFields };
         }
         return f;
       })
