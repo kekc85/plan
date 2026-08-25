@@ -2,14 +2,13 @@ import React from 'react';
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import FlightRow from './FlightRow';
@@ -25,9 +24,15 @@ export default function ShiftTable({
   onAddFlight
 }) {
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 6,
+        distance: 8, // Для мыши (ПК/ноутбук): мгновенное перетаскивание при сдвиге на 8px
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200, // Для пальца на смартфоне/планшете: удержание 200мс (позволяет свободно скроллить и перетаскивать при удержании)
+        tolerance: 6, // Допуск микро-сдвига пальца при зажатии
       },
     })
   );
