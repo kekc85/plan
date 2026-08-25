@@ -210,12 +210,18 @@ def login(req: LoginRequest):
             new_hash, new_salt = hash_password("dispatch123")
             cursor.execute(
                 q("INSERT INTO plan_users (username, password_hash, salt, full_name, role, is_active, created_at) VALUES (%s, %s, %s, %s, 'dispatcher', 1, %s);", engine),
-                ("dispatcher", new_hash, new_salt, "Диспетчер по центровке", now_str)
+                ("dispatcher", new_hash, new_salt, "Иван Иванов", now_str)
             )
             if engine == "sqlite": conn.commit()
             cursor.execute(q("SELECT * FROM plan_users WHERE LOWER(username) = 'dispatcher';", engine))
             user_dict = dict(cursor.fetchone())
             is_valid = True
+
+    try:
+        cursor.execute(q("UPDATE plan_users SET full_name = 'Иван Иванов' WHERE username = 'dispatcher' AND full_name = 'Диспетчер по центровке';", engine))
+        if engine == "sqlite": conn.commit()
+    except Exception:
+        pass
 
     conn.close()
 

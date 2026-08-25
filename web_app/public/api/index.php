@@ -37,6 +37,10 @@ function getDb() {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false
             ]);
+            // Автоматическое обновление имени диспетчера по умолчанию на реальное имя
+            try {
+                $pdo->exec("UPDATE plan_users SET full_name = 'Иван Иванов' WHERE username = 'dispatcher' AND full_name = 'Диспетчер по центровке'");
+            } catch (Exception $ign) {}
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['detail' => 'Ошибка подключения к MySQL: ' . $e->getMessage()]);
