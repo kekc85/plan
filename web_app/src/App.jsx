@@ -27,6 +27,29 @@ import { Bell, CheckCircle2, X, Volume2, MessageSquare } from 'lucide-react';
 
 const STORAGE_KEY = 'aviabit_shift_journal_v4';
 
+function normalizeFlight(f) {
+  if (!f) return f;
+  let status = f.status || 'pending';
+  if (status === 'in_progress') status = 'pending';
+
+  const hasManualWork = !!(f.fuel_block || f.dow || f.doi || (f.notes && f.notes.trim()));
+  const isRen = (f.route_airports || '').toUpperCase().includes('REN') || (f.route_city || '').toUpperCase().includes('ОРЕНБУРГ');
+
+  if (f.astra_times_sent && isRen) {
+    status = 'closed';
+  } else if (f.ldm_sent && !isRen) {
+    status = 'closed';
+  } else if (f.szv_sent) {
+    status = 'released';
+  } else if (f.lir_sent) {
+    status = 'lir_sent';
+  } else if (status === 'prepared' && !hasManualWork) {
+    status = 'pending';
+  }
+
+  return { ...f, status };
+}
+
 export default function App() {
   const [isDark, setIsDark] = useState(() => {
     const savedTheme = localStorage.getItem(`${STORAGE_KEY}_theme`);
@@ -96,10 +119,10 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(normalizeFlight);
       } catch (e) {}
     }
-    return INITIAL_FLIGHTS;
+    return INITIAL_FLIGHTS.map(normalizeFlight);
   });
 
   // Автозагрузка с сервера SQLite при старте
@@ -108,7 +131,7 @@ export default function App() {
       .then((data) => {
         if (data) {
           if (data.flights && data.flights.length > 0) {
-            setFlights(data.flights);
+            setFlights(data.flights.map(normalizeFlight));
           }
           if (data.shiftInfo) {
             setShiftInfo(prev => ({

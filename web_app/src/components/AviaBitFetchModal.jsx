@@ -94,18 +94,28 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
 
           const merged = { ...inc };
           if (old.id) merged.id = old.id;
-          if (old.status) merged.status = old.status;
           if (old.lir_sent !== undefined) merged.lir_sent = old.lir_sent;
           if (old.szv_sent !== undefined) merged.szv_sent = old.szv_sent;
           if (old.ldm_sent !== undefined) merged.ldm_sent = old.ldm_sent;
           if (old.astra_times_sent !== undefined) merged.astra_times_sent = old.astra_times_sent;
           if (old.notes) merged.notes = old.notes;
 
-          ['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'cargo', 'mail', 'baggage', 'pax', 'crew'].forEach(field => {
+          let hasManualWork = false;
+          ['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'cargo', 'mail', 'baggage'].forEach(field => {
             if (old[field] !== undefined && old[field] !== '') {
               merged[field] = old[field];
+              hasManualWork = true;
             }
           });
+
+          // Сохраняем статус только если была реальная работа или чекбоксы
+          if (old.status === 'closed' || old.status === 'released' || old.status === 'lir_sent') {
+            merged.status = old.status;
+          } else if (old.status === 'prepared' && (hasManualWork || (old.notes && old.notes.trim()))) {
+            merged.status = 'prepared';
+          } else {
+            merged.status = 'pending';
+          }
 
           return merged;
         });
