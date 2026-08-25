@@ -9,7 +9,7 @@ import { INITIAL_FLIGHTS } from './utils/mockData';
 import { exportShiftToExcel } from './utils/excelExport';
 import { parseExcelToFlights } from './utils/excelImport';
 import { playReleaseAlertSound, initAudioUnlock } from './utils/audioAlert';
-import { sortFlightsChronologically } from './utils/validators';
+import { sortFlightsChronologically, isFlightReleaseOverdue } from './utils/validators';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Bell, CheckCircle2, X, Volume2 } from 'lucide-react';
 
@@ -95,7 +95,25 @@ export default function App() {
     setLastSaved(timeStr);
   }, [flights, shiftInfo]);
 
-  // Проверка наступления времени выпуска рейсов (каждую секунду для точности)
+  const initialSuppressionDoneRef = React.useRef(false);
+
+  // При первой загрузке страницы: подавляем всплывающие окна для рейсов, чье время УЖЕ прошло в прошлом
+  useEffect(() => {
+    if (!initialSuppressionDoneRef.current && flights && flights.length > 0) {
+      const pastAlerts = {};
+      for (const flight of flights) {
+        if (isFlightReleaseOverdue(flight)) {
+          const alertKey = `${flight.id}_${flight.release_time || ''}`;
+          pastAlerts[alertKey] = true;
+          playedAlertsRef.current[alertKey] = true;
+        }
+      }
+      setDismissedAlerts(prev => ({ ...pastAlerts, ...prev }));
+      initialSuppressionDoneRef.current = true;
+    }
+  }, [flights]);
+
+  // Проверка наступления времени выпуска рейсов (в реальном времени)
   useEffect(() => {
     const checkReleaseAlerts = () => {
       const now = new Date();
@@ -117,7 +135,6 @@ export default function App() {
           continue;
         }
 
-        // Если не заполнено время выпуска
         const relTime = flight.release_time || '';
         if (!relTime || !relTime.includes(':')) continue;
 
@@ -126,21 +143,18 @@ export default function App() {
 
         const releaseTotal = parts[0] * 60 + parts[1];
 
-        // Разница в минутах для МСК и локального времени
+        // Разница в минутах
         const diffMsk = mskTotal - releaseTotal;
         const diffLocal = localTotal - releaseTotal;
 
-        // Если время выпуска наступило (в пределах окна от 0 до 120 минут)
-        const isDue = (diffMsk >= 0 && diffMsk <= 120) || (diffLocal >= 0 && diffLocal <= 120);
+        // Всплывающее окно и звук активируются только в момент наступления времени выпуска (окно до 2 минут)
+        const isDueNow = (diffMsk >= 0 && diffMsk <= 2) || (diffLocal >= 0 && diffLocal <= 2);
         const alertKey = `${flight.id}_${relTime}`;
 
-        if (isDue && !dismissedAlerts[alertKey]) {
+        if (isDueNow && !dismissedAlerts[alertKey] && !playedAlertsRef.current[alertKey]) {
           setActiveAlert(flight);
-          // Воспроизводим сигнал СТРОГО 1 раз при появлении напоминания
-          if (!playedAlertsRef.current[alertKey]) {
-            playedAlertsRef.current[alertKey] = true;
-            playReleaseAlertSound();
-          }
+          playedAlertsRef.current[alertKey] = true;
+          playReleaseAlertSound();
           break;
         }
       }
@@ -176,6 +190,16 @@ export default function App() {
 
   // Обработка данных, полученных напрямую из AviaBit
   const handleAviaBitScheduleLoaded = (fetchedFlights, shiftInterval) => {
+    // Для всех рейсов, чье время выпуска уже в прошлом, подавляем всплывающие окна
+    const pastAlerts = {};
+    for (const flight of fetchedFlights) {
+      if (isFlightReleaseOverdue(flight)) {
+        const alertKey = `${flight.id}_${flight.release_time || ''}`;
+        pastAlerts[alertKey] = true;
+        playedAlertsRef.current[alertKey] = true;
+      }
+    }
+    setDismissedAlerts(prev => ({ ...pastAlerts, ...prev }));
     setFlights(fetchedFlights);
     if (shiftInterval) {
       setShiftInfo(prev => ({
@@ -194,6 +218,15 @@ export default function App() {
         alert('В выбранном файле Excel не найдено подходящих строк рейсов.');
         return;
       }
+      const pastAlerts = {};
+      for (const flight of importedFlights) {
+        if (isFlightReleaseOverdue(flight)) {
+          const alertKey = `${flight.id}_${flight.release_time || ''}`;
+          pastAlerts[alertKey] = true;
+          playedAlertsRef.current[alertKey] = true;
+        }
+      }
+      setDismissedAlerts(prev => ({ ...pastAlerts, ...prev }));
       setFlights(importedFlights);
       alert(`Успешно импортировано ${importedFlights.length} рейсов из файла Excel!`);
     } catch (err) {

@@ -194,4 +194,55 @@ export function sortFlightsChronologically(flights, baseHour = 8) {
   });
 }
 
+// Определение, просрочено ли время выпуска рейса (действие не выполнено)
+export function isFlightReleaseOverdue(flight) {
+  if (!flight) return false;
+  // Если рейс уже выпущен или закрыт или отправлен СЗВ/LDM - не просрочен
+  if (flight.status === 'released' || flight.status === 'closed' || flight.szv_sent || flight.ldm_sent) {
+    return false;
+  }
+  const relTime = flight.release_time || '';
+  if (!relTime || !relTime.includes(':')) return false;
+
+  const parts = relTime.split(':').map(Number);
+  const rH = parts[0];
+  const rM = parts[1];
+  if (isNaN(rH) || isNaN(rM)) return false;
+
+  const now = new Date();
+  let mskNow = now;
+  try {
+    const mskStr = now.toLocaleString("en-US", { timeZone: "Europe/Moscow" });
+    mskNow = new Date(mskStr);
+  } catch (e) {}
+
+  const currentDay = mskNow.getDate();
+  const currentMonth = mskNow.getMonth() + 1;
+  const currentTotalMins = mskNow.getHours() * 60 + mskNow.getMinutes();
+
+  // Если у рейса указана дата (например 25.08)
+  const dStr = flight.flight_date || flight.date || '';
+  if (dStr && dStr.includes('.')) {
+    const dParts = dStr.split('.').map(Number);
+    const fDay = dParts[0];
+    const fMonth = dParts[1];
+    if (!isNaN(fDay) && !isNaN(fMonth)) {
+      if (fMonth < currentMonth || (fMonth === currentMonth && fDay < currentDay)) {
+        return true; // Прошедшая дата
+      }
+      if (fMonth > currentMonth || (fMonth === currentMonth && fDay > currentDay)) {
+        return false; // Будущая дата
+      }
+      return currentTotalMins >= (rH * 60 + rM);
+    }
+  }
+
+  // Если дата не указана (в рамках суточной смены 09:00 - 09:00, база 8:00)
+  const releaseMins = rH * 60 + rM;
+  const normNow = (currentTotalMins - 8 * 60 + 1440) % 1440;
+  const normRel = (releaseMins - 8 * 60 + 1440) % 1440;
+
+  return normNow >= normRel;
+}
+
 

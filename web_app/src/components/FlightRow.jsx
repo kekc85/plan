@@ -10,7 +10,8 @@ import {
   formatValidAcNum, 
   formatValidAcConfig,
   formatValidMtow,
-  formatValidDayMonth
+  formatValidDayMonth,
+  isFlightReleaseOverdue
 } from '../utils/validators';
 
 export default function FlightRow({
@@ -148,6 +149,7 @@ export default function FlightRow({
   };
 
   const currentStatus = flight.status || 'pending';
+  const isOverdue = isFlightReleaseOverdue(flight);
 
   // Раздельные цветовые схемы для СВЕТЛОЙ и ТЕМНОЙ тем
   const rowStatusTheme = {
@@ -158,6 +160,10 @@ export default function FlightRow({
     released: 'bg-emerald-50/95 dark:bg-emerald-950/80 hover:bg-emerald-100/90 dark:hover:bg-emerald-950/95 text-slate-950 dark:text-emerald-100 border-l-4 border-l-emerald-500 border-b border-b-emerald-200 dark:border-b-emerald-500/30',
     closed: 'bg-slate-300 dark:bg-black/95 hover:bg-slate-350 dark:hover:bg-black text-slate-950 dark:text-zinc-400 border-l-4 border-l-slate-800 dark:border-l-zinc-600 opacity-80 dark:opacity-60 font-semibold',
   };
+
+  const activeRowTheme = isOverdue
+    ? 'bg-rose-50/95 dark:bg-rose-950/40 hover:bg-rose-100/90 dark:hover:bg-rose-950/60 text-slate-950 dark:text-rose-100 border-l-4 border-l-rose-600 ring-2 ring-rose-500 ring-inset shadow-md'
+    : rowStatusTheme[currentStatus];
 
   const statusBadgeStyle = {
     pending: 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-600 font-semibold',
@@ -172,7 +178,7 @@ export default function FlightRow({
     <tr
       ref={setNodeRef}
       style={style}
-      className={`group border-b border-slate-200 dark:border-slate-800/80 transition-all duration-150 ${rowStatusTheme[currentStatus]} ${
+      className={`group border-b border-slate-200 dark:border-slate-800/80 transition-all duration-150 ${activeRowTheme} ${
         isDragging ? 'shadow-2xl ring-2 ring-sky-400 z-50 opacity-90' : ''
       }`}
     >
@@ -230,19 +236,32 @@ export default function FlightRow({
 
       {/* 4. ВРЕМЯ (Сверху Время Выпуска, затем Время Вылета, снизу Дата число.месяц 25.08) */}
       <td className="py-1 px-1 whitespace-nowrap text-center">
-        <div className="flex flex-col items-center gap-0.5 bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 rounded-md p-1 min-w-[76px]">
+        <div className={`flex flex-col items-center gap-0.5 rounded-md p-1 min-w-[76px] transition-colors ${
+          isOverdue
+            ? 'bg-rose-100/95 dark:bg-rose-950/80 border-2 border-rose-500 shadow-sm'
+            : 'bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700'
+        }`}>
           {/* 1. Время выпуска (-40 мин) */}
           <div className="flex items-center justify-center gap-0.5 w-full">
-            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase leading-none">ВЫП:</span>
+            <span className={`text-[9px] font-extrabold uppercase leading-none ${
+              isOverdue ? 'text-rose-700 dark:text-rose-300 font-black animate-pulse' : 'text-emerald-600 dark:text-emerald-400'
+            }`}>
+              ВЫП:
+            </span>
             <input
               type="text"
               value={flight.release_time || ''}
               onChange={handleReleaseTimeChange}
               onFocus={(e) => e.target.select()}
               onMouseDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
               placeholder="--:--"
-              className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-emerald-500 rounded px-0.5 text-center font-mono font-extrabold text-xs text-emerald-700 dark:text-emerald-300 outline-none w-12 cursor-text"
-              title="Время выпуска (за 40 мин до вылета)"
+              className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 rounded px-0.5 text-center font-mono font-extrabold text-xs outline-none w-12 cursor-text ${
+                isOverdue
+                  ? 'text-rose-900 dark:text-rose-100 focus:ring-rose-500 font-black'
+                  : 'text-emerald-700 dark:text-emerald-300 focus:ring-emerald-500'
+              }`}
+              title={isOverdue ? 'ВНИМАНИЕ: Срок выпуска рейса истек! Выполните выпуск.' : 'Время выпуска (за 40 мин до вылета)'}
             />
           </div>
 
