@@ -37,9 +37,10 @@ function getDb() {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false
             ]);
-            // Автоматическое обновление имени диспетчера по умолчанию на реальное имя
+            // Автоматическое обновление имени диспетчера по умолчанию на реальное имя и удаление старых резервных рейсов
             try {
                 $pdo->exec("UPDATE plan_users SET full_name = 'Иван Иванов' WHERE username = 'dispatcher' AND full_name = 'Диспетчер по центровке'");
+                $pdo->exec("DELETE FROM plan_flights WHERE flight_number LIKE '~%' OR flight_number LIKE '%РЕЗ%' OR flight_number LIKE '%REZ%' OR flight_number LIKE 'РЕ%'");
             } catch (Exception $ign) {}
         } catch (Exception $e) {
             http_response_code(500);
@@ -435,15 +436,19 @@ if ($route === '/shift/smart_merge') {
 
     $existingMap = [];
     foreach ($current as $f) {
-        $key = strtoupper(trim($f['flight'] ?? '')) . '_' . trim($f['flight_date'] ?? '');
+        $flightClean = strtoupper(str_replace(['-', ' '], '', trim($f['flight'] ?? '')));
+        $flightDate = trim($f['flight_date'] ?? '');
+        $key = "{$flightClean}_{$flightDate}";
         $existingMap[$key] = $f;
     }
 
     $merged = [];
-    $processed = [];
 
     foreach ($incoming as $inc) {
-        $key = strtoupper(trim($inc['flight'] ?? '')) . '_' . trim($inc['flight_date'] ?? '');
+        $flightClean = strtoupper(str_replace(['-', ' '], '', trim($inc['flight'] ?? '')));
+        $flightDate = trim($inc['flight_date'] ?? '');
+        $key = "{$flightClean}_{$flightDate}";
+
         if (isset($existingMap[$key])) {
             $old = $existingMap[$key];
             $item = array_merge($inc, [
@@ -462,20 +467,13 @@ if ($route === '/shift/smart_merge') {
                 }
             }
             $merged[] = $item;
-            $processed[$key] = true;
         } else {
             $merged[] = $inc;
-            $processed[$key] = true;
         }
     }
 
-    foreach ($current as $f) {
-        $key = strtoupper(trim($f['flight'] ?? '')) . '_' . trim($f['flight_date'] ?? '');
-        if (!isset($processed[$key])) {
-            $merged[] = $f;
-        }
-    }
-
+    // ВАЖНО: Мы НЕ добавляем старые рейсы, которых нет в подгруженном расписании ($incoming).
+    // При переключении смен чужие/прошлые рейсы автоматически заменяются новым расписанием.
     echo json_encode(['flights' => $merged, 'merged_count' => count($merged)]);
     exit;
 }

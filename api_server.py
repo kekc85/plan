@@ -566,18 +566,21 @@ def smart_merge_schedules(req: SmartMergeRequest):
     Умное слияние нового расписания (из AviaBit или Excel) с текущим планом:
     - Для рейсов, которые УЖЕ БЫЛИ в плане: сохраняются все введенные веса, топливо,
       статусы, чекбоксы LIR/СЗВ/LDM/Времена и диспетчерские заметки.
-    - Новые рейсы добавляются в план.
+    - Рейсы за пределами выбранного интервала очищаются.
     """
     existing_map = {}
     for f in req.current_flights:
-        key = f"{f.get('flight', '').strip().upper()}_{f.get('flight_date', '').strip()}"
+        flight_clean = f.get("flight", "").replace("-", "").replace(" ", "").strip().upper()
+        flight_date = str(f.get("flight_date", "")).strip()
+        key = f"{flight_clean}_{flight_date}"
         existing_map[key] = f
 
     merged_flights = []
-    processed_keys = set()
 
     for inc in req.incoming_flights:
-        key = f"{inc.get('flight', '').strip().upper()}_{inc.get('flight_date', '').strip()}"
+        flight_clean = inc.get("flight", "").replace("-", "").replace(" ", "").strip().upper()
+        flight_date = str(inc.get("flight_date", "")).strip()
+        key = f"{flight_clean}_{flight_date}"
         
         if key in existing_map:
             old = existing_map[key]
@@ -596,15 +599,8 @@ def smart_merge_schedules(req: SmartMergeRequest):
                     merged[field] = old[field]
 
             merged_flights.append(merged)
-            processed_keys.add(key)
         else:
             merged_flights.append(inc)
-            processed_keys.add(key)
-
-    for f in req.current_flights:
-        key = f"{f.get('flight', '').strip().upper()}_{f.get('flight_date', '').strip()}"
-        if key not in processed_keys:
-            merged_flights.append(f)
 
     return {"flights": merged_flights, "merged_count": len(merged_flights)}
 
