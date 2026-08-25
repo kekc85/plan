@@ -42,7 +42,10 @@ export default function App() {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
-  const [isHandoverNotesDismissed, setIsHandoverNotesDismissed] = useState(false);
+  const [isHandoverNotesDismissed, setIsHandoverNotesDismissed] = useState(() => {
+    const saved = localStorage.getItem(`${STORAGE_KEY}_dismissed_handover_note`);
+    return !!saved;
+  });
 
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [lastSaved, setLastSaved] = useState('');
@@ -106,6 +109,17 @@ export default function App() {
               ...prev,
               ...data.shiftInfo
             }));
+
+            // Проверяем, было ли уже подтверждено ознакомление с этим замечанием
+            if (data.shiftInfo.handover) {
+              const noteKey = `${data.shiftInfo.handover.handover_time || ''}_${data.shiftInfo.handover.notes || ''}`;
+              const dismissedKey = localStorage.getItem(`${STORAGE_KEY}_dismissed_handover_note`);
+              if (dismissedKey === noteKey || data.shiftInfo.handover.is_read || !data.shiftInfo.handover.notes?.trim()) {
+                setIsHandoverNotesDismissed(true);
+              } else {
+                setIsHandoverNotesDismissed(false);
+              }
+            }
           }
         }
       })
@@ -385,6 +399,26 @@ export default function App() {
     }
   };
 
+  // Подтверждение ознакомления с замечаниями сменщика
+  const handleDismissHandoverNotes = () => {
+    setIsHandoverNotesDismissed(true);
+    const noteKey = `${shiftInfo?.handover?.handover_time || ''}_${shiftInfo?.handover?.notes || ''}`;
+    localStorage.setItem(`${STORAGE_KEY}_dismissed_handover_note`, noteKey);
+
+    // Помечаем замечание как прочитанное в shiftInfo и базе данных
+    setShiftInfo(prev => {
+      if (!prev?.handover) return prev;
+      return {
+        ...prev,
+        handover: {
+          ...prev.handover,
+          is_read: true,
+          read_at: new Date().toISOString()
+        }
+      };
+    });
+  };
+
   // Передача смены
   const handleHandoverSuccess = (newDispatcherName, archiveClosed, handoverData) => {
     setShiftInfo(prev => ({
@@ -392,6 +426,7 @@ export default function App() {
       dispatcher: newDispatcherName,
       handover: handoverData || prev.handover
     }));
+    localStorage.removeItem(`${STORAGE_KEY}_dismissed_handover_note`);
     setIsHandoverNotesDismissed(false);
     if (archiveClosed) {
       setFlights(prev => prev.filter(f => f.status !== 'closed'));
@@ -481,7 +516,7 @@ export default function App() {
         </div>
 
         {/* Карточка особых замечаний по смене (переданных сменщиком) */}
-        {shiftInfo?.handover?.notes && shiftInfo.handover.notes.trim() && !isHandoverNotesDismissed && (
+        {shiftInfo?.handover?.notes && shiftInfo.handover.notes.trim() && !shiftInfo.handover.is_read && !isHandoverNotesDismissed && (
           <div className="mb-3.5 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-amber-500/5 dark:from-amber-950/40 dark:via-amber-900/20 dark:to-transparent border-2 border-amber-400/60 dark:border-amber-500/50 rounded-2xl p-3.5 shadow-md backdrop-blur-md flex items-start gap-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="p-2 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl flex-shrink-0 shadow-sm mt-0.5">
               <MessageSquare className="w-5 h-5" />
@@ -504,9 +539,9 @@ export default function App() {
                   )}
                   <button
                     type="button"
-                    onClick={() => setIsHandoverNotesDismissed(true)}
+                    onClick={handleDismissHandoverNotes}
                     className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 rounded-lg transition-colors cursor-pointer"
-                    title="Скрыть замечания"
+                    title="Подтвердить ознакомление"
                   >
                     Ознакомлен ✕
                   </button>
