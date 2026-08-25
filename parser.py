@@ -560,8 +560,8 @@ def process_flights(
 def export_to_excel(
     rows: list,
     output_filename: str,
-    start_dt: datetime,
-    end_dt: datetime
+    start_dt: any = None,
+    end_dt: any = None
 ):
     """
     Экспорт данных в таблицу Excel по точному формату "Суточный план Диспетчера группы центровки".
@@ -571,14 +571,22 @@ def export_to_excel(
     ws.title = "Суточный план"
 
     # Форматирование диапазона дат и времени для заголовка
-    if start_dt.hour == 0 and start_dt.minute == 0 and end_dt.hour == 23 and end_dt.minute >= 59:
-        start_fmt = start_dt.strftime("%d.%m.")
-        end_fmt = end_dt.strftime("%d.%m.%y")
-        date_header_str = f"{start_fmt}-{end_fmt}"
+    if isinstance(start_dt, str) and not end_dt:
+        date_header_str = start_dt
+    elif isinstance(start_dt, datetime) and isinstance(end_dt, datetime):
+        if start_dt.hour == 0 and start_dt.minute == 0 and end_dt.hour == 23 and end_dt.minute >= 59:
+            start_fmt = start_dt.strftime("%d.%m.")
+            end_fmt = end_dt.strftime("%d.%m.%y")
+            date_header_str = f"{start_fmt}-{end_fmt}"
+        else:
+            start_fmt = start_dt.strftime("%d.%m.%y %H:%M")
+            end_fmt = end_dt.strftime("%d.%m.%y %H:%M")
+            date_header_str = f"{start_fmt} - {end_fmt}"
+    elif isinstance(start_dt, str) and isinstance(end_dt, str):
+        date_header_str = f"{start_dt} - {end_dt}"
     else:
-        start_fmt = start_dt.strftime("%d.%m.%y %H:%M")
-        end_fmt = end_dt.strftime("%d.%m.%y %H:%M")
-        date_header_str = f"{start_fmt} - {end_fmt}"
+        now_dt = datetime.now(MSK_TZ)
+        date_header_str = now_dt.strftime("%d.%m.%Y")
 
     title_text = f"Суточный план Диспетчера группы центровки  {date_header_str}"
 
