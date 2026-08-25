@@ -424,6 +424,20 @@ export default function App() {
     );
   });
 
+  // Если пользователь не авторизован - показываем изолированный экран входа (приложение полностью скрыто)
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
+        <LoginModal
+          isOpen={true}
+          isFullScreen={true}
+          onClose={() => {}}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col transition-colors duration-200">
       {/* Header Bar */}
