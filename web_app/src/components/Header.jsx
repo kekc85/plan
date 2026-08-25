@@ -21,6 +21,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { formatValidDateInterval } from '../utils/validators';
+import DownloadManualModal from './DownloadManualModal';
 
 export default function Header({
   shiftInfo,
@@ -44,6 +45,7 @@ export default function Header({
   const [utcTime, setUtcTime] = useState('');
   const [mskTime, setMskTime] = useState('');
   const [currentDateStr, setCurrentDateStr] = useState('');
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   // Идущие часы UTC, МСК и текущая дата (каждую секунду)
@@ -341,20 +343,26 @@ export default function Header({
             </button>
 
             {/* КНОПКА 5: ИНСТРУКЦИЯ ДЛЯ ДИСПЕТЧЕРА */}
-            <a
-              href="Руководство_пользователя_AeroPlan.docx"
-              download="Руководство_пользователя_AeroPlan.docx"
-              className="flex items-center gap-1 bg-sky-100 hover:bg-sky-200 dark:bg-sky-950/80 dark:hover:bg-sky-900 text-sky-800 dark:text-sky-300 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-sky-300 dark:border-sky-700/80 shadow-sm transition-all active:scale-95 no-underline"
-              title="Скачать иллюстрированное руководство пользователя в формате Word (.docx)"
+            <button
+              type="button"
+              onClick={() => setIsManualModalOpen(true)}
+              className="flex items-center gap-1 bg-sky-100 hover:bg-sky-200 dark:bg-sky-950/80 dark:hover:bg-sky-900 text-sky-800 dark:text-sky-300 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-sky-300 dark:border-sky-700/80 shadow-sm transition-all active:scale-95 cursor-pointer"
+              title="Открыть меню скачивания руководства пользователя (.docx)"
             >
               <BookOpen className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
               <span>Инструкция</span>
-            </a>
+            </button>
           </div>
 
         </div>
 
       </div>
+
+      {/* Модальное окно скачивания руководства пользователя с выбором пути */}
+      <DownloadManualModal
+        isOpen={isManualModalOpen}
+        onClose={() => setIsManualModalOpen(false)}
+      />
     </header>
   );
 }
