@@ -510,6 +510,74 @@ if ($route === '/shift/handover') {
 }
 
 // ----------------------------------------------------
+// ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ЗАПРОСА К AVIABIT С АВТОРИЗАЦИЕЙ
+// ----------------------------------------------------
+function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTsMs, $templateId = 1055) {
+    $cookieJar = tempnam(sys_get_temp_dir(), 'avb_');
+    $origin = rtrim($baseUrl, '/');
+    $referer = $origin . '/plan-flight';
+
+    // 1. Авторизация в AviaBit
+    $authPayload = json_encode([
+        'rememberMe' => true,
+        'version' => [
+            'date' => '2026-08-06T08:00:00.000Z',
+            'company' => 'AviaBit',
+            'number' => '9.8.1'
+        ],
+        'eng' => false,
+        'username' => $username,
+        'password' => $password
+    ]);
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, "$origin/api/auth");
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $authPayload);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieJar);
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieJar);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Origin: $origin",
+        "Referer: $referer",
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Content-Type: application/json',
+        'Accept: application/json, text/plain, */*'
+    ]);
+    curl_exec($ch);
+    curl_close($ch);
+
+    // 2. Получение суточного плана полетов
+    $url = "$origin/api/plan-flight?dateBegin={$startTsMs}&dateEnd={$endTsMs}&eng=false&apCode=3&apId=0&template={$templateId}&showCancel=false";
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieJar);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Origin: $origin",
+        "Referer: $referer",
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept: application/json, text/plain, */*'
+    ]);
+    $schedRes = curl_exec($ch);
+    curl_close($ch);
+
+    @unlink($cookieJar);
+
+    if ($schedRes) {
+        $data = json_decode($schedRes, true);
+        if (is_array($data)) {
+            return $data;
+        }
+    }
+    return [];
+}
+
+// ----------------------------------------------------
 // ЭНДПОИНТ: /fetch_schedule (Парсер AviaBit)
 // ----------------------------------------------------
 if ($route === '/fetch_schedule') {
@@ -558,34 +626,17 @@ if ($route === '/fetch_schedule') {
         'GRV' => 'Грозный', 'VOG' => 'Волгоград', 'ASF' => 'Астрахань', 'AYT' => 'Анталья'
     ];
 
-    $urls = [];
-    if ($airline === 'both' || $airline === 'nordwind') {
-        $urls[] = "https://aviabit.nordwindairlines.ru/api/plan-flight?dateBegin={$tsStartMs}&dateEnd={$tsEndMs}&eng=false&apCode=3&apId=0&template=1055&showCancel=false";
-    }
-    if ($airline === 'both' || $airline === 'ikar') {
-        $urls[] = "https://aviabit.ikar.aero/api/plan-flight?dateBegin={$tsStartMs}&dateEnd={$tsEndMs}&eng=false&apCode=3&apId=0&template=1055&showCancel=false";
-    }
+    $avbUser = 'a.zubkov';
+    $avbPass = 'SoLnCeVo1985';
 
     $rawFlights = [];
-    foreach ($urls as $url) {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 25);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Content-Type: application/json'
-        ]);
-        $res = curl_exec($ch);
-        curl_close($ch);
-
-        if ($res) {
-            $data = json_decode($res, true);
-            if (is_array($data)) {
-                $rawFlights = array_merge($rawFlights, $data);
-            }
-        }
+    if ($airline === 'both' || $airline === 'nordwind') {
+        $nw = fetchAviaBitSchedule('https://aviabit.nordwindairlines.ru', $avbUser, $avbPass, $tsStartMs, $tsEndMs);
+        if (!empty($nw)) $rawFlights = array_merge($rawFlights, $nw);
+    }
+    if ($airline === 'both' || $airline === 'ikar') {
+        $ik = fetchAviaBitSchedule('https://aviabit.ikar.aero', $avbUser, $avbPass, $tsStartMs, $tsEndMs);
+        if (!empty($ik)) $rawFlights = array_merge($rawFlights, $ik);
     }
 
     $processed = [];
