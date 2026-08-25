@@ -216,7 +216,7 @@ export default function FlightRow({
     >
       {/* 1. Drag Handle & Index */}
       <td
-        className="py-2.5 px-1 text-center whitespace-nowrap no-print w-8 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
+        className="sticky left-0 z-20 py-2.5 px-1 text-center whitespace-nowrap no-print w-8 min-w-[32px] bg-inherit hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155]"
         title="Хватайте и перетаскивайте в любое место"
       >
         <div className="flex items-center justify-center gap-0.5">
@@ -226,7 +226,7 @@ export default function FlightRow({
       </td>
 
       {/* 2. № Рейса */}
-      <td className="py-2.5 px-1 font-mono font-extrabold text-base text-sky-700 dark:text-sky-400 whitespace-nowrap min-w-[82px] text-center">
+      <td className="sticky left-8 z-20 py-2.5 px-1 font-mono font-extrabold text-base text-sky-700 dark:text-sky-400 whitespace-nowrap min-w-[82px] text-center bg-inherit shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)]">
         <input
           type="text"
           value={flight.flight || ''}

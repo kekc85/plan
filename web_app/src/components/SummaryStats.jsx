@@ -61,7 +61,7 @@ export default function SummaryStats({ flights }) {
       </div>
 
       {/* 5. Закрыто (LDM) */}
-      <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm">
+      <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 shadow-sm col-span-2 sm:col-span-1">
         <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
           <ShieldCheck className="w-4 h-4" />
         </div>
