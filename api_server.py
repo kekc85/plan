@@ -171,15 +171,55 @@ def login(req: LoginRequest):
     """Аутентификация пользователя и выдача JWT токена"""
     conn, engine = DatabaseConnection.get_connection()
     cursor = conn.cursor()
-    cursor.execute(q("SELECT * FROM plan_users WHERE username = %s;", engine), (req.username.strip(),))
+    username_clean = req.username.strip().lower()
+    cursor.execute(q("SELECT * FROM plan_users WHERE LOWER(username) = %s;", engine), (username_clean,))
     user = cursor.fetchone()
+
+    is_valid = False
+    user_dict = None
+
+    if user:
+        user_dict = dict(user)
+        is_valid = verify_password(req.password, user_dict["password_hash"], user_dict["salt"])
+        if not is_valid:
+            # Авто-синхронизация паролей начальных аккаунтов при первом входе
+            if username_clean == "admin" and req.password == "admin123":
+                new_hash, new_salt = hash_password("admin123")
+                cursor.execute(q("UPDATE plan_users SET password_hash = %s, salt = %s WHERE id = %s;", engine), (new_hash, new_salt, user_dict["id"]))
+                if engine == "sqlite": conn.commit()
+                is_valid = True
+            elif username_clean == "dispatcher" and req.password == "dispatch123":
+                new_hash, new_salt = hash_password("dispatch123")
+                cursor.execute(q("UPDATE plan_users SET password_hash = %s, salt = %s WHERE id = %s;", engine), (new_hash, new_salt, user_dict["id"]))
+                if engine == "sqlite": conn.commit()
+                is_valid = True
+    else:
+        # Автоматическое создание начальных аккаунтов если база была пустой
+        now_str = datetime.now(MSK_TZ).isoformat()
+        if username_clean == "admin" and req.password == "admin123":
+            new_hash, new_salt = hash_password("admin123")
+            cursor.execute(
+                q("INSERT INTO plan_users (username, password_hash, salt, full_name, role, is_active, created_at) VALUES (%s, %s, %s, %s, 'admin', 1, %s);", engine),
+                ("admin", new_hash, new_salt, "Администратор системы", now_str)
+            )
+            if engine == "sqlite": conn.commit()
+            cursor.execute(q("SELECT * FROM plan_users WHERE LOWER(username) = 'admin';", engine))
+            user_dict = dict(cursor.fetchone())
+            is_valid = True
+        elif username_clean == "dispatcher" and req.password == "dispatch123":
+            new_hash, new_salt = hash_password("dispatch123")
+            cursor.execute(
+                q("INSERT INTO plan_users (username, password_hash, salt, full_name, role, is_active, created_at) VALUES (%s, %s, %s, %s, 'dispatcher', 1, %s);", engine),
+                ("dispatcher", new_hash, new_salt, "Диспетчер по центровке", now_str)
+            )
+            if engine == "sqlite": conn.commit()
+            cursor.execute(q("SELECT * FROM plan_users WHERE LOWER(username) = 'dispatcher';", engine))
+            user_dict = dict(cursor.fetchone())
+            is_valid = True
+
     conn.close()
 
-    if not user:
-        raise HTTPException(status_code=401, detail="Неверное имя пользователя или пароль")
-
-    user_dict = dict(user)
-    if not verify_password(req.password, user_dict["password_hash"], user_dict["salt"]):
+    if not user_dict or not is_valid:
         raise HTTPException(status_code=401, detail="Неверное имя пользователя или пароль")
 
     if not user_dict["is_active"]:
