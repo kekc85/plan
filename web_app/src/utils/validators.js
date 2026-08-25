@@ -245,4 +245,20 @@ export function isFlightReleaseOverdue(flight) {
   return normNow >= normRel;
 }
 
+// Проверка, вылетает ли рейс из Оренбурга (REN)
+export function isRenDeparture(flight) {
+  if (!flight) return false;
+  const routeAirports = (flight.route_airports || '').toUpperCase();
+  const routeCity = (flight.route_city || '').toUpperCase();
+  const dep = (flight.dep_airport || '').toUpperCase();
+  const origin = (flight.origin || '').toUpperCase();
+
+  if (dep === 'REN' || origin === 'REN') return true;
+  if (routeAirports.startsWith('REN') || routeAirports.startsWith('UWSG')) return true;
+  if (routeCity.includes('ОРЕНБУРГ') || routeCity.startsWith('REN')) return true;
+
+  return false;
+}
+
+
 

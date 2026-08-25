@@ -11,7 +11,8 @@ import {
   formatValidAcConfig,
   formatValidMtow,
   formatValidDayMonth,
-  isFlightReleaseOverdue
+  isFlightReleaseOverdue,
+  isRenDeparture
 } from '../utils/validators';
 
 export default function FlightRow({
@@ -141,6 +142,13 @@ export default function FlightRow({
     onUpdateFlight(flight.id, updates);
   };
 
+  // Чекбокс Проставить времена в Astra (для рейсов из REN Оренбург)
+  const handleToggleAstraTimes = (e) => {
+    if (e) e.stopPropagation();
+    const nextVal = !flight.astra_times_sent;
+    onUpdateFlight(flight.id, { astra_times_sent: nextVal });
+  };
+
   const handleCheckboxKeyDown = (e, toggleFn) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -150,6 +158,7 @@ export default function FlightRow({
 
   const currentStatus = flight.status || 'pending';
   const isOverdue = isFlightReleaseOverdue(flight);
+  const isRen = isRenDeparture(flight);
 
   // Раздельные цветовые схемы для СВЕТЛОЙ и ТЕМНОЙ тем
   const rowStatusTheme = {
@@ -582,7 +591,35 @@ export default function FlightRow({
         </button>
       </td>
 
-      {/* 17. СТАТУС РЕЙСА */}
+      {/* 17. ВРЕМЕНА В ASTRA (Строго для рейсов вылетающих из REN Оренбург) */}
+      <td className="py-2.5 px-0.5 text-center whitespace-nowrap">
+        {isRen ? (
+          <button
+            type="button"
+            onClick={handleToggleAstraTimes}
+            onKeyDown={(e) => handleCheckboxKeyDown(e, handleToggleAstraTimes)}
+            onMouseDown={(e) => e.stopPropagation()}
+            tabIndex={0}
+            className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border text-xs font-extrabold transition-all focus:outline-none focus:ring-2 focus:ring-teal-400 shadow-sm ${
+              flight.astra_times_sent
+                ? 'bg-teal-600 text-white border-teal-700 dark:bg-teal-500/30 dark:text-teal-200 dark:border-teal-400'
+                : 'bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border-teal-400/60 dark:border-teal-600/50 hover:bg-teal-100/70 hover:border-teal-500 animate-pulse'
+            }`}
+            title="Для рейса из Оренбурга (REN) необходимо вручную проставить время движения и взлёта в Astra!"
+          >
+            <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${
+              flight.astra_times_sent ? 'bg-white text-teal-700 border-white' : 'border-teal-500 dark:border-teal-400 bg-white dark:bg-slate-900'
+            }`}>
+              {flight.astra_times_sent && <Check className="w-3 h-3 stroke-[3]" />}
+            </div>
+            <span>Времена</span>
+          </button>
+        ) : (
+          <span className="text-slate-300 dark:text-slate-700 font-mono text-xs select-none">—</span>
+        )}
+      </td>
+
+      {/* 18. СТАТУС РЕЙСА */}
       <td className="py-2.5 px-1 text-center whitespace-nowrap">
         <select
           value={currentStatus}

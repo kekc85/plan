@@ -65,6 +65,7 @@ export default function ShiftTable({
               <th className="py-3 px-1 font-extrabold tracking-wider uppercase min-w-[140px]">Багаж (особенности)</th>
               <th className="py-3 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 text-amber-700 dark:text-amber-300">СЗВ</th>
               <th className="py-3 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 text-emerald-700 dark:text-emerald-300">LDM</th>
+              <th className="py-3 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[85px] text-teal-700 dark:text-teal-300">Астра (REN)<br/><span className="text-[9px] font-medium text-slate-500">Времена</span></th>
               <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-28">Статус</th>
               <th className="py-3 px-1 font-extrabold tracking-wider uppercase min-w-[120px]">Примечания</th>
               <th className="py-3 px-1 text-center font-extrabold tracking-wider uppercase w-14 no-print">Действия</th>
@@ -98,7 +99,7 @@ export default function ShiftTable({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="19" className="text-center py-16 text-slate-500">
+                    <td colSpan="20" className="text-center py-16 text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <PlaneTakeoff className="w-10 h-10 text-slate-400 dark:text-slate-600 animate-pulse" />
                         <p className="text-sm font-bold text-slate-700 dark:text-slate-300">В журнале смены пока нет рейсов</p>
