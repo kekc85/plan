@@ -119,9 +119,9 @@ export default function HandoverModal({
           )}
 
           {/* Карточка Сдал -> Принял */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl p-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl p-3.5 items-center">
             <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1.5">
                 Смену сдаёт
               </span>
               <p className="font-extrabold text-sm text-slate-900 dark:text-slate-100 py-1">
@@ -130,8 +130,8 @@ export default function HandoverModal({
             </div>
 
             <div>
-              <label className="text-[10px] font-extrabold uppercase tracking-wider text-sky-700 dark:text-sky-400 block mb-1">
-                Смену принимает (выберите учётную запись) *
+              <label className="text-[10px] font-extrabold uppercase tracking-wider text-sky-700 dark:text-sky-400 block mb-1.5 whitespace-nowrap">
+                Смену принимает *
               </label>
               <div className="relative">
                 <select
