@@ -5,6 +5,7 @@
  * - Вертикальный поворот текста для колонок СЗВ и ЛДМ (90°)
  * - Точные границы ячеек и пропорциональные ширины
  * - Альбомная ориентация страницы A4 (fit to page)
+ * - Окно выбора места сохранения без закрытия или перехода страницы
  */
 
 export async function exportShiftToExcel(flights, shiftInfo) {
@@ -36,18 +37,54 @@ export async function exportShiftToExcel(flights, shiftInfo) {
 
       if (response.ok) {
         const blob = await response.blob();
+        const cleanDate = (shiftInfo?.date_interval || shiftInfo?.date || 'export').replace(/[^a-zA-Z0-9а-яА-Я._-]/g, '_');
+        const fileName = `Суточный_план_Диспетчера_${cleanDate}.xlsx`;
+
+        // 1. Предпочтительный вариант: File System Access API (нативное модальное окно «Сохранить как»)
+        // Приложение остается на экране, поверх него открывается диалог выбора папки и имени файла
+        if (typeof window.showSaveFilePicker === 'function') {
+          try {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: fileName,
+              types: [
+                {
+                  description: 'Таблица Microsoft Excel (.xlsx)',
+                  accept: {
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']
+                  }
+                }
+              ]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return;
+          } catch (pickerErr) {
+            // Если пользователь нажал "Отмена" в окне сохранения - просто выходим без ошибок
+            if (pickerErr.name === 'AbortError') {
+              return;
+            }
+            console.warn('showSaveFilePicker fallback:', pickerErr);
+          }
+        }
+
+        // 2. Универсальный фоновый триггер скачивания без перехода по URL
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
+        a.style.display = 'none';
         a.href = downloadUrl;
-
-        // Извлекаем имя файла из заголовка Content-Disposition или формируем по дате
-        const cleanDate = (shiftInfo?.date_interval || shiftInfo?.date || 'export').replace(/[^a-zA-Z0-9а-яА-Я._-]/g, '_');
-        a.download = `Суточный_план_Диспетчера_${cleanDate}.xlsx`;
-        
+        a.setAttribute('download', fileName);
         document.body.appendChild(a);
         a.click();
-        a.remove();
-        window.URL.revokeObjectURL(downloadUrl);
+
+        // Задержка перед отзывом URL, чтобы браузер успел обработать скачивание в фоне
+        setTimeout(() => {
+          if (a.parentNode) {
+            document.body.removeChild(a);
+          }
+          window.URL.revokeObjectURL(downloadUrl);
+        }, 3000);
+
         return;
       } else {
         const errData = await response.json().catch(() => ({}));
