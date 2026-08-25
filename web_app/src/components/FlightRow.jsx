@@ -37,64 +37,69 @@ export default function FlightRow({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 50 : 1,
-    opacity: isDragging ? 0.75 : 1,
   };
 
   const handleCellChange = (field, value) => {
     onUpdateFlight(flight.id, { [field]: value });
   };
 
-  // Авто-маска времени вылета и авто-расчет времени выпуска (за 40 мин)
+  // Изменение времени вылета -> авто-расчет времени выпуска (-40 мин)
   const handleDepartureTimeChange = (e) => {
-    const formatted = formatValidTime(e.target.value);
+    const rawVal = e.target.value;
+    const formatted = formatValidTime(rawVal);
     const updates = { time: formatted };
-    if (formatted && formatted.length === 5) {
-      updates.release_time = calcReleaseTime(formatted, 40);
+
+    if (formatted.length === 5 && formatted.includes(':')) {
+      updates.release_time = calcReleaseTime(formatted);
     }
     onUpdateFlight(flight.id, updates);
   };
 
-  // Автоматическая сортировка при выходе из поля времени вылета
+  // Авто-сортировка при потере фокуса на поле времени вылета
   const handleDepartureTimeBlur = () => {
-    if (flight.time && flight.time.length === 5) {
-      onUpdateFlight(flight.id, {}, true);
-    }
+    onUpdateFlight(flight.id, {}, true);
   };
 
+  // Сортировка по нажатию клавиши Enter
   const handleDepartureTimeKeyDown = (e) => {
+    e.stopPropagation();
     if (e.key === 'Enter') {
       e.target.blur();
     }
   };
 
-  // Ручное изменение времени выпуска
+  // Изменение времени выпуска вручную
   const handleReleaseTimeChange = (e) => {
-    const formatted = formatValidTime(e.target.value);
-    onUpdateFlight(flight.id, { release_time: formatted });
+    const rawVal = e.target.value;
+    const formatted = formatValidTime(rawVal);
+    handleCellChange('release_time', formatted);
   };
 
-  // Синхронизация статуса из селектора с чекбоксами
+  // Смена статуса из выпадающего списка
   const handleStatusSelectChange = (e) => {
     const newStatus = e.target.value;
     const updates = { status: newStatus };
 
-    if (newStatus === 'pending' || newStatus === 'in_progress' || newStatus === 'prepared') {
-      updates.lir_sent = false;
-      updates.szv_sent = false;
-      updates.ldm_sent = false;
+    if (newStatus === 'released') {
+      updates.szv_sent = true;
+      updates.lir_sent = true;
+    } else if (newStatus === 'closed') {
+      updates.ldm_sent = true;
+      updates.szv_sent = true;
+      updates.lir_sent = true;
+      if (isRen) {
+        updates.astra_times_sent = true;
+      }
     } else if (newStatus === 'lir_sent') {
       updates.lir_sent = true;
       updates.szv_sent = false;
       updates.ldm_sent = false;
-    } else if (newStatus === 'released') {
-      updates.lir_sent = true;
-      updates.szv_sent = true;
+    } else if (newStatus === 'pending' || newStatus === 'in_progress' || newStatus === 'prepared') {
+      updates.szv_sent = false;
       updates.ldm_sent = false;
-    } else if (newStatus === 'closed') {
-      updates.lir_sent = true;
-      updates.szv_sent = true;
-      updates.ldm_sent = true;
+      if (newStatus === 'pending') {
+        updates.lir_sent = false;
+      }
     }
 
     onUpdateFlight(flight.id, updates);
@@ -203,16 +208,16 @@ export default function FlightRow({
     <tr
       ref={setNodeRef}
       style={style}
-      className={`group border-b border-slate-200 dark:border-slate-800/80 transition-all duration-150 ${activeRowTheme} ${
+      {...attributes}
+      {...listeners}
+      className={`group border-b border-slate-200 dark:border-slate-800/80 transition-all duration-150 ${activeRowTheme} cursor-grab active:cursor-grabbing ${
         isDragging ? 'shadow-2xl ring-2 ring-sky-400 z-50 opacity-90' : ''
       }`}
     >
       {/* 1. Drag Handle & Index */}
       <td
-        {...attributes}
-        {...listeners}
-        className="py-2.5 px-1 text-center whitespace-nowrap no-print w-8 cursor-grab active:cursor-grabbing hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
-        title="Перетащите для изменения порядка строк"
+        className="py-2.5 px-1 text-center whitespace-nowrap no-print w-8 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
+        title="Хватайте и перетаскивайте в любое место"
       >
         <div className="flex items-center justify-center gap-0.5">
           <GripVertical className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 group-hover:text-sky-500" />
@@ -227,6 +232,7 @@ export default function FlightRow({
           value={flight.flight || ''}
           onChange={(e) => handleCellChange('flight', formatValidFlight(e.target.value))}
           onFocus={(e) => e.target.select()}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-sky-500 rounded px-1 py-0.5 w-20 font-extrabold font-mono text-base text-sky-700 dark:text-sky-400 outline-none cursor-text tracking-wide text-center"
@@ -241,6 +247,7 @@ export default function FlightRow({
             value={flight.route_city || ''}
             onChange={(e) => handleCellChange('route_city', e.target.value)}
             onFocus={(e) => e.target.select()}
+            onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="Город"
@@ -251,6 +258,7 @@ export default function FlightRow({
             value={flight.route_airports || ''}
             onChange={(e) => handleCellChange('route_airports', e.target.value.toUpperCase())}
             onFocus={(e) => e.target.select()}
+            onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="DEP-ARR"
@@ -278,6 +286,7 @@ export default function FlightRow({
               value={flight.release_time || ''}
               onChange={handleReleaseTimeChange}
               onFocus={(e) => e.target.select()}
+              onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="--:--"
@@ -300,6 +309,7 @@ export default function FlightRow({
               onBlur={handleDepartureTimeBlur}
               onKeyDown={handleDepartureTimeKeyDown}
               onFocus={(e) => e.target.select()}
+              onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               placeholder="00:00"
               className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-amber-500 rounded px-0.5 text-center font-mono font-extrabold text-sm text-amber-700 dark:text-amber-300 outline-none w-14 cursor-text"
@@ -315,6 +325,7 @@ export default function FlightRow({
               onChange={(e) => handleCellChange('flight_date', formatValidDayMonth(e.target.value))}
               onBlur={() => onUpdateFlight(flight.id, {}, true)}
               onFocus={(e) => e.target.select()}
+              onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="25.08"
@@ -333,6 +344,7 @@ export default function FlightRow({
           value={flight.ac_num || ''}
           onChange={(e) => handleCellChange('ac_num', formatValidAcNum(e.target.value))}
           onFocus={(e) => e.target.select()}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="73314"
@@ -348,6 +360,7 @@ export default function FlightRow({
           value={flight.ac_config || ''}
           onChange={(e) => handleCellChange('ac_config', formatValidAcConfig(e.target.value))}
           onFocus={(e) => e.target.select()}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="189"
@@ -363,6 +376,7 @@ export default function FlightRow({
           value={flight.pax || ''}
           onChange={(e) => handleCellChange('pax', e.target.value.replace(/\D/g, '').slice(0, 4))}
           onFocus={(e) => e.target.select()}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="0"
@@ -378,6 +392,7 @@ export default function FlightRow({
           value={flight.crew || ''}
           onChange={(e) => handleCellChange('crew', formatValidCrew(e.target.value))}
           onFocus={(e) => e.target.select()}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="2/4/0/0"
@@ -396,6 +411,7 @@ export default function FlightRow({
                 value={flight.fuel_block || ''}
                 onChange={(e) => handleCellChange('fuel_block', e.target.value)}
                 onFocus={(e) => e.target.select()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
@@ -409,6 +425,7 @@ export default function FlightRow({
                 value={flight.fuel_trip || ''}
                 onChange={(e) => handleCellChange('fuel_trip', e.target.value)}
                 onFocus={(e) => e.target.select()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
@@ -422,6 +439,7 @@ export default function FlightRow({
                 value={flight.fuel_taxi || ''}
                 onChange={(e) => handleCellChange('fuel_taxi', e.target.value)}
                 onFocus={(e) => e.target.select()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
@@ -438,6 +456,7 @@ export default function FlightRow({
                 value={flight.dow || ''}
                 onChange={(e) => handleCellChange('dow', e.target.value)}
                 onFocus={(e) => e.target.select()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
@@ -451,6 +470,7 @@ export default function FlightRow({
                 value={flight.doi || ''}
                 onChange={(e) => handleCellChange('doi', e.target.value)}
                 onFocus={(e) => e.target.select()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
@@ -462,6 +482,7 @@ export default function FlightRow({
               <select
                 value={flight.galley || 'D'}
                 onChange={(e) => handleCellChange('galley', e.target.value)}
+                onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-amber-500 rounded px-1 py-0.5 font-mono text-xs text-amber-800 dark:text-amber-300 text-center font-extrabold outline-none cursor-pointer"
@@ -485,6 +506,7 @@ export default function FlightRow({
           value={flight.mtow || ''}
           onChange={(e) => handleCellChange('mtow', formatValidMtow(e.target.value))}
           onFocus={(e) => e.target.select()}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="—"
@@ -499,6 +521,7 @@ export default function FlightRow({
           type="button"
           onClick={handleToggleLir}
           onKeyDown={(e) => handleCheckboxKeyDown(e, handleToggleLir)}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           tabIndex={0}
           className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded-md border text-xs font-extrabold transition-all focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm ${
@@ -523,6 +546,7 @@ export default function FlightRow({
           rows={2}
           value={flight.cargo || ''}
           onChange={(e) => handleCellChange('cargo', e.target.value)}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="Груз..."
@@ -537,6 +561,7 @@ export default function FlightRow({
           rows={2}
           value={flight.mail || ''}
           onChange={(e) => handleCellChange('mail', e.target.value)}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="Почта..."
@@ -551,6 +576,7 @@ export default function FlightRow({
           rows={2}
           value={flight.baggage || ''}
           onChange={(e) => handleCellChange('baggage', e.target.value)}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="Особенности багажа..."
@@ -565,6 +591,7 @@ export default function FlightRow({
           type="button"
           onClick={handleToggleSzv}
           onKeyDown={(e) => handleCheckboxKeyDown(e, handleToggleSzv)}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           tabIndex={0}
           className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-extrabold transition-all focus:outline-none focus:ring-2 focus:ring-amber-400 shadow-sm ${
@@ -589,6 +616,7 @@ export default function FlightRow({
           type="button"
           onClick={handleToggleLdm}
           onKeyDown={(e) => handleCheckboxKeyDown(e, handleToggleLdm)}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           tabIndex={0}
           className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-extrabold transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400 shadow-sm ${
@@ -614,6 +642,7 @@ export default function FlightRow({
             type="button"
             onClick={handleToggleAstraTimes}
             onKeyDown={(e) => handleCheckboxKeyDown(e, handleToggleAstraTimes)}
+            onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             tabIndex={0}
             className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border text-xs font-extrabold transition-all focus:outline-none focus:ring-2 focus:ring-teal-400 shadow-sm ${
@@ -640,6 +669,7 @@ export default function FlightRow({
         <select
           value={currentStatus}
           onChange={handleStatusSelectChange}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           className={`text-xs font-extrabold rounded-md px-2.5 py-1 border focus:outline-none cursor-pointer shadow-sm ${statusBadgeStyle[currentStatus]}`}
         >
@@ -652,12 +682,13 @@ export default function FlightRow({
         </select>
       </td>
 
-      {/* 18. Примечания */}
+      {/* 19. Примечания */}
       <td className="py-1 px-1 min-w-[120px]">
         <textarea
           rows={2}
           value={flight.notes || ''}
           onChange={(e) => handleCellChange('notes', e.target.value)}
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="Заметка..."
@@ -666,11 +697,12 @@ export default function FlightRow({
         />
       </td>
 
-      {/* 19. Действия */}
+      {/* 20. Действия */}
       <td className="py-2.5 px-1 text-center whitespace-nowrap no-print">
         <div className="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp(index); }}
+            onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             disabled={isFirst}
             className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800"
@@ -680,6 +712,7 @@ export default function FlightRow({
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown(index); }}
+            onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             disabled={isLast}
             className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800"
@@ -689,6 +722,7 @@ export default function FlightRow({
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDeleteFlight(flight.id); }}
+            onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             className="p-1 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-colors ml-0.5"
             title="Удалить рейс"

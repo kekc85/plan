@@ -1,6 +1,6 @@
 export const APP_NAME = "AeroPlan W&B";
-export const APP_VERSION = "v1.0.1";
-export const BUILD_DATE = "25.08.2026";
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : "v1.0.1";
+export const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : "25.08.2026";
 export const DEVELOPER = "Andrey Zubkov";
 
 export function getFullVersionString() {
