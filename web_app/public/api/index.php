@@ -843,8 +843,24 @@ if ($route === '/fetch_schedule') {
         $candidates[] = $fl;
     }
 
-function parseTelegramLoad($text) {
+function parseTelegramLoad($text, $code = '') {
     if (!$text) {
+        return ['cargo' => '', 'mail' => '', 'baggage' => ''];
+    }
+
+    $lines = array_values(array_filter(array_map('trim', explode("\n", $text))));
+    if (empty($lines)) {
+        return ['cargo' => '', 'mail' => '', 'baggage' => ''];
+    }
+
+    // Строгая проверка: телеграмма должна быть именно UWS (в заголовке / коде)
+    $isUws = (
+        ($code && strtoupper(trim($code)) === 'UWS') ||
+        (stripos($lines[0], 'UWS') === 0) ||
+        (isset($lines[1]) && stripos($lines[1], 'UWS') === 0)
+    );
+
+    if (!$isUws) {
         return ['cargo' => '', 'mail' => '', 'baggage' => ''];
     }
 
@@ -857,37 +873,25 @@ function parseTelegramLoad($text) {
 
     // Регулярное выражение для строк UWS:
     // -KEJ/154P/C или KEJ/154/C или /154P/C или -KEJ/154K/C или -KEJ/20P/M
-    if (preg_match_all('/(?:[A-Z]{3})?\/(\d+)(?:P|K|KG|PC)?\/([CMBE])/i', $text, $matches, PREG_SET_ORDER)) {
-        foreach ($matches as $m) {
-            $weight = (int)$m[1];
-            $type = strtoupper($m[2]);
-            if ($type === 'C') { // Cargo
-                $cargoTotal += $weight;
-                $hasCargo = true;
-            } elseif ($type === 'M') { // Mail
-                $mailTotal += $weight;
-                $hasMail = true;
-            } elseif ($type === 'B' || $type === 'E') { // Baggage / Equipment
-                $baggageTotal += $weight;
-                $hasBaggage = true;
-            }
+    foreach ($lines as $line) {
+        if (strtoupper($line) === 'UWS' || preg_match('/^[A-Z0-9]{2,6}\/\d{1,2}\.[A-Z]{3}/i', $line)) {
+            continue;
         }
-    }
 
-    // Если UWS не дал результатов, проверяем LDM: .C154.M20 или .B/1938.C/154
-    if (!$hasCargo && !$hasMail) {
-        if (preg_match('/\.C\/?(\d+)/i', $text, $m)) {
-            $val = (int)$m[1];
-            if ($val > 0) {
-                $cargoTotal = $val;
-                $hasCargo = true;
-            }
-        }
-        if (preg_match('/\.M\/?(\d+)/i', $text, $m)) {
-            $val = (int)$m[1];
-            if ($val > 0) {
-                $mailTotal = $val;
-                $hasMail = true;
+        if (preg_match_all('/(?:^|[-.\/\s])(?:[A-Z]{3}\/)?(\d+)(?:P|K|KG|PC)?\/([CMBE])(?:\b|[\/\s]|$)/i', $line, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $m) {
+                $weight = (int)$m[1];
+                $type = strtoupper($m[2]);
+                if ($type === 'C') { // Cargo
+                    $cargoTotal += $weight;
+                    $hasCargo = true;
+                } elseif ($type === 'M') { // Mail
+                    $mailTotal += $weight;
+                    $hasMail = true;
+                } elseif ($type === 'B' || $type === 'E') { // Baggage / Equipment
+                    $baggageTotal += $weight;
+                    $hasBaggage = true;
+                }
             }
         }
     }
@@ -1078,10 +1082,11 @@ function parseTelegramLoad($text) {
 
         $airports = "{$dep}-{$arr}";
 
-        // Парсинг телеграмм (UWS / LDM) для извлечения Груза (Cargo) и Почты (Mail)
+        // Парсинг телеграмм (строго UWS) для извлечения Груза (Cargo) и Почты (Mail)
         $telexData = $telegrams[$pfId] ?? [];
         $telexText = $telexData['text'] ?? '';
-        $tlgLoad = parseTelegramLoad($telexText);
+        $telexCode = $telexData['code'] ?? '';
+        $tlgLoad = parseTelegramLoad($telexText, $telexCode);
 
         $cargoVal = $tlgLoad['cargo'] ?? '';
         $mailVal = $tlgLoad['mail'] ?? '';

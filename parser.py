@@ -349,9 +349,10 @@ class AviaBitClient:
         return {}
 
 
-def parse_telegram_load(text: str) -> dict:
+def parse_telegram_load(text: str, code: str = "") -> dict:
     """
-    Парсинг телеграмм UWS и LDM для извлечения веса груза (Cargo) и почты (Mail).
+    Парсинг ТОЛЬКО телеграмм типа UWS (Unit Weight Signal) для извлечения веса груза (Cargo) и почты (Mail).
+    Игнорирует PNL (пассажиры), CFP (нав. планы), ADL, ETL, MVT и другие сторонние телеграммы.
     Пример UWS:
       UWS
       N4491/29.AER
@@ -365,6 +366,20 @@ def parse_telegram_load(text: str) -> dict:
     if not text:
         return {'cargo': '', 'mail': '', 'baggage': ''}
 
+    lines = [l.strip() for l in text.strip().splitlines() if l.strip()]
+    if not lines:
+        return {'cargo': '', 'mail': '', 'baggage': ''}
+
+    # Строгая проверка: телеграмма должна быть именно UWS
+    is_uws = (
+        (code and str(code).strip().upper() == "UWS") or
+        lines[0].upper().startswith("UWS") or
+        (len(lines) > 1 and lines[1].upper().startswith("UWS"))
+    )
+
+    if not is_uws:
+        return {'cargo': '', 'mail': '', 'baggage': ''}
+
     cargo_total = 0
     mail_total = 0
     baggage_total = 0
@@ -372,36 +387,28 @@ def parse_telegram_load(text: str) -> dict:
     has_mail = False
     has_baggage = False
 
-    # 1. Проверяем формат UWS (-IATA/154P/C, /154/C, -KEJ/20P/M и т.д.)
-    uws_pattern = re.compile(r'(?:[A-Z]{3})?/(\d+)(?:P|K|KG|PC)?/([CMBE])', re.I)
-    for match in uws_pattern.finditer(text):
-        weight = int(match.group(1))
-        t_type = match.group(2).upper()
-        if t_type == 'C': # Cargo (Груз)
-            cargo_total += weight
-            has_cargo = True
-        elif t_type == 'M': # Mail (Почта)
-            mail_total += weight
-            has_mail = True
-        elif t_type in ('B', 'E'): # Baggage / Equipment
-            baggage_total += weight
-            has_baggage = True
+    # В телеграмме UWS строки загрузки имеют формат:
+    # -KEJ/154P/C или -KEJ/20P/M или /154P/C или KEJ/154/C
+    uws_pattern = re.compile(r'(?:^|[-./\s])(?:[A-Z]{3}/)?(\d+)(?:P|K|KG|PC)?/([CMBE])(?:\b|[/\s]|$)', re.I)
 
-    # 2. Если в UWS не найдено, проверяем формат LDM (.B/1938.C154.M20 или .B/1938.C/154)
-    if not has_cargo and not has_mail:
-        ldm_c = re.search(r'\.C/?(\d+)', text, re.I)
-        if ldm_c:
-            c_val = int(ldm_c.group(1))
-            if c_val > 0:
-                cargo_total = c_val
+    for line in lines:
+        # Пропускаем заголовок "UWS" и строку с рейсом (например N4491/29.AER)
+        if line.upper() == "UWS" or re.match(r'^[A-Z0-9]{2,6}/\d{1,2}\.[A-Z]{3}', line, re.I):
+            continue
+
+        for match in uws_pattern.finditer(line):
+            weight_str, item_type = match.groups()
+            weight = int(weight_str)
+            t_type = item_type.upper()
+            if t_type == 'C': # Cargo (Груз)
+                cargo_total += weight
                 has_cargo = True
-
-        ldm_m = re.search(r'\.M/?(\d+)', text, re.I)
-        if ldm_m:
-            m_val = int(ldm_m.group(1))
-            if m_val > 0:
-                mail_total = m_val
+            elif t_type == 'M': # Mail (Почта)
+                mail_total += weight
                 has_mail = True
+            elif t_type in ('B', 'E'): # Baggage / Equipment
+                baggage_total += weight
+                has_baggage = True
 
     return {
         'cargo': str(cargo_total) if has_cargo and cargo_total > 0 else '',
@@ -631,10 +638,11 @@ def process_flights(
 
         pax_notes = parse_pax_count(pax_raw, load_list)
 
-        # Парсинг телеграмм (UWS / LDM) для извлечения Груза (Cargo) и Почты (Mail)
+        # Парсинг телеграмм (строго UWS) для извлечения Груза (Cargo) и Почты (Mail)
         telex_data = telegrams.get(pf_id, {})
         telex_text = telex_data.get("text", "") if isinstance(telex_data, dict) else ""
-        tlg_load = parse_telegram_load(telex_text)
+        telex_code = telex_data.get("code", "") if isinstance(telex_data, dict) else ""
+        tlg_load = parse_telegram_load(telex_text, telex_code)
 
         cargo_val = tlg_load.get("cargo", "")
         mail_val = tlg_load.get("mail", "")
