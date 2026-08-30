@@ -21,12 +21,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // ----------------------------------------------------
 // 1. КОНФИГУРАЦИЯ БАЗЫ ДАННЫХ MYSQL (BEGET)
 // ----------------------------------------------------
-define('DB_HOST', 'localhost');
-define('DB_PORT', 3306);
-define('DB_NAME', 'kekc8584_plan');
-define('DB_USER', 'kekc8584_plan');
-define('DB_PASS', 'Y4vZI5p*0dmQ');
-define('JWT_SECRET', 'aeroplan_wb_secret_beget_2026_andrey');
+// Автоматическая загрузка .env файла (если он загружен на сервер)
+$envPaths = [__DIR__ . '/.env', dirname(__DIR__) . '/.env', __DIR__ . '/../.env'];
+foreach ($envPaths as $envFile) {
+    if (file_exists($envFile)) {
+        $envLines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($envLines as $line) {
+            $line = trim($line);
+            if (empty($line) || strpos($line, '#') === 0 || strpos($line, '=') === false) continue;
+            list($k, $v) = explode('=', $line, 2);
+            $k = trim($k);
+            $v = trim($v, " \t\n\r\0\x0B'\"");
+            $_ENV[$k] = $v;
+            putenv("$k=$v");
+        }
+        break;
+    }
+}
+
+define('DB_HOST', getenv('DB_HOST') ?: $_ENV['DB_HOST'] ?? 'localhost');
+define('DB_PORT', (int)(getenv('DB_PORT') ?: $_ENV['DB_PORT'] ?? 3306));
+define('DB_NAME', getenv('DB_NAME') ?: $_ENV['DB_NAME'] ?? 'kekc8584_plan');
+define('DB_USER', getenv('DB_USER') ?: $_ENV['DB_USER'] ?? 'kekc8584_plan');
+define('DB_PASS', getenv('DB_PASSWORD') ?: $_ENV['DB_PASSWORD'] ?? 'Y4vZI5p*0dmQ');
+define('JWT_SECRET', getenv('PLAN_JWT_SECRET') ?: $_ENV['PLAN_JWT_SECRET'] ?? 'aeroplan_wb_secret_beget_2026_andrey');
 
 function getDb() {
     static $pdo = null;
