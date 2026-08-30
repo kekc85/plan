@@ -7,6 +7,7 @@
 
 import sys
 import os
+import re
 import argparse
 import json
 import xml.etree.ElementTree as ET
