@@ -857,27 +857,46 @@ function parseTelegramLoad($text, $code = '') {
     $firstLineUpper = strtoupper($lines[0]);
     $secondLineUpper = isset($lines[1]) ? strtoupper($lines[1]) : '';
 
-    // 1. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ FFM (Freight Forward Manifest)
-    $isFfm = (
-        $codeUpper === 'FFM' ||
+    // 1. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ FBL (Freight Bill List) / FFM (Manifest)
+    $isFblOrFfm = (
+        in_array($codeUpper, ['FBL', 'FFM']) ||
+        strpos($firstLineUpper, 'FBL') === 0 ||
         strpos($firstLineUpper, 'FFM') === 0 ||
+        strpos($secondLineUpper, 'FBL') === 0 ||
         strpos($secondLineUpper, 'FFM') === 0
     );
 
-    if ($isFfm) {
-        $ffmItems = [];
-        foreach ($lines as $line) {
+    if ($isFblOrFfm) {
+        $fblItems = [];
+        $totalLines = count($lines);
+        for ($i = 0; $i < $totalLines; $i++) {
+            $line = $lines[$i];
             if (preg_match('/\/T(\d+)K([\d.]+)(?:[A-Z0-9.]+)?\/([A-Z0-9А-Яа-я\s_\-]+)/i', $line, $m)) {
                 $pieces = (int)$m[1];
                 $rawWeight = (float)$m[2];
                 $weightRounded = (int)ceil($rawWeight);
                 $nature = strtoupper(trim($m[3]));
-                $ffmItems[] = "{$pieces}/{$weightRounded}/{$nature}";
+
+                // Проверяем следующую строку на наличие IATA-кода (например /PEF, /PER, /VAL)
+                $iataCode = '';
+                if ($i + 1 < $totalLines) {
+                    $nextLine = $lines[$i + 1];
+                    if (preg_match('/^\/([A-Z]{3,4})(?:\/[A-Z]{3,4})*$/i', $nextLine) && strtoupper($nextLine) !== '/LAST') {
+                        $iataCode = strtoupper(ltrim($nextLine, '/'));
+                        $i++; // пропускаем строку кода
+                    }
+                }
+
+                if ($iataCode) {
+                    $fblItems[] = "{$pieces}/{$weightRounded}/{$iataCode}/{$nature}";
+                } else {
+                    $fblItems[] = "{$pieces}/{$weightRounded}/{$nature}";
+                }
             }
         }
-        if (!empty($ffmItems)) {
+        if (!empty($fblItems)) {
             return [
-                'cargo' => implode(', ', $ffmItems),
+                'cargo' => implode(', ', $fblItems),
                 'mail' => '',
                 'baggage' => ''
             ];

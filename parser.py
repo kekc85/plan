@@ -356,12 +356,14 @@ def parse_telegram_load(text: str, code: str = "") -> dict:
     для автоматического извлечения груза (Cargo) и почты (Mail).
     Игнорирует PNL (пассажиры), CFP (нав. планы), ADL, ETL, MVT и другие сторонние телеграммы.
 
-    1. Формат FFM (Freight Forward Manifest):
-       FFM/8
-       1/N4491/29AUG2230/AER/73317
+    1. Формат FBL (Freight Bill List) и FFM (Manifest):
+       FBL/4
+       1/N4491/29AUG/AER/RA73317
        KEJ
        216-77327434AERKEJ/T8K153.7MC1.03/FLOWERS
-       -> Результат: 8/154/FLOWERS (мест/вес_округленный/характер_груза)
+       /PEF
+       LAST
+       -> Результат: 8/154/PEF/FLOWERS (мест/вес_округленный/код_ИАТА/характер_груза)
 
     2. Формат UWS (Unit Weight Signal):
        UWS
@@ -382,31 +384,49 @@ def parse_telegram_load(text: str, code: str = "") -> dict:
     first_line_upper = lines[0].upper()
     second_line_upper = lines[1].upper() if len(lines) > 1 else ""
 
-    # 1. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ FFM
-    is_ffm = (
-        code_upper == "FFM" or
+    # 1. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ FBL / FFM
+    is_fbl_or_ffm = (
+        code_upper in ("FBL", "FFM") or
+        first_line_upper.startswith("FBL") or
         first_line_upper.startswith("FFM") or
+        second_line_upper.startswith("FBL") or
         second_line_upper.startswith("FFM")
     )
 
-    if is_ffm:
-        ffm_pattern = re.compile(
+    if is_fbl_or_ffm:
+        item_pattern = re.compile(
             r'/T(\d+)K([\d.]+)(?:[A-Z0-9.]+)?/([A-Z0-9А-Яа-я\s_\-]+)',
             re.I
         )
-        ffm_items = []
-        for line in lines:
-            match = ffm_pattern.search(line)
+        fbl_items = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            match = item_pattern.search(line)
             if match:
                 pieces_str, weight_str, nature = match.groups()
                 pieces = int(pieces_str)
                 raw_weight = float(weight_str)
                 weight_rounded = math.ceil(raw_weight)
                 nature_clean = nature.strip().upper()
-                ffm_items.append(f"{pieces}/{weight_rounded}/{nature_clean}")
 
-        if ffm_items:
-            cargo_formatted = ", ".join(ffm_items)
+                # Проверяем следующую строку на наличие спецкода ИАТА (например /PEF, /PER, /VAL, /DGR, /HUM)
+                iata_code = ""
+                if i + 1 < len(lines):
+                    next_line = lines[i + 1]
+                    code_match = re.match(r'^/([A-Z]{3,4})(?:/[A-Z]{3,4})*$', next_line, re.I)
+                    if code_match and next_line.upper() != "/LAST":
+                        iata_code = next_line.lstrip("/").upper()
+                        i += 1  # пропускаем строку кода
+
+                if iata_code:
+                    fbl_items.append(f"{pieces}/{weight_rounded}/{iata_code}/{nature_clean}")
+                else:
+                    fbl_items.append(f"{pieces}/{weight_rounded}/{nature_clean}")
+            i += 1
+
+        if fbl_items:
+            cargo_formatted = ", ".join(fbl_items)
             return {'cargo': cargo_formatted, 'mail': '', 'baggage': ''}
 
     # 2. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ UWS
