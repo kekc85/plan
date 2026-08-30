@@ -334,13 +334,13 @@ class AviaBitClient:
             pass
         return {}
 
-    def fetch_flight_telex(self, pf_record_id: int) -> dict:
+    def fetch_flight_telex_list(self, pf_record_id: int) -> dict:
         """
-        Запрос телеграммы по рейсу (UWS / LDM / MVT).
+        Запрос списка всех телеграмм по рейсу.
         """
         if not pf_record_id:
             return {}
-        url = f"{self.base_url}/api/telex-message?id={pf_record_id}"
+        url = f"{self.base_url}/api/telex-list?planFlightId={pf_record_id}"
         try:
             resp = self.session.get(url, headers=self.headers, timeout=5)
             if resp.status_code == 200 and resp.text:
@@ -348,6 +348,66 @@ class AviaBitClient:
         except Exception:
             pass
         return {}
+
+    def fetch_flight_telex_message(self, telex_id: int) -> dict:
+        """
+        Запрос конкретной телеграммы по её ID.
+        """
+        if not telex_id:
+            return {}
+        url = f"{self.base_url}/api/telex-message?id={telex_id}"
+        try:
+            resp = self.session.get(url, headers=self.headers, timeout=5)
+            if resp.status_code == 200 and resp.text:
+                return resp.json()
+        except Exception:
+            pass
+        return {}
+
+    def fetch_flight_best_telegram(self, pf_record_id: int) -> dict:
+        """
+        Получает список телеграмм рейса, выбирает наиболее информативную по приоритету:
+        FBL -> FFM -> UWS -> LDM и возвращает её текст и код.
+        """
+        t_data = self.fetch_flight_telex_list(pf_record_id)
+        if not t_data or not isinstance(t_data, dict):
+            return {}
+
+        all_telegrams = []
+        for route, items in t_data.items():
+            if isinstance(items, list):
+                all_telegrams.extend(items)
+
+        if not all_telegrams:
+            return {}
+
+        # Строгий приоритет: FBL -> FFM -> UWS -> LDM
+        best_t = None
+        for target_name in ("FBL", "FFM", "UWS", "LDM"):
+            for t in all_telegrams:
+                t_name = (t.get("name") or t.get("telexCode") or "").upper()
+                if t_name == target_name:
+                    best_t = t
+                    break
+            if best_t:
+                break
+
+        if not best_t:
+            return {}
+
+        t_id = best_t.get("id") or best_t.get("telexID")
+        t_name = best_t.get("name") or best_t.get("telexCode")
+        telex_res = self.fetch_flight_telex_message(t_id)
+        if telex_res and isinstance(telex_res, dict):
+            telex_res["target_name"] = t_name
+            return telex_res
+        return {}
+
+    def fetch_flight_telex(self, pf_record_id: int) -> dict:
+        """
+        Запрос телеграммы по рейсу.
+        """
+        return self.fetch_flight_best_telegram(pf_record_id)
 
 
 def parse_telegram_load(text: str, code: str = "") -> dict:
@@ -697,10 +757,10 @@ def process_flights(
 
         pax_notes = parse_pax_count(pax_raw, load_list)
 
-        # Парсинг телеграмм (строго UWS) для извлечения Груза (Cargo) и Почты (Mail)
+        # Парсинг телеграмм (FBL / FFM / UWS) для извлечения Груза (Cargo) и Почты (Mail)
         telex_data = telegrams.get(pf_id, {})
         telex_text = telex_data.get("text", "") if isinstance(telex_data, dict) else ""
-        telex_code = telex_data.get("code", "") if isinstance(telex_data, dict) else ""
+        telex_code = telex_data.get("target_name") or telex_data.get("code") or ""
         tlg_load = parse_telegram_load(telex_text, telex_code)
 
         cargo_val = tlg_load.get("cargo", "")

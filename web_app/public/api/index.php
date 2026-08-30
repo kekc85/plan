@@ -953,9 +953,11 @@ function parseTelegramLoad($text, $code = '') {
     ];
 }
 
-    // 2. Параллельная загрузка оперативной информации (пассажиры, загрузка, экипаж) и телеграмм (UWS / LDM)
+    // 2. Параллельная загрузка оперативной информации (пассажиры, загрузка, экипаж) и списка телеграмм
     $preliminaries = [];
+    $telexLists = [];
     $telegrams = [];
+
     if (!empty($candidates)) {
         $mh = curl_multi_init();
         $handles = [];
@@ -987,9 +989,9 @@ function parseTelegramLoad($text, $code = '') {
             curl_multi_add_handle($mh, $ch1);
             $handles["prelim_{$pfId}"] = $ch1;
 
-            // 2.2 Запрос телеграммы (UWS/LDM/MVT)
-            $urlTelex = "$baseUrl/api/telex-message?id=$pfId&eng=false";
-            $ch2 = curl_init($urlTelex);
+            // 2.2 Запрос списка телеграмм (telex-list)
+            $urlTelexList = "$baseUrl/api/telex-list?planFlightId=$pfId";
+            $ch2 = curl_init($urlTelexList);
             curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch2, CURLOPT_TIMEOUT, 6);
             curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
@@ -1001,7 +1003,7 @@ function parseTelegramLoad($text, $code = '') {
                 "Cookie: connect.sid=$cookieVal"
             ]);
             curl_multi_add_handle($mh, $ch2);
-            $handles["telex_{$pfId}"] = $ch2;
+            $handles["tlist_{$pfId}"] = $ch2;
         }
 
         $running = null;
@@ -1019,9 +1021,9 @@ function parseTelegramLoad($text, $code = '') {
                     if (strpos($key, 'prelim_') === 0) {
                         $pfId = (int)substr($key, 7);
                         $preliminaries[$pfId] = $json;
-                    } elseif (strpos($key, 'telex_') === 0) {
+                    } elseif (strpos($key, 'tlist_') === 0) {
                         $pfId = (int)substr($key, 6);
-                        $telegrams[$pfId] = $json;
+                        $telexLists[$pfId] = $json;
                     }
                 }
             }
@@ -1029,6 +1031,85 @@ function parseTelegramLoad($text, $code = '') {
             curl_close($ch);
         }
         curl_multi_close($mh);
+
+        // 2.3 Выбор наиболее приоритетной телеграммы (FBL -> FFM -> UWS -> LDM) и дозагрузка текста
+        $msgHandles = [];
+        $mh2 = curl_multi_init();
+        $bestMeta = [];
+
+        foreach ($candidates as $c) {
+            $pfId = $c['pfRecordId'] ?? null;
+            if (!$pfId || empty($telexLists[$pfId])) continue;
+            
+            $tData = $telexLists[$pfId];
+            $allTelegrams = [];
+            foreach ($tData as $route => $items) {
+                if (is_array($items)) {
+                    foreach ($items as $it) $allTelegrams[] = $it;
+                }
+            }
+
+            $bestT = null;
+            foreach (['FBL', 'FFM', 'UWS', 'LDM'] as $targetName) {
+                foreach ($allTelegrams as $t) {
+                    $tName = strtoupper($t['name'] ?? $t['telexCode'] ?? '');
+                    if ($tName === $targetName) {
+                        $bestT = $t;
+                        break;
+                    }
+                }
+                if ($bestT) break;
+            }
+
+            if ($bestT) {
+                $tId = $bestT['id'] ?? $bestT['telexID'] ?? null;
+                $tName = strtoupper($bestT['name'] ?? $bestT['telexCode'] ?? '');
+                if ($tId) {
+                    $airlineName = $c['_airline'] ?? 'nordwind';
+                    $baseUrl = ($airlineName === 'ikar') ? 'https://aviabit.ikar.aero' : 'https://aviabit.nordwindairlines.ru';
+                    $cookieVal = getAviaBitCookie($airlineName, $defaultCookies[$airlineName] ?? '');
+                    $urlMsg = "$baseUrl/api/telex-message?id=$tId";
+
+                    $chM = curl_init($urlMsg);
+                    curl_setopt($chM, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($chM, CURLOPT_TIMEOUT, 6);
+                    curl_setopt($chM, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($chM, CURLOPT_HTTPHEADER, [
+                        "Origin: $baseUrl",
+                        "Referer: $baseUrl/plan-flight",
+                        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+                        'Accept: application/json, text/plain, */*',
+                        "Cookie: connect.sid=$cookieVal"
+                    ]);
+                    curl_multi_add_handle($mh2, $chM);
+                    $msgHandles[$pfId] = $chM;
+                    $bestMeta[$pfId] = $tName;
+                }
+            }
+        }
+
+        if (!empty($msgHandles)) {
+            $running2 = null;
+            do {
+                curl_multi_exec($mh2, $running2);
+                curl_multi_select($mh2);
+            } while ($running2 > 0);
+
+            foreach ($msgHandles as $pfId => $chM) {
+                $resp = curl_multi_getcontent($chM);
+                $code = curl_getinfo($chM, CURLINFO_HTTP_CODE);
+                if ($code === 200 && $resp) {
+                    $json = json_decode($resp, true);
+                    if (is_array($json)) {
+                        $json['target_name'] = $bestMeta[$pfId] ?? '';
+                        $telegrams[$pfId] = $json;
+                    }
+                }
+                curl_multi_remove_handle($mh2, $chM);
+                curl_close($chM);
+            }
+        }
+        curl_multi_close($mh2);
     }
 
     // 3. Формирование итогового списка рейсов
@@ -1132,10 +1213,10 @@ function parseTelegramLoad($text, $code = '') {
 
         $airports = "{$dep}-{$arr}";
 
-        // Парсинг телеграмм (строго UWS) для извлечения Груза (Cargo) и Почты (Mail)
+        // Парсинг телеграмм (FBL / FFM / UWS) для извлечения Груза (Cargo) и Почты (Mail)
         $telexData = $telegrams[$pfId] ?? [];
         $telexText = $telexData['text'] ?? '';
-        $telexCode = $telexData['code'] ?? '';
+        $telexCode = $telexData['target_name'] ?? $telexData['code'] ?? '';
         $tlgLoad = parseTelegramLoad($telexText, $telexCode);
 
         $cargoVal = $tlgLoad['cargo'] ?? '';
