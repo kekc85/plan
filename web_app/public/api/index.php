@@ -52,6 +52,41 @@ function getDb() {
     return $pdo;
 }
 
+function initAirportsTable($db) {
+    static $initialized = false;
+    if ($initialized) return;
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS plan_departure_airports (
+            code VARCHAR(10) PRIMARY KEY,
+            city_name VARCHAR(100) NOT NULL,
+            is_enabled TINYINT(1) DEFAULT 1,
+            is_custom TINYINT(1) DEFAULT 0,
+            sort_order INT DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $count = $db->query("SELECT COUNT(*) FROM plan_departure_airports")->fetchColumn();
+        if ($count == 0) {
+            $defaults = [
+                ['KQT', 'Бохтар', 1, 0, 1], ['VRA', 'Варадеро', 1, 0, 2], ['GOI', 'Гоа', 1, 0, 3],
+                ['GOX', 'Гоа', 1, 0, 4], ['DYU', 'Душанбе', 1, 0, 5], ['ISB', 'Исламабад', 1, 0, 6],
+                ['CCC', 'Кайококо', 1, 0, 7], ['CXR', 'Камрань', 1, 0, 8], ['HOG', 'Ольгин', 1, 0, 9],
+                ['REN', 'Оренбург', 1, 0, 10], ['OSS', 'Ош', 1, 0, 11], ['PMW', 'Парламар', 1, 0, 12],
+                ['PMV', 'Парламар', 1, 0, 13], ['ROV', 'Ростов', 1, 0, 14], ['XIY', 'Сиань', 1, 0, 15],
+                ['AER', 'Сочи', 1, 0, 16], ['SUI', 'Сухум', 1, 0, 17], ['UUD', 'Улан-Удэ', 1, 0, 18],
+                ['UTP', 'Утапао', 1, 0, 19], ['LBD', 'Худжант', 1, 0, 20], ['HTA', 'Чита', 1, 0, 21],
+                ['SSH', 'Шарм Эль Шейх', 1, 0, 22], ['SVO', 'Москва', 1, 0, 23], ['TAS', 'Ташкент', 1, 0, 24],
+                ['NMA', 'Наманган', 1, 0, 25], ['TJU', 'Куляб', 1, 0, 26], ['SKD', 'Самарканд', 1, 0, 27]
+            ];
+            $stmt = $db->prepare("INSERT IGNORE INTO plan_departure_airports (code, city_name, is_enabled, is_custom, sort_order) VALUES (?, ?, ?, ?, ?)");
+            foreach ($defaults as $d) {
+                $stmt->execute($d);
+            }
+        }
+        $initialized = true;
+    } catch (Exception $e) {}
+}
+
 // Fallback для заголовков
 if (!function_exists('getallheaders')) {
     function getallheaders() {
@@ -683,13 +718,35 @@ if ($route === '/fetch_schedule') {
     $tsStartMs = $startBoundTs * 1000;
     $tsEndMs = $endBoundTs * 1000;
 
-    $allowedDeps = [
-        'KQT' => true, 'VRA' => true, 'GOI' => true, 'GOX' => true, 'DYU' => true, 'ISB' => true,
-        'CCC' => true, 'CXR' => true, 'HOG' => true, 'REN' => true, 'OSS' => true, 'PMW' => true,
-        'PMV' => true, 'ROV' => true, 'XIY' => true, 'AER' => true, 'SUI' => true, 'UUD' => true,
-        'UTP' => true, 'LBD' => true, 'HTA' => true, 'SSH' => true, 'SVO' => true, 'TAS' => true,
-        'NMA' => true, 'TJU' => true, 'SKD' => true
-    ];
+    // Динамический фильтр разрешенных аэропортов вылета
+    $allowedDeps = [];
+    if (!empty($input['allowed_departures']) && is_array($input['allowed_departures'])) {
+        foreach ($input['allowed_departures'] as $code) {
+            $c = strtoupper(trim($code));
+            if ($c) $allowedDeps[$c] = true;
+        }
+    } else {
+        try {
+            $db = getDb();
+            initAirportsTable($db);
+            $rows = $db->query("SELECT code FROM plan_departure_airports WHERE is_enabled = 1")->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($rows)) {
+                foreach ($rows as $c) {
+                    $allowedDeps[strtoupper(trim($c))] = true;
+                }
+            }
+        } catch (Exception $e) {}
+    }
+
+    if (empty($allowedDeps)) {
+        $allowedDeps = [
+            'KQT' => true, 'VRA' => true, 'GOI' => true, 'GOX' => true, 'DYU' => true, 'ISB' => true,
+            'CCC' => true, 'CXR' => true, 'HOG' => true, 'REN' => true, 'OSS' => true, 'PMW' => true,
+            'PMV' => true, 'ROV' => true, 'XIY' => true, 'AER' => true, 'SUI' => true, 'UUD' => true,
+            'UTP' => true, 'LBD' => true, 'HTA' => true, 'SSH' => true, 'SVO' => true, 'TAS' => true,
+            'NMA' => true, 'TJU' => true, 'SKD' => true
+        ];
+    }
 
     $iataCities = [
         'KQT' => 'Бохтар', 'VRA' => 'Варадеро', 'GOI' => 'Гоа', 'GOX' => 'Гоа', 'DYU' => 'Душанбе',
@@ -711,6 +768,15 @@ if ($route === '/fetch_schedule') {
         'BHK' => 'Бухара', 'FEG' => 'Фергана', 'UGU' => 'Ургенч', 'FRU' => 'Бишкек',
         'EVN' => 'Ереван', 'GYD' => 'Баку', 'TBS' => 'Тбилиси'
     ];
+
+    try {
+        $db = getDb();
+        initAirportsTable($db);
+        $customCities = $db->query("SELECT code, city_name FROM plan_departure_airports")->fetchAll(PDO::FETCH_KEY_PAIR);
+        if ($customCities) {
+            $iataCities = array_merge($iataCities, $customCities);
+        }
+    } catch (Exception $e) {}
 
     $avbUser = 'a.zubkov';
     $avbPass = 'SoLnCeVo1985';
@@ -1085,6 +1151,91 @@ if (strpos($route, '/admin/users') === 0) {
         echo json_encode(['success' => true, 'message' => 'Пользователь удален']);
         exit;
     }
+}
+
+// ----------------------------------------------------
+// ЭНДПОИНТ: /airports (Управление фильтром аэропортов вылета)
+// ----------------------------------------------------
+if ($route === '/airports') {
+    $db = getDb();
+    initAirportsTable($db);
+    $method = $_SERVER['REQUEST_METHOD'];
+
+    if ($method === 'GET') {
+        $stmt = $db->query("SELECT code, city_name, is_enabled, is_custom, sort_order FROM plan_departure_airports ORDER BY sort_order ASC, code ASC");
+        $rows = $stmt->fetchAll();
+        $res = [];
+        foreach ($rows as $r) {
+            $res[] = [
+                'code' => $r['code'],
+                'city_name' => $r['city_name'],
+                'is_enabled' => (bool)$r['is_enabled'],
+                'is_custom' => (bool)$r['is_custom'],
+                'sort_order' => (int)($r['sort_order'] ?? 0)
+            ];
+        }
+        echo json_encode(['success' => true, 'airports' => $res]);
+        exit;
+    }
+
+    if ($method === 'POST') {
+        $input = getJsonInput();
+        $airports = $input['airports'] ?? [];
+        if (!empty($airports) && is_array($airports)) {
+            $stmt = $db->prepare("INSERT INTO plan_departure_airports (code, city_name, is_enabled, is_custom, sort_order)
+                VALUES (?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE city_name = VALUES(city_name), is_enabled = VALUES(is_enabled), is_custom = VALUES(is_custom), sort_order = VALUES(sort_order)");
+            foreach ($airports as $idx => $item) {
+                $code = strtoupper(trim($item['code'] ?? ''));
+                $city = trim($item['city_name'] ?? '');
+                $isEnabled = !empty($item['is_enabled']) ? 1 : 0;
+                $isCustom = !empty($item['is_custom']) ? 1 : 0;
+                $order = isset($item['sort_order']) ? (int)$item['sort_order'] : $idx;
+                if ($code && $city) {
+                    $stmt->execute([$code, $city, $isEnabled, $isCustom, $order]);
+                }
+            }
+        }
+        echo json_encode(['success' => true, 'message' => 'Список аэропортов успешно сохранен']);
+        exit;
+    }
+}
+
+if ($route === '/airports/save') {
+    $db = getDb();
+    initAirportsTable($db);
+    $input = getJsonInput();
+    $airports = $input['airports'] ?? [];
+    if (!empty($airports) && is_array($airports)) {
+        $stmt = $db->prepare("INSERT INTO plan_departure_airports (code, city_name, is_enabled, is_custom, sort_order)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE city_name = VALUES(city_name), is_enabled = VALUES(is_enabled), is_custom = VALUES(is_custom), sort_order = VALUES(sort_order)");
+        foreach ($airports as $idx => $item) {
+            $code = strtoupper(trim($item['code'] ?? ''));
+            $city = trim($item['city_name'] ?? '');
+            $isEnabled = !empty($item['is_enabled']) ? 1 : 0;
+            $isCustom = !empty($item['is_custom']) ? 1 : 0;
+            $order = isset($item['sort_order']) ? (int)$item['sort_order'] : $idx;
+            if ($code && $city) {
+                $stmt->execute([$code, $city, $isEnabled, $isCustom, $order]);
+            }
+        }
+    }
+    echo json_encode(['success' => true, 'message' => 'Список аэропортов успешно сохранен']);
+    exit;
+}
+
+if ($route === '/airports/delete') {
+    $db = getDb();
+    initAirportsTable($db);
+    $input = getJsonInput();
+    $code = strtoupper(trim($input['code'] ?? ''));
+    if ($code) {
+        $del = $db->prepare("DELETE FROM plan_departure_airports WHERE code = ? AND is_custom = 1");
+        $del->execute([$code]);
+    }
+    echo json_encode(['success' => true, 'message' => "Аэропорт $code удален"]);
+    exit;
 }
 
 // Если маршрут не найден

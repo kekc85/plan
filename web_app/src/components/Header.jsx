@@ -26,6 +26,8 @@ export default function Header({
   shiftInfo,
   setShiftInfo,
   onOpenAviaBitModal,
+  onOpenAirportsModal,
+  departureAirportsCount,
   onImportExcelFile,
   onAddFlight,
   onExportExcel,
@@ -302,6 +304,21 @@ export default function Header({
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
               <span>AviaBit</span>
+            </button>
+
+            {/* КНОПКА 1.1: НАСТРОЙКА АЭРОПОРТОВ ВЫЛЕТА (ФИЛЬТР) */}
+            <button
+              onClick={onOpenAirportsModal}
+              className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-blue-300 dark:border-blue-800 shadow-sm transition-all active:scale-95"
+              title="Настройка городов и аэропортов вылета для фильтрации расписания AviaBit"
+            >
+              <Plane className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Аэропорты</span>
+              {departureAirportsCount !== undefined && (
+                <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-tight">
+                  {departureAirportsCount}
+                </span>
+              )}
             </button>
 
             {/* КНОПКА 2: ИМПОРТ EXCEL */}

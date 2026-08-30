@@ -171,3 +171,23 @@ export async function fetchAviaBitSchedule(params) {
     body: JSON.stringify(params)
   });
 }
+
+// --- УПРАВЛЕНИЕ АЭРОПОРТАМИ ВЫЛЕТА (ФИЛЬТР) ---
+
+export async function fetchDepartureAirports() {
+  return request('/airports');
+}
+
+export async function saveDepartureAirports(airportsList) {
+  return request('/airports/save', {
+    method: 'POST',
+    body: JSON.stringify({ airports: airportsList })
+  });
+}
+
+export async function deleteDepartureAirport(code) {
+  return request('/airports/delete', {
+    method: 'POST',
+    body: JSON.stringify({ code })
+  });
+}

@@ -164,6 +164,37 @@ def init_db():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """)
 
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS plan_departure_airports (
+            code VARCHAR(10) PRIMARY KEY,
+            city_name VARCHAR(100) NOT NULL,
+            is_enabled TINYINT(1) DEFAULT 1,
+            is_custom TINYINT(1) DEFAULT 0,
+            sort_order INT DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """)
+
+        cursor.execute("SELECT COUNT(*) as count FROM plan_departure_airports;")
+        res_airports = cursor.fetchone()
+        c_airports = res_airports["count"] if isinstance(res_airports, dict) else res_airports[0]
+        if c_airports == 0:
+            default_airports = [
+                ('KQT', 'Бохтар', 1, 0, 1), ('VRA', 'Варадеро', 1, 0, 2), ('GOI', 'Гоа', 1, 0, 3),
+                ('GOX', 'Гоа', 1, 0, 4), ('DYU', 'Душанбе', 1, 0, 5), ('ISB', 'Исламабад', 1, 0, 6),
+                ('CCC', 'Кайококо', 1, 0, 7), ('CXR', 'Камрань', 1, 0, 8), ('HOG', 'Ольгин', 1, 0, 9),
+                ('REN', 'Оренбург', 1, 0, 10), ('OSS', 'Ош', 1, 0, 11), ('PMW', 'Парламар', 1, 0, 12),
+                ('PMV', 'Парламар', 1, 0, 13), ('ROV', 'Ростов', 1, 0, 14), ('XIY', 'Сиань', 1, 0, 15),
+                ('AER', 'Сочи', 1, 0, 16), ('SUI', 'Сухум', 1, 0, 17), ('UUD', 'Улан-Удэ', 1, 0, 18),
+                ('UTP', 'Утапао', 1, 0, 19), ('LBD', 'Худжант', 1, 0, 20), ('HTA', 'Чита', 1, 0, 21),
+                ('SSH', 'Шарм Эль Шейх', 1, 0, 22), ('SVO', 'Москва', 1, 0, 23), ('TAS', 'Ташкент', 1, 0, 24),
+                ('NMA', 'Наманган', 1, 0, 25), ('TJU', 'Куляб', 1, 0, 26), ('SKD', 'Самарканд', 1, 0, 27)
+            ]
+            cursor.executemany("""
+            INSERT IGNORE INTO plan_departure_airports (code, city_name, is_enabled, is_custom, sort_order)
+            VALUES (%s, %s, %s, %s, %s);
+            """, default_airports)
+
         # Проверяем наличие администратора
         cursor.execute("SELECT COUNT(*) as count FROM plan_users WHERE role = 'admin';")
         res = cursor.fetchone()
@@ -258,7 +289,39 @@ def init_db():
             notes TEXT
         );
         """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS plan_departure_airports (
+            code TEXT PRIMARY KEY,
+            city_name TEXT NOT NULL,
+            is_enabled INTEGER DEFAULT 1,
+            is_custom INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            updated_at TEXT
+        );
+        """)
         conn.commit()
+
+        cursor.execute("SELECT COUNT(*) as count FROM plan_departure_airports;")
+        res_airports = cursor.fetchone()
+        c_airports = res_airports["count"] if isinstance(res_airports, sqlite3.Row) else res_airports[0]
+        if c_airports == 0:
+            default_airports = [
+                ('KQT', 'Бохтар', 1, 0, 1), ('VRA', 'Варадеро', 1, 0, 2), ('GOI', 'Гоа', 1, 0, 3),
+                ('GOX', 'Гоа', 1, 0, 4), ('DYU', 'Душанбе', 1, 0, 5), ('ISB', 'Исламабад', 1, 0, 6),
+                ('CCC', 'Кайококо', 1, 0, 7), ('CXR', 'Камрань', 1, 0, 8), ('HOG', 'Ольгин', 1, 0, 9),
+                ('REN', 'Оренбург', 1, 0, 10), ('OSS', 'Ош', 1, 0, 11), ('PMW', 'Парламар', 1, 0, 12),
+                ('PMV', 'Парламар', 1, 0, 13), ('ROV', 'Ростов', 1, 0, 14), ('XIY', 'Сиань', 1, 0, 15),
+                ('AER', 'Сочи', 1, 0, 16), ('SUI', 'Сухум', 1, 0, 17), ('UUD', 'Улан-Удэ', 1, 0, 18),
+                ('UTP', 'Утапао', 1, 0, 19), ('LBD', 'Худжант', 1, 0, 20), ('HTA', 'Чита', 1, 0, 21),
+                ('SSH', 'Шарм Эль Шейх', 1, 0, 22), ('SVO', 'Москва', 1, 0, 23), ('TAS', 'Ташкент', 1, 0, 24),
+                ('NMA', 'Наманган', 1, 0, 25), ('TJU', 'Куляб', 1, 0, 26), ('SKD', 'Самарканд', 1, 0, 27)
+            ]
+            cursor.executemany("""
+            INSERT OR IGNORE INTO plan_departure_airports (code, city_name, is_enabled, is_custom, sort_order)
+            VALUES (?, ?, ?, ?, ?);
+            """, default_airports)
+            conn.commit()
 
         cursor.execute("SELECT COUNT(*) as count FROM plan_users WHERE role = 'admin';")
         res = cursor.fetchone()

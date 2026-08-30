@@ -409,7 +409,8 @@ def process_flights(
     candidate_flights: list,
     preliminaries: dict = None,
     start_dt_msk: datetime = None,
-    end_dt_msk: datetime = None
+    end_dt_msk: datetime = None,
+    allowed_departures: set = None
 ) -> list:
     """
     Обработка и форматирование данных рейсов под итоговую таблицу.
@@ -417,6 +418,8 @@ def process_flights(
     """
     if preliminaries is None:
         preliminaries = {}
+
+    active_departures = set(allowed_departures) if allowed_departures is not None else ALLOWED_DEPARTURES
 
     if start_dt_msk and start_dt_msk.tzinfo is None:
         start_dt_msk = start_dt_msk.replace(tzinfo=MSK_TZ)
@@ -443,7 +446,7 @@ def process_flights(
             continue
 
         # Фильтр по разрешенным аэропортам вылета
-        if dep not in ALLOWED_DEPARTURES:
+        if dep not in active_departures:
             continue
 
         fl_key = (
@@ -852,7 +855,8 @@ def run_parse(
     filter_name: str = "WBGarantiya",
     prompt_code_callback=None,
     start_time_str: str = "00:00",
-    end_time_str: str = "23:59"
+    end_time_str: str = "23:59",
+    allowed_departures: set = None
 ) -> tuple[bool, str, int, str]:
     """
     Основная программная функция выгрузки расписания с учетом диапазона дат и времени (МСК).
@@ -904,7 +908,7 @@ def run_parse(
     if not all_flights:
         return False, f"Рейсы за период {start_str} - {end_str} не найдены ни на одном сервере.", 0, ""
 
-    rows = process_flights(all_flights, start_dt_msk=start_dt_msk, end_dt_msk=end_dt_msk)
+    rows = process_flights(all_flights, start_dt_msk=start_dt_msk, end_dt_msk=end_dt_msk, allowed_departures=allowed_departures)
     if not rows:
         return False, "Нет рейсов, соответствующих указанным аэропортам вылета и интервалу времени.", 0, ""
 

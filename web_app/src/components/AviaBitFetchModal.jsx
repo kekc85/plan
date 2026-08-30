@@ -3,7 +3,14 @@ import { X, Plane, Zap, Calendar, Clock, AlertCircle, CheckCircle2, Loader2, Ref
 import { formatValidDateInterval, formatValidTime, sortFlightsChronologically } from '../utils/validators';
 import { fetchAviaBitSchedule, smartMergeSchedules } from '../utils/api';
 
-export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, currentFlights = [] }) {
+export default function AviaBitFetchModal({
+  isOpen,
+  onClose,
+  onScheduleLoaded,
+  currentFlights = [],
+  airports = [],
+  onOpenAirportsModal
+}) {
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -57,13 +64,18 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
     setErrorMsg('');
     setSuccessMsg('');
 
+    const activeAirportCodes = (airports && airports.length > 0)
+      ? airports.filter(a => a.is_enabled).map(a => a.code)
+      : undefined;
+
     const payload = {
       date_from: dateFrom,
       time_from: timeFrom,
       date_to: dateTo,
       time_to: timeTo,
       airline: airline,
-      filter_name: 'WBGarantiya'
+      filter_name: 'WBGarantiya',
+      allowed_departures: activeAirportCodes
     };
 
     try {
@@ -310,6 +322,34 @@ export default function AviaBitFetchModal({ isOpen, onClose, onScheduleLoaded, c
                 Только Икар
               </button>
             </div>
+          </div>
+
+          {/* Фильтр городов вылета */}
+          <div className="flex items-center justify-between gap-2 p-2.5 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 rounded-xl">
+            <div className="flex items-center gap-2 min-w-0">
+              <Plane className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate">
+                  Фильтр вылетов:{' '}
+                  <span className="text-blue-600 dark:text-blue-400">
+                    {airports.filter(a => a.is_enabled).length} из {airports.length || 26} городов
+                  </span>
+                </span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate">
+                  {airports.filter(a => a.is_enabled).map(a => a.code).slice(0, 10).join(', ')}
+                  {airports.filter(a => a.is_enabled).length > 10 ? '...' : ''}
+                </span>
+              </div>
+            </div>
+            {onOpenAirportsModal && (
+              <button
+                type="button"
+                onClick={onOpenAirportsModal}
+                className="px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 bg-white dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-slate-700 border border-blue-300 dark:border-blue-700 rounded-lg shadow-sm transition-colors shrink-0"
+              >
+                Настроить
+              </button>
+            )}
           </div>
 
           {/* Опция Smart Merge */}

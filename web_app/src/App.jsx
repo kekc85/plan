@@ -9,6 +9,7 @@ import LoginModal from './components/LoginModal';
 import AdminModal from './components/AdminModal';
 import HandoverModal from './components/HandoverModal';
 import DownloadManualModal from './components/DownloadManualModal';
+import DepartureAirportsModal from './components/DepartureAirportsModal';
 import { INITIAL_FLIGHTS } from './utils/mockData';
 import { exportShiftToExcel } from './utils/excelExport';
 import { parseExcelToFlights } from './utils/excelImport';
@@ -20,7 +21,8 @@ import {
   authLogout, 
   fetchCurrentShift, 
   saveShift, 
-  smartMergeSchedules 
+  smartMergeSchedules,
+  fetchDepartureAirports
 } from './utils/api';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Bell, CheckCircle2, X, Volume2, MessageSquare } from 'lucide-react';
@@ -61,6 +63,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAviaBitModalOpen, setIsAviaBitModalOpen] = useState(false);
+  const [isAirportsModalOpen, setIsAirportsModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
@@ -68,6 +71,17 @@ export default function App() {
   const [isHandoverNotesDismissed, setIsHandoverNotesDismissed] = useState(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_dismissed_handover_note`);
     return !!saved;
+  });
+
+  const [departureAirports, setDepartureAirports] = useState(() => {
+    try {
+      const saved = localStorage.getItem('aeroplan_departure_airports');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [];
   });
 
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
@@ -154,6 +168,18 @@ export default function App() {
       })
       .catch((err) => {
         console.warn('Initial server sync note:', err.message);
+      });
+
+    // Загрузка актуального списка аэропортов вылета
+    fetchDepartureAirports()
+      .then((res) => {
+        if (res && res.airports && res.airports.length > 0) {
+          setDepartureAirports(res.airports);
+          localStorage.setItem('aeroplan_departure_airports', JSON.stringify(res.airports));
+        }
+      })
+      .catch((err) => {
+        console.warn('Departure airports fetch note:', err.message);
       });
   }, []);
 
@@ -488,6 +514,8 @@ export default function App() {
         shiftInfo={shiftInfo}
         setShiftInfo={setShiftInfo}
         onOpenAviaBitModal={() => setIsAviaBitModalOpen(true)}
+        onOpenAirportsModal={() => setIsAirportsModalOpen(true)}
+        departureAirportsCount={departureAirports.filter(a => a.is_enabled).length}
         onImportExcelFile={handleImportExcelFile}
         onAddFlight={() => setIsAddModalOpen(true)}
         onExportExcel={handleExportExcel}
@@ -659,6 +687,19 @@ export default function App() {
         onClose={() => setIsAviaBitModalOpen(false)}
         onScheduleLoaded={handleAviaBitScheduleLoaded}
         currentFlights={flights}
+        airports={departureAirports}
+        onOpenAirportsModal={() => setIsAirportsModalOpen(true)}
+      />
+
+      {/* Модальное окно настройки городов вылета (Фильтр AviaBit) */}
+      <DepartureAirportsModal
+        isOpen={isAirportsModalOpen}
+        onClose={() => setIsAirportsModalOpen(false)}
+        airports={departureAirports}
+        onAirportsChange={(updated) => {
+          setDepartureAirports(updated);
+          localStorage.setItem('aeroplan_departure_airports', JSON.stringify(updated));
+        }}
       />
 
       {/* Add Flight Modal */}

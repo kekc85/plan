@@ -92,6 +92,18 @@ class UpdateUserRequest(BaseModel):
     new_password: Optional[str] = None
 
 
+class AirportItem(BaseModel):
+    code: str
+    city_name: str
+    is_enabled: bool = True
+    is_custom: bool = False
+    sort_order: Optional[int] = 0
+
+
+class SaveAirportsRequest(BaseModel):
+    airports: List[AirportItem]
+
+
 class FetchScheduleRequest(BaseModel):
     date_from: str
     time_from: str = "08:00"
@@ -99,6 +111,7 @@ class FetchScheduleRequest(BaseModel):
     time_to: str = "14:00"
     airline: str = "both"
     filter_name: str = "WBGarantiya"
+    allowed_departures: Optional[List[str]] = None
 
 
 class ExportExcelRequest(BaseModel):
@@ -745,7 +758,22 @@ def fetch_schedule(req: FetchScheduleRequest):
     if not all_raw_flights and errors:
         raise HTTPException(status_code=502, detail="; ".join(errors))
 
-    processed_rows = process_flights(all_raw_flights, start_dt_msk=start_dt, end_dt_msk=end_dt)
+    active_deps = None
+    if req.allowed_departures:
+        active_deps = {c.strip().upper() for c in req.allowed_departures if c.strip()}
+    else:
+        try:
+            cursor, conn, _ = execute_query(
+                "SELECT code FROM plan_departure_airports WHERE is_enabled = 1;",
+                "SELECT code FROM plan_departure_airports WHERE is_enabled = 1;"
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            active_deps = {r["code"] if isinstance(r, dict) else r[0] for r in rows}
+        except Exception:
+            pass
+
+    processed_rows = process_flights(all_raw_flights, start_dt_msk=start_dt, end_dt_msk=end_dt, allowed_departures=active_deps)
 
     result_flights = []
     for idx, row in enumerate(processed_rows):
@@ -809,6 +837,87 @@ def fetch_schedule(req: FetchScheduleRequest):
         "interval_info": f"{start_dt.strftime('%d.%m.%Y %H:%M')} — {end_dt.strftime('%d.%m.%Y %H:%M')}",
         "errors": errors if errors else None
     }
+
+
+# --- 7. УПРАВЛЕНИЕ АЭРОПОРТАМИ ВЫЛЕТА (ФИЛЬТР) ---
+
+@app.get("/api/airports")
+def get_airports():
+    """Получает список всех аэропортов вылета и их статус активности"""
+    cursor, conn, engine = execute_query(
+        "SELECT code, city_name, is_enabled, is_custom, sort_order FROM plan_departure_airports ORDER BY sort_order ASC, code ASC;",
+        "SELECT code, city_name, is_enabled, is_custom, sort_order FROM plan_departure_airports ORDER BY sort_order ASC, code ASC;"
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    result = []
+    for r in rows:
+        if isinstance(r, dict):
+            result.append({
+                "code": r["code"],
+                "city_name": r["city_name"],
+                "is_enabled": bool(r["is_enabled"]),
+                "is_custom": bool(r["is_custom"]),
+                "sort_order": r.get("sort_order", 0)
+            })
+        else:
+            result.append({
+                "code": r[0],
+                "city_name": r[1],
+                "is_enabled": bool(r[2]),
+                "is_custom": bool(r[3]),
+                "sort_order": r[4] if len(r) > 4 else 0
+            })
+    return {"success": True, "airports": result}
+
+
+@app.post("/api/airports/save")
+def save_airports(req: SaveAirportsRequest):
+    """Сохраняет обновленный список аэропортов и их активности"""
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+
+    try:
+        now_str = datetime.now(MSK_TZ).isoformat()
+        for idx, item in enumerate(req.airports):
+            code = item.code.strip().upper()
+            city = item.city_name.strip()
+            is_enabled = 1 if item.is_enabled else 0
+            is_custom = 1 if item.is_custom else 0
+            order = item.sort_order if item.sort_order is not None else idx
+
+            if engine == "mysql":
+                cursor.execute("""
+                INSERT INTO plan_departure_airports (code, city_name, is_enabled, is_custom, sort_order)
+                VALUES (%s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE city_name = VALUES(city_name), is_enabled = VALUES(is_enabled), is_custom = VALUES(is_custom), sort_order = VALUES(sort_order);
+                """, (code, city, is_enabled, is_custom, order))
+            else:
+                cursor.execute("""
+                INSERT INTO plan_departure_airports (code, city_name, is_enabled, is_custom, sort_order, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(code) DO UPDATE SET city_name=excluded.city_name, is_enabled=excluded.is_enabled, is_custom=excluded.is_custom, sort_order=excluded.sort_order, updated_at=excluded.updated_at;
+                """, (code, city, is_enabled, is_custom, order, now_str))
+
+        if engine == "sqlite":
+            conn.commit()
+    finally:
+        conn.close()
+
+    return {"success": True, "message": "Список аэропортов успешно сохранен"}
+
+
+@app.delete("/api/airports/{code}")
+def delete_airport(code: str):
+    """Удаляет пользовательский аэропорт"""
+    code_clean = code.strip().upper()
+    execute_query(
+        "DELETE FROM plan_departure_airports WHERE code = %s AND is_custom = 1;",
+        "DELETE FROM plan_departure_airports WHERE code = ? AND is_custom = 1;",
+        (code_clean,)
+    )
+    return {"success": True, "message": f"Аэропорт {code_clean} удален"}
 
 
 # --- 7. ЭКСПОРТ В ФОРМАТ EXCEL ЧЕРЕЗ OPENPYXL ---
