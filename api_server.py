@@ -11,9 +11,12 @@ import sys
 import io
 import json
 import urllib.parse
+import time
+from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Depends, Body, Header
+
+from fastapi import FastAPI, HTTPException, Depends, Body, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -52,15 +55,56 @@ init_db()
 app = FastAPI(
     title="AeroPlan W&B API (MySQL Beget)",
     description="API сервер для электронного журнала смены диспетчера центровки",
-    version="1.0.14"
+    version="1.0.15"
 )
 
-# Разрешаем CORS
+# Ограничение частоты неудачных попыток входа (Rate Limiting)
+FAILED_LOGIN_ATTEMPTS = defaultdict(list)
+
+def get_client_ip(request: Request) -> str:
+    """Извлекает реальный IP адрес клиента с учетом прокси"""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+def check_login_rate_limit(client_ip: str):
+    """Проверяет, не превышен ли лимит неудачных попыток (максимум 10 за 5 минут)"""
+    now = time.time()
+    valid_attempts = [t for t in FAILED_LOGIN_ATTEMPTS[client_ip] if now - t < 300]
+    FAILED_LOGIN_ATTEMPTS[client_ip] = valid_attempts
+    if len(valid_attempts) >= 10:
+        raise HTTPException(
+            status_code=429,
+            detail="Слишком много неудачных попыток входа. Доступ временно заблокирован на 5 минут."
+        )
+
+def record_failed_login(client_ip: str):
+    """Фиксирует неудачную попытку входа"""
+    FAILED_LOGIN_ATTEMPTS[client_ip].append(time.time())
+
+def clear_failed_logins(client_ip: str):
+    """Сбрасывает счетчик неудачных попыток при успешном входе"""
+    if client_ip in FAILED_LOGIN_ATTEMPTS:
+        del FAILED_LOGIN_ATTEMPTS[client_ip]
+
+# Разрешенные доверенные источники CORS
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://boostandgo.ru"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*\.beget\.tech|https://boostandgo\.ru",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -180,8 +224,11 @@ def health_check():
 
 
 @app.post("/api/auth/login")
-def login(req: LoginRequest):
-    """Аутентификация пользователя и выдача JWT токена"""
+def login(req: LoginRequest, request: Request):
+    """Аутентификация пользователя и выдача JWT токена с защитой от перебора (Rate Limiting)"""
+    client_ip = get_client_ip(request)
+    check_login_rate_limit(client_ip)
+
     conn, engine = DatabaseConnection.get_connection()
     cursor = conn.cursor()
     username_clean = req.username.strip().lower()
@@ -239,10 +286,13 @@ def login(req: LoginRequest):
     conn.close()
 
     if not user_dict or not is_valid:
+        record_failed_login(client_ip)
         raise HTTPException(status_code=401, detail="Неверное имя пользователя или пароль")
 
     if not user_dict["is_active"]:
         raise HTTPException(status_code=403, detail="Учетная запись заблокирована администратором")
+
+    clear_failed_logins(client_ip)
 
     token = create_jwt_token({
         "user_id": user_dict["id"],
@@ -498,8 +548,8 @@ def get_current_shift():
 
 
 @app.post("/api/shift/save")
-def save_shift_state(req: SaveShiftRequest):
-    """Атомарно сохраняет состояние смены и рейсов в MySQL / SQLite базе данных"""
+def save_shift_state(req: SaveShiftRequest, current_user: dict = Depends(get_current_user)):
+    """Атомарно сохраняет состояние смены и рейсов в MySQL / SQLite базе данных (требуется авторизация)"""
     conn, engine = DatabaseConnection.get_connection()
     cursor = conn.cursor()
     now_str = datetime.now(MSK_TZ).isoformat()
@@ -589,9 +639,9 @@ def save_shift_state(req: SaveShiftRequest):
 # --- 4. УМНОЕ СЛИЯНИЕ РАСПИСАНИЙ (SMART MERGE) ---
 
 @app.post("/api/shift/smart_merge")
-def smart_merge_schedules(req: SmartMergeRequest):
+def smart_merge_schedules(req: SmartMergeRequest, current_user: dict = Depends(get_current_user)):
     """
-    Умное слияние нового расписания (из AviaBit или Excel) с текущим планом:
+    Умное слияние нового расписания (из AviaBit или Excel) с текущим планом (требуется авторизация):
     - Для рейсов, которые УЖЕ БЫЛИ в плане: сохраняются все введенные веса, топливо,
       статусы, чекбоксы LIR/СЗВ/LDM/Времена и диспетчерские заметки.
     - Рейсы за пределами выбранного интервала очищаются.
@@ -636,9 +686,9 @@ def smart_merge_schedules(req: SmartMergeRequest):
 # --- 5. ПЕРЕДАЧА СМЕНЫ (HANDOVER) ---
 
 @app.post("/api/shift/handover")
-def shift_handover(req: HandoverRequest):
+def shift_handover(req: HandoverRequest, current_user: dict = Depends(get_current_user)):
     """
-    Фиксирует передачу смены между диспетчерами в MySQL:
+    Фиксирует передачу смены между диспетчерами в MySQL (требуется авторизация):
     - Записывает протокол сдачи-приемки в журнал аудита
     - Опционально архивирует улетевшие закрытые рейсы
     - Обновляет имя дежурного диспетчера
@@ -711,9 +761,9 @@ def get_handover_history():
 # --- 6. ЗАГРУЗКА РАСПИСАНИЯ AVIABIT ---
 
 @app.post("/api/fetch_schedule")
-def fetch_schedule(req: FetchScheduleRequest):
+def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_current_user)):
     """
-    Запрашивает суточное расписание через AviaBit (Nordwind / Икар)
+    Запрашивает суточное расписание через AviaBit (Nordwind / Икар) (требуется авторизация)
     """
     try:
         dt_from = parse_date_arg(req.date_from)
@@ -873,8 +923,8 @@ def get_airports():
 
 
 @app.post("/api/airports/save")
-def save_airports(req: SaveAirportsRequest):
-    """Сохраняет обновленный список аэропортов и их активности"""
+def save_airports(req: SaveAirportsRequest, current_user: dict = Depends(get_current_user)):
+    """Сохраняет обновленный список аэропортов и их активности (требуется авторизация)"""
     conn, engine = DatabaseConnection.get_connection()
     cursor = conn.cursor()
 
@@ -909,8 +959,8 @@ def save_airports(req: SaveAirportsRequest):
 
 
 @app.delete("/api/airports/{code}")
-def delete_airport(code: str):
-    """Удаляет пользовательский аэропорт"""
+def delete_airport(code: str, current_user: dict = Depends(get_current_user)):
+    """Удаляет пользовательский аэропорт (требуется авторизация)"""
     code_clean = code.strip().upper()
     execute_query(
         "DELETE FROM plan_departure_airports WHERE code = %s AND is_custom = 1;",
@@ -923,9 +973,9 @@ def delete_airport(code: str):
 # --- 7. ЭКСПОРТ В ФОРМАТ EXCEL ЧЕРЕЗ OPENPYXL ---
 
 @app.post("/api/export_excel")
-def export_excel_endpoint(req: ExportExcelRequest):
+def export_excel_endpoint(req: ExportExcelRequest, current_user: dict = Depends(get_current_user)):
     """
-    Формирует оригинальный Excel файл суточного плана через канонический генератор openpyxl.
+    Формирует оригинальный Excel файл суточного плана через канонический генератор openpyxl (требуется авторизация).
     """
     if not req.flights:
         raise HTTPException(status_code=400, detail="Список рейсов пуст")
@@ -988,9 +1038,9 @@ def get_shift_legacy():
 
 
 @app.post("/api/save_shift")
-def save_shift_legacy(data: dict = Body(...)):
+def save_shift_legacy(data: dict = Body(...), current_user: dict = Depends(get_current_user)):
     req = SaveShiftRequest(shiftInfo=data.get("shiftInfo"), flights=data.get("flights", []))
-    return save_shift_state(req)
+    return save_shift_state(req, current_user)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,11 @@
 *.session*.json
 .session.json
 .session_ikar.json
+*.db
+*.sqlite
+*.sqlite3
+database.db
+plan.db
 
 # Python
 __pycache__/

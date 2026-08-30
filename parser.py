@@ -546,7 +546,7 @@ def parse_crew(crew_xml_str: str) -> tuple:
     its = 0
     pax = 0
 
-    if not crew_xml_str:
+    if not crew_xml_str or "<!DOCTYPE" in crew_xml_str.upper() or "<!ENTITY" in crew_xml_str.upper():
         return cockpit, cabin, its, pax
 
     try:

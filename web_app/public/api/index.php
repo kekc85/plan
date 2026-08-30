@@ -393,6 +393,7 @@ if ($route === '/shift/current') {
 // ЭНДПОИНТ: /shift/save
 // ----------------------------------------------------
 if ($route === '/shift/save') {
+    getAuthUser();
     $input = getJsonInput();
     $shiftInfo = $input['shiftInfo'] ?? [];
     $flights = $input['flights'] ?? [];
@@ -478,6 +479,7 @@ if ($route === '/shift/save') {
 // ЭНДПОИНТ: /shift/smart_merge
 // ----------------------------------------------------
 if ($route === '/shift/smart_merge') {
+    getAuthUser();
     $input = getJsonInput();
     $current = $input['current_flights'] ?? [];
     $incoming = $input['incoming_flights'] ?? [];
@@ -499,18 +501,17 @@ if ($route === '/shift/smart_merge') {
 
         if (isset($existingMap[$key])) {
             $old = $existingMap[$key];
-            $item = array_merge($inc, [
-                'id' => $old['id'] ?? $inc['id'],
-                'status' => $old['status'] ?? $inc['status'] ?? 'pending',
-                'lir_sent' => !empty($old['lir_sent']),
-                'szv_sent' => !empty($old['szv_sent']),
-                'ldm_sent' => !empty($old['ldm_sent']),
-                'astra_times_sent' => !empty($old['astra_times_sent']),
-                'notes' => $old['notes'] ?? $inc['notes'] ?? ''
-            ]);
+            $item = $inc;
+            $item['id'] = $old['id'] ?? $inc['id'];
+            $item['status'] = $old['status'] ?? $inc['status'] ?? 'pending';
+            $item['lir_sent'] = !empty($old['lir_sent']);
+            $item['szv_sent'] = !empty($old['szv_sent']);
+            $item['ldm_sent'] = !empty($old['ldm_sent']);
+            $item['astra_times_sent'] = !empty($old['astra_times_sent']);
+            $item['notes'] = !empty($old['notes']) ? $old['notes'] : ($inc['notes'] ?? '');
 
             foreach (['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'cargo', 'mail', 'baggage', 'pax', 'crew'] as $field) {
-                if (!empty($old[$field])) {
+                if (isset($old[$field]) && $old[$field] !== '') {
                     $item[$field] = $old[$field];
                 }
             }
@@ -530,6 +531,7 @@ if ($route === '/shift/smart_merge') {
 // ЭНДПОИНТ: /shift/handover
 // ----------------------------------------------------
 if ($route === '/shift/handover') {
+    getAuthUser();
     $input = getJsonInput();
     $handedOverBy = trim($input['handed_over_by'] ?? '');
     $acceptedBy = trim($input['accepted_by'] ?? '');
@@ -553,9 +555,20 @@ if ($route === '/shift/handover') {
             transferred_flights_summary, notes
         ) VALUES (?, ?, ?, ?, ?, ?)
     ");
-    $ins->execute([$handedOverBy, $acceptedBy, $nowStr, count($activeFlights), $summaryText, $notes]);
+    $ins->execute([
+        $handedOverBy,
+        $acceptedBy,
+        $nowStr,
+        count($activeFlights),
+        $summaryText,
+        $notes
+    ]);
 
-    $db->prepare("UPDATE plan_shifts SET dispatcher_name = ? WHERE status = 'active'")->execute([$acceptedBy]);
+    $activeShift = $db->query("SELECT id FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1")->fetch();
+    if ($activeShift) {
+        $upd = $db->prepare("UPDATE plan_shifts SET dispatcher_name = ? WHERE id = ?");
+        $upd->execute([$acceptedBy, $activeShift['id']]);
+    }
 
     if ($archiveClosed) {
         $db->exec("DELETE FROM plan_flights WHERE status = 'closed'");
@@ -691,6 +704,7 @@ function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTs
 // ЭНДПОИНТ: /fetch_schedule (Парсер AviaBit)
 // ----------------------------------------------------
 if ($route === '/fetch_schedule') {
+    getAuthUser();
     $input = getJsonInput();
     $dateFrom = $input['date_from'] ?? date('d.m.Y');
     $timeFrom = $input['time_from'] ?? '08:00';
@@ -1440,6 +1454,7 @@ if ($route === '/airports') {
 }
 
 if ($route === '/airports/save') {
+    getAuthUser();
     $db = getDb();
     initAirportsTable($db);
     $input = getJsonInput();
@@ -1464,6 +1479,7 @@ if ($route === '/airports/save') {
 }
 
 if ($route === '/airports/delete') {
+    getAuthUser();
     $db = getDb();
     initAirportsTable($db);
     $input = getJsonInput();
