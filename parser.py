@@ -8,6 +8,7 @@
 import sys
 import os
 import re
+import math
 import argparse
 import json
 import xml.etree.ElementTree as ET
@@ -351,17 +352,24 @@ class AviaBitClient:
 
 def parse_telegram_load(text: str, code: str = "") -> dict:
     """
-    Парсинг ТОЛЬКО телеграмм типа UWS (Unit Weight Signal) для извлечения веса груза (Cargo) и почты (Mail).
+    Парсинг телеграмм типа FFM (грузовые манифесты) и UWS (Unit Weight Signal)
+    для автоматического извлечения груза (Cargo) и почты (Mail).
     Игнорирует PNL (пассажиры), CFP (нав. планы), ADL, ETL, MVT и другие сторонние телеграммы.
-    Пример UWS:
-      UWS
-      N4491/29.AER
-      BULK
-      -KEJ/154P/C
-      -KEJ/20P/M
-    Где:
-      154P/C -> груз 154 кг
-      20P/M  -> почта 20 кг
+
+    1. Формат FFM (Freight Forward Manifest):
+       FFM/8
+       1/N4491/29AUG2230/AER/73317
+       KEJ
+       216-77327434AERKEJ/T8K153.7MC1.03/FLOWERS
+       -> Результат: 8/154/FLOWERS (мест/вес_округленный/характер_груза)
+
+    2. Формат UWS (Unit Weight Signal):
+       UWS
+       N4491/29.AER
+       BULK
+       -KEJ/154P/C
+       -KEJ/20P/M
+       -> Результат: cargo: "154", mail: "20"
     """
     if not text:
         return {'cargo': '', 'mail': '', 'baggage': ''}
@@ -370,11 +378,42 @@ def parse_telegram_load(text: str, code: str = "") -> dict:
     if not lines:
         return {'cargo': '', 'mail': '', 'baggage': ''}
 
-    # Строгая проверка: телеграмма должна быть именно UWS
+    code_upper = str(code).strip().upper() if code else ""
+    first_line_upper = lines[0].upper()
+    second_line_upper = lines[1].upper() if len(lines) > 1 else ""
+
+    # 1. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ FFM
+    is_ffm = (
+        code_upper == "FFM" or
+        first_line_upper.startswith("FFM") or
+        second_line_upper.startswith("FFM")
+    )
+
+    if is_ffm:
+        ffm_pattern = re.compile(
+            r'/T(\d+)K([\d.]+)(?:[A-Z0-9.]+)?/([A-Z0-9А-Яа-я\s_\-]+)',
+            re.I
+        )
+        ffm_items = []
+        for line in lines:
+            match = ffm_pattern.search(line)
+            if match:
+                pieces_str, weight_str, nature = match.groups()
+                pieces = int(pieces_str)
+                raw_weight = float(weight_str)
+                weight_rounded = math.ceil(raw_weight)
+                nature_clean = nature.strip().upper()
+                ffm_items.append(f"{pieces}/{weight_rounded}/{nature_clean}")
+
+        if ffm_items:
+            cargo_formatted = ", ".join(ffm_items)
+            return {'cargo': cargo_formatted, 'mail': '', 'baggage': ''}
+
+    # 2. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ UWS
     is_uws = (
-        (code and str(code).strip().upper() == "UWS") or
-        lines[0].upper().startswith("UWS") or
-        (len(lines) > 1 and lines[1].upper().startswith("UWS"))
+        code_upper == "UWS" or
+        first_line_upper.startswith("UWS") or
+        second_line_upper.startswith("UWS")
     )
 
     if not is_uws:

@@ -853,11 +853,42 @@ function parseTelegramLoad($text, $code = '') {
         return ['cargo' => '', 'mail' => '', 'baggage' => ''];
     }
 
-    // Строгая проверка: телеграмма должна быть именно UWS (в заголовке / коде)
+    $codeUpper = $code ? strtoupper(trim($code)) : '';
+    $firstLineUpper = strtoupper($lines[0]);
+    $secondLineUpper = isset($lines[1]) ? strtoupper($lines[1]) : '';
+
+    // 1. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ FFM (Freight Forward Manifest)
+    $isFfm = (
+        $codeUpper === 'FFM' ||
+        strpos($firstLineUpper, 'FFM') === 0 ||
+        strpos($secondLineUpper, 'FFM') === 0
+    );
+
+    if ($isFfm) {
+        $ffmItems = [];
+        foreach ($lines as $line) {
+            if (preg_match('/\/T(\d+)K([\d.]+)(?:[A-Z0-9.]+)?\/([A-Z0-9А-Яа-я\s_\-]+)/i', $line, $m)) {
+                $pieces = (int)$m[1];
+                $rawWeight = (float)$m[2];
+                $weightRounded = (int)ceil($rawWeight);
+                $nature = strtoupper(trim($m[3]));
+                $ffmItems[] = "{$pieces}/{$weightRounded}/{$nature}";
+            }
+        }
+        if (!empty($ffmItems)) {
+            return [
+                'cargo' => implode(', ', $ffmItems),
+                'mail' => '',
+                'baggage' => ''
+            ];
+        }
+    }
+
+    // 2. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ UWS (Unit Weight Signal)
     $isUws = (
-        ($code && strtoupper(trim($code)) === 'UWS') ||
-        (stripos($lines[0], 'UWS') === 0) ||
-        (isset($lines[1]) && stripos($lines[1], 'UWS') === 0)
+        $codeUpper === 'UWS' ||
+        strpos($firstLineUpper, 'UWS') === 0 ||
+        strpos($secondLineUpper, 'UWS') === 0
     );
 
     if (!$isUws) {
