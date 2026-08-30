@@ -843,8 +843,65 @@ if ($route === '/fetch_schedule') {
         $candidates[] = $fl;
     }
 
-    // 2. Параллельная загрузка оперативной информации (пассажиры, загрузка, экипаж)
+function parseTelegramLoad($text) {
+    if (!$text) {
+        return ['cargo' => '', 'mail' => '', 'baggage' => ''];
+    }
+
+    $cargoTotal = 0;
+    $mailTotal = 0;
+    $baggageTotal = 0;
+    $hasCargo = false;
+    $hasMail = false;
+    $hasBaggage = false;
+
+    // Регулярное выражение для строк UWS:
+    // -KEJ/154P/C или KEJ/154/C или /154P/C или -KEJ/154K/C или -KEJ/20P/M
+    if (preg_match_all('/(?:[A-Z]{3})?\/(\d+)(?:P|K|KG|PC)?\/([CMBE])/i', $text, $matches, PREG_SET_ORDER)) {
+        foreach ($matches as $m) {
+            $weight = (int)$m[1];
+            $type = strtoupper($m[2]);
+            if ($type === 'C') { // Cargo
+                $cargoTotal += $weight;
+                $hasCargo = true;
+            } elseif ($type === 'M') { // Mail
+                $mailTotal += $weight;
+                $hasMail = true;
+            } elseif ($type === 'B' || $type === 'E') { // Baggage / Equipment
+                $baggageTotal += $weight;
+                $hasBaggage = true;
+            }
+        }
+    }
+
+    // Если UWS не дал результатов, проверяем LDM: .C154.M20 или .B/1938.C/154
+    if (!$hasCargo && !$hasMail) {
+        if (preg_match('/\.C\/?(\d+)/i', $text, $m)) {
+            $val = (int)$m[1];
+            if ($val > 0) {
+                $cargoTotal = $val;
+                $hasCargo = true;
+            }
+        }
+        if (preg_match('/\.M\/?(\d+)/i', $text, $m)) {
+            $val = (int)$m[1];
+            if ($val > 0) {
+                $mailTotal = $val;
+                $hasMail = true;
+            }
+        }
+    }
+
+    return [
+        'cargo' => ($hasCargo && $cargoTotal > 0) ? (string)$cargoTotal : '',
+        'mail' => ($hasMail && $mailTotal > 0) ? (string)$mailTotal : '',
+        'baggage' => ($hasBaggage && $baggageTotal > 0) ? (string)$baggageTotal : ''
+    ];
+}
+
+    // 2. Параллельная загрузка оперативной информации (пассажиры, загрузка, экипаж) и телеграмм (UWS / LDM)
     $preliminaries = [];
+    $telegrams = [];
     if (!empty($candidates)) {
         $mh = curl_multi_init();
         $handles = [];
@@ -859,21 +916,38 @@ if ($route === '/fetch_schedule') {
             $airlineName = $c['_airline'] ?? 'nordwind';
             $baseUrl = ($airlineName === 'ikar') ? 'https://aviabit.ikar.aero' : 'https://aviabit.nordwindairlines.ru';
             $cookieVal = getAviaBitCookie($airlineName, $defaultCookies[$airlineName] ?? '');
-            $url = "$baseUrl/api/preliminary-crew-load?planFlightId=$pfId&eng=false";
-
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 6);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            
+            // 2.1 Запрос preliminary
+            $urlPrelim = "$baseUrl/api/preliminary-crew-load?planFlightId=$pfId&eng=false";
+            $ch1 = curl_init($urlPrelim);
+            curl_setopt($ch1, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch1, CURLOPT_TIMEOUT, 6);
+            curl_setopt($ch1, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch1, CURLOPT_HTTPHEADER, [
                 "Origin: $baseUrl",
                 "Referer: $baseUrl/plan-flight",
                 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
                 'Accept: application/json, text/plain, */*',
                 "Cookie: connect.sid=$cookieVal"
             ]);
-            curl_multi_add_handle($mh, $ch);
-            $handles[$pfId] = $ch;
+            curl_multi_add_handle($mh, $ch1);
+            $handles["prelim_{$pfId}"] = $ch1;
+
+            // 2.2 Запрос телеграммы (UWS/LDM/MVT)
+            $urlTelex = "$baseUrl/api/telex-message?id=$pfId&eng=false";
+            $ch2 = curl_init($urlTelex);
+            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch2, CURLOPT_TIMEOUT, 6);
+            curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch2, CURLOPT_HTTPHEADER, [
+                "Origin: $baseUrl",
+                "Referer: $baseUrl/plan-flight",
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+                'Accept: application/json, text/plain, */*',
+                "Cookie: connect.sid=$cookieVal"
+            ]);
+            curl_multi_add_handle($mh, $ch2);
+            $handles["telex_{$pfId}"] = $ch2;
         }
 
         $running = null;
@@ -882,13 +956,19 @@ if ($route === '/fetch_schedule') {
             curl_multi_select($mh);
         } while ($running > 0);
 
-        foreach ($handles as $pfId => $ch) {
+        foreach ($handles as $key => $ch) {
             $resp = curl_multi_getcontent($ch);
             $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             if ($code === 200 && $resp) {
                 $json = json_decode($resp, true);
                 if (is_array($json)) {
-                    $preliminaries[$pfId] = $json;
+                    if (strpos($key, 'prelim_') === 0) {
+                        $pfId = (int)substr($key, 7);
+                        $preliminaries[$pfId] = $json;
+                    } elseif (strpos($key, 'telex_') === 0) {
+                        $pfId = (int)substr($key, 6);
+                        $telegrams[$pfId] = $json;
+                    }
                 }
             }
             curl_multi_remove_handle($mh, $ch);
@@ -998,6 +1078,28 @@ if ($route === '/fetch_schedule') {
 
         $airports = "{$dep}-{$arr}";
 
+        // Парсинг телеграмм (UWS / LDM) для извлечения Груза (Cargo) и Почты (Mail)
+        $telexData = $telegrams[$pfId] ?? [];
+        $telexText = $telexData['text'] ?? '';
+        $tlgLoad = parseTelegramLoad($telexText);
+
+        $cargoVal = $tlgLoad['cargo'] ?? '';
+        $mailVal = $tlgLoad['mail'] ?? '';
+
+        // Фолбэк на preliminary load block если в телеграмме нет
+        if ($cargoVal === '' && !empty($loadList) && is_array($loadList)) {
+            $ld0 = $loadList[0] ?? [];
+            if (!empty($ld0['Cg']) && (int)$ld0['Cg'] > 0) {
+                $cargoVal = (string)$ld0['Cg'];
+            }
+        }
+        if ($mailVal === '' && !empty($loadList) && is_array($loadList)) {
+            $ld0 = $loadList[0] ?? [];
+            if (!empty($ld0['Ml']) && (int)$ld0['Ml'] > 0) {
+                $mailVal = (string)$ld0['Ml'];
+            }
+        }
+
         $processed[] = [
             'id' => 'fl_' . time() . '_' . $idx,
             'flight' => $flClean,
@@ -1018,8 +1120,8 @@ if ($route === '/fetch_schedule') {
             'galley' => 'D',
             'mtow' => '',
             'lir_sent' => false,
-            'cargo' => '',
-            'mail' => '',
+            'cargo' => $cargoVal,
+            'mail' => $mailVal,
             'baggage' => '',
             'szv_sent' => false,
             'ldm_sent' => false,

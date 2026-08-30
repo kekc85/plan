@@ -332,6 +332,82 @@ class AviaBitClient:
             pass
         return {}
 
+    def fetch_flight_telex(self, pf_record_id: int) -> dict:
+        """
+        Запрос телеграммы по рейсу (UWS / LDM / MVT).
+        """
+        if not pf_record_id:
+            return {}
+        url = f"{self.base_url}/api/telex-message?id={pf_record_id}"
+        try:
+            resp = self.session.get(url, headers=self.headers, timeout=5)
+            if resp.status_code == 200 and resp.text:
+                return resp.json()
+        except Exception:
+            pass
+        return {}
+
+
+def parse_telegram_load(text: str) -> dict:
+    """
+    Парсинг телеграмм UWS и LDM для извлечения веса груза (Cargo) и почты (Mail).
+    Пример UWS:
+      UWS
+      N4491/29.AER
+      BULK
+      -KEJ/154P/C
+      -KEJ/20P/M
+    Где:
+      154P/C -> груз 154 кг
+      20P/M  -> почта 20 кг
+    """
+    if not text:
+        return {'cargo': '', 'mail': '', 'baggage': ''}
+
+    cargo_total = 0
+    mail_total = 0
+    baggage_total = 0
+    has_cargo = False
+    has_mail = False
+    has_baggage = False
+
+    # 1. Проверяем формат UWS (-IATA/154P/C, /154/C, -KEJ/20P/M и т.д.)
+    uws_pattern = re.compile(r'(?:[A-Z]{3})?/(\d+)(?:P|K|KG|PC)?/([CMBE])', re.I)
+    for match in uws_pattern.finditer(text):
+        weight = int(match.group(1))
+        t_type = match.group(2).upper()
+        if t_type == 'C': # Cargo (Груз)
+            cargo_total += weight
+            has_cargo = True
+        elif t_type == 'M': # Mail (Почта)
+            mail_total += weight
+            has_mail = True
+        elif t_type in ('B', 'E'): # Baggage / Equipment
+            baggage_total += weight
+            has_baggage = True
+
+    # 2. Если в UWS не найдено, проверяем формат LDM (.B/1938.C154.M20 или .B/1938.C/154)
+    if not has_cargo and not has_mail:
+        ldm_c = re.search(r'\.C/?(\d+)', text, re.I)
+        if ldm_c:
+            c_val = int(ldm_c.group(1))
+            if c_val > 0:
+                cargo_total = c_val
+                has_cargo = True
+
+        ldm_m = re.search(r'\.M/?(\d+)', text, re.I)
+        if ldm_m:
+            m_val = int(ldm_m.group(1))
+            if m_val > 0:
+                mail_total = m_val
+                has_mail = True
+
+    return {
+        'cargo': str(cargo_total) if has_cargo and cargo_total > 0 else '',
+        'mail': str(mail_total) if has_mail and mail_total > 0 else '',
+        'baggage': str(baggage_total) if has_baggage and baggage_total > 0 else ''
+    }
+
 
 def parse_crew(crew_xml_str: str) -> tuple:
     """
@@ -459,27 +535,39 @@ def process_flights(
             seen_keys.add(fl_key)
             unique_candidates.append(fl)
 
-    # Параллельная дозагрузка preliminary (пассажиры/экипаж/города), если не была загружена
+    # Параллельная дозагрузка preliminary (пассажиры/экипаж/города) и telegrams (UWS/LDM груз/почта)
     missing_pf_ids = [
         (fl.get("pfRecordId"), fl.get("_client"))
         for fl in unique_candidates
         if fl.get("pfRecordId") and fl.get("pfRecordId") not in preliminaries
     ]
 
+    telegrams = {}
     if missing_pf_ids:
-        print(f"[*] Загрузка оперативной информации (пассажиры/продажи) для {len(missing_pf_ids)} рейсов...")
+        print(f"[*] Загрузка оперативной информации (пассажиры, продажи, телеграммы UWS) для {len(missing_pf_ids)} рейсов...")
         with ThreadPoolExecutor(max_workers=30) as executor:
-            future_to_id = {
+            future_to_prelim = {
                 executor.submit(client.fetch_flight_preliminary, pf_id): pf_id
                 for pf_id, client in missing_pf_ids
                 if client is not None
             }
-            for future in as_completed(future_to_id):
-                pf_id = future_to_id[future]
+            future_to_telex = {
+                executor.submit(client.fetch_flight_telex, pf_id): pf_id
+                for pf_id, client in missing_pf_ids
+                if client is not None
+            }
+            for future in as_completed(future_to_prelim):
+                pf_id = future_to_prelim[future]
                 try:
                     preliminaries[pf_id] = future.result()
                 except Exception:
                     preliminaries[pf_id] = {}
+            for future in as_completed(future_to_telex):
+                pf_id = future_to_telex[future]
+                try:
+                    telegrams[pf_id] = future.result()
+                except Exception:
+                    telegrams[pf_id] = {}
 
     processed = []
 
@@ -542,6 +630,29 @@ def process_flights(
 
         pax_notes = parse_pax_count(pax_raw, load_list)
 
+        # Парсинг телеграмм (UWS / LDM) для извлечения Груза (Cargo) и Почты (Mail)
+        telex_data = telegrams.get(pf_id, {})
+        telex_text = telex_data.get("text", "") if isinstance(telex_data, dict) else ""
+        tlg_load = parse_telegram_load(telex_text)
+
+        cargo_val = tlg_load.get("cargo", "")
+        mail_val = tlg_load.get("mail", "")
+
+        # Если в телеграмме нет, проверяем блок load в preliminary
+        if not cargo_val and load_list and isinstance(load_list, list) and len(load_list) > 0:
+            leg_load = load_list[0]
+            if isinstance(leg_load, dict):
+                cg = leg_load.get("Cg", 0)
+                if cg and int(cg) > 0:
+                    cargo_val = str(cg)
+
+        if not mail_val and load_list and isinstance(load_list, list) and len(load_list) > 0:
+            leg_load = load_list[0]
+            if isinstance(leg_load, dict):
+                ml = leg_load.get("Ml", 0)
+                if ml and int(ml) > 0:
+                    mail_val = str(ml)
+
         # Условие для SVO: рейсы с вылетом из SVO включаются ТОЛЬКО если пассажиров 0 (пустые/перегоночные)
         if dep == "SVO":
             pax_int = int(pax_notes) if str(pax_notes).isdigit() else 0
@@ -575,6 +686,8 @@ def process_flights(
             "pax_notes": pax_notes,
             "crew": crew_str,
             "fuel": "",  # Ячейка топлива остается пустой для ручного ввода
+            "cargo": cargo_val,
+            "mail": mail_val,
             "dep": dep,
             "arr": arr
         })
