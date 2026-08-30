@@ -365,11 +365,16 @@ export default function FlightRow({
               onFocus={(e) => e.target.select()}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') {
+                  e.target.blur();
+                }
+              }}
               placeholder="25.08"
               maxLength={5}
               className="bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-1 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-16 cursor-text tracking-wide"
-              title="Дата рейса (число.месяц с маской, например 2608 -> 26.08)"
+              title="Дата рейса (число.месяц с маской, например 2608 -> 26.08) — нажмите Enter или смените поле для авто-сортировки"
             />
           </div>
         </div>

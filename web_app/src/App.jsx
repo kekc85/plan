@@ -314,16 +314,21 @@ export default function App() {
     setFlights((items) => arrayMove(items, index, index + 1));
   };
 
-  // Обновление отдельного поля рейса
-  const handleUpdateFlight = (id, updatedFields) => {
-    setFlights(prev =>
-      prev.map(f => {
+  // Обновление отдельного поля рейса (с поддержкой авто-сортировки при смене времени/даты)
+  const handleUpdateFlight = (id, updatedFields = {}, shouldSort = false) => {
+    setFlights(prev => {
+      const updatedList = prev.map(f => {
         if (f.id === id) {
           return { ...f, ...updatedFields };
         }
         return f;
-      })
-    );
+      });
+
+      if (shouldSort) {
+        return sortFlightsChronologically(updatedList);
+      }
+      return updatedList;
+    });
   };
 
   // Удаление рейса
