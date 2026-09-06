@@ -819,12 +819,12 @@ def process_flights(
         raw_tail = (fl.get("pln") or "").strip()
         tail_clean = raw_tail.replace("RA-", "").replace("RA", "").replace("-", "").strip()
 
+        # Компановка
+        layout = (fl.get("prePlaneComponovkaInfo") or "").strip()
+
         # Тип ВС (с нормализацией: 73H -> 738, 73J -> 739, авто-определением по борту/компоновке)
         raw_type = (fl.get("plnType") or fl.get("planeType") or "").strip()
         ac_type = detect_plane_type(raw_type=raw_type, tail=tail_clean, layout=layout)
-
-        # Компановка
-        layout = (fl.get("prePlaneComponovkaInfo") or "").strip()
 
         # Экипаж (4 разные цифры через слеш: Летный/Салон/ИТС/Пассажиры)
         cockpit, cabin, its, pax = parse_crew(fl.get("crew"))

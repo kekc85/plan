@@ -29,6 +29,7 @@ from db import (
     DatabaseConnection,
     hash_password,
     verify_password,
+    execute_query,
     MSK_TZ
 )
 from auth import (
