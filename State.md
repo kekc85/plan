@@ -5,6 +5,7 @@
     3. Подтверждение изменений: на уровне ячейки (клик по бейджу или правка), строки рейса («✓ Ознакомлен») или всей смены («Ознакомиться со всеми»). Неподтвержденные изменения персистентно сохраняются в поле `unread_changes` в БД и `localStorage` до явного подтверждения.
     4. БД и бэкенды: добавлена колонка `unread_changes TEXT NULL` в `plan_flights` (`db.py`, `schema.sql`), безопасная автомиграция SQLite/MySQL, полная поддержка в FastAPI (`api_server.py`) и PHP (`web_app/public/api/index.php`).
     5. Обновлена ручная подкачка `AviaBitFetchModal.jsx`, проект пересобран (`npm run build`), обновлен архив `plan.zip`.
+    6. Исправлена ошибка инициализации в `App.jsx` (`unreadChangesCount is not defined`), вызывавшая падение React и черный экран; проект пересобран, архив `plan.zip` обновлен.
   - Устранен сбой 500 Internal Server Error при парсинге AviaBit и получении списка аэропортов:
     1. В `parser.py` (`process_flights`) исправлен порядок вычисления `layout`: переменная компоновки теперь извлекается строго до вызова `detect_plane_type`, что устранило `UnboundLocalError: cannot access local variable 'layout'`.
     2. В `api_server.py` добавлен недостающий импорт `execute_query` из модуля `db`, что устранило `NameError: name 'execute_query' is not defined` в эндпоинтах `/api/airports` и фильтрации вылетов.

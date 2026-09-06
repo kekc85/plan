@@ -180,6 +180,9 @@ export default function App() {
     return INITIAL_FLIGHTS.map(normalizeFlight);
   });
 
+  // Подсчет общего количества неподтвержденных изменений
+  const unreadChangesCount = React.useMemo(() => countUnreadChanges(flights), [flights]);
+
   // Автозагрузка с сервера SQLite при старте
   useEffect(() => {
     fetchCurrentShift()
