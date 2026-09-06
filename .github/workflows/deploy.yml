@@ -1,0 +1,109 @@
+name: Deploy to Beget (Production & Test)
+
+on:
+  push:
+    branches:
+      - main
+      - production
+      - dev
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target Environment'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - production
+          - test
+
+jobs:
+  build-and-deploy:
+    name: Build & Sync to Beget Hosting
+    runs-on: ubuntu-latest
+    steps:
+      - name: ?? Checkout latest code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ?? Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'web_app/package-lock.json'
+
+      - name: ?? Determine Environment & Settings
+        id: env-setup
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          DISPATCH_CHOICE="${{ github.event.inputs.target_env }}"
+          
+          IS_TEST=false
+          if [ "$DISPATCH_CHOICE" = "test" ] || ([ "$DISPATCH_CHOICE" = "auto" ] && [ "$BRANCH" = "dev" ]); then
+            IS_TEST=true
+          fi
+          
+          if [ "$IS_TEST" = true ]; then
+            echo "ENV_NAME=Test" >> $GITHUB_ENV
+            echo "VITE_BASE=/plan_test/" >> $GITHUB_ENV
+            
+            RAW_DIR="${{ secrets.BEGET_TEST_REMOTE_DIR }}"
+            if [ -z "$RAW_DIR" ]; then
+              RAW_DIR="boostandgo.ru/public_html/plan_test/"
+            fi
+          else
+            echo "ENV_NAME=Production" >> $GITHUB_ENV
+            echo "VITE_BASE=/plan/" >> $GITHUB_ENV
+            
+            RAW_DIR="${{ secrets.BEGET_REMOTE_DIR }}"
+            if [ -z "$RAW_DIR" ]; then
+              RAW_DIR="boostandgo.ru/public_html/plan/"
+            fi
+          fi
+          
+          # Clean FTP directory
+          CLEAN_DIR=$(echo "$RAW_DIR" | tr -d '\r\n' | sed -e 's|^[[:space:]]*||' -e 's|[[:space:]]*$||')
+          [[ "$CLEAN_DIR" != */ ]] && CLEAN_DIR="${CLEAN_DIR}/"
+          
+          # Clean server address
+          RAW_SERVER="${{ secrets.BEGET_FTP_SERVER }}"
+          CLEAN_SERVER=$(echo "$RAW_SERVER" | sed -e 's|^[^/]*://||' -e 's|/.*$||' | tr -d '[:space:]')
+          
+          echo "CLEAN_SERVER=${CLEAN_SERVER}" >> $GITHUB_ENV
+          echo "CLEAN_DIR=${CLEAN_DIR}" >> $GITHUB_ENV
+          
+          echo "?? Deploy Environment: $ENV_NAME"
+          echo "?? Base URL: $VITE_BASE"
+          echo "?? Target Server: $CLEAN_SERVER"
+          echo "?? Target Directory: $CLEAN_DIR"
+
+      - name: ?? Install Frontend Dependencies
+        working-directory: web_app
+        run: npm ci || npm install
+
+      - name: ?? Build Frontend
+        working-directory: web_app
+        run: |
+          VITE_BASE_PATH="${{ env.VITE_BASE }}" npm run build
+
+      - name: ?? Sync Built Files to Beget
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.CLEAN_SERVER }}
+          username: ${{ secrets.BEGET_FTP_USERNAME }}
+          password: ${{ secrets.BEGET_FTP_PASSWORD }}
+          local-dir: ./web_app/dist/
+          server-dir: ${{ env.CLEAN_DIR }}
+          protocol: ftp
+          log-level: verbose
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.session_*.json
+            **/api/.session_*.json
+            **/db_config.php
+            **/backups/**
+            **/node_modules/**

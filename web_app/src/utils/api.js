@@ -11,6 +11,9 @@ function getApiBaseUrl() {
       return '/api';
     }
     const path = window.location.pathname;
+    if (path.includes('/plan_test')) {
+      return '/plan_test/api';
+    }
     if (path.includes('/plan')) {
       return '/plan/api';
     }
