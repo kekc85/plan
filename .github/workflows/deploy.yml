@@ -23,19 +23,19 @@ jobs:
     name: Build & Sync to Beget Hosting
     runs-on: ubuntu-latest
     steps:
-      - name: ?? Checkout latest code
+      - name: Checkout latest code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: ?? Setup Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: 'web_app/package-lock.json'
 
-      - name: ?? Determine Environment & Settings
+      - name: Determine Environment & Settings
         id: env-setup
         run: |
           BRANCH="${GITHUB_REF_NAME}"
@@ -75,21 +75,21 @@ jobs:
           echo "CLEAN_SERVER=${CLEAN_SERVER}" >> $GITHUB_ENV
           echo "CLEAN_DIR=${CLEAN_DIR}" >> $GITHUB_ENV
           
-          echo "?? Deploy Environment: $ENV_NAME"
-          echo "?? Base URL: $VITE_BASE"
-          echo "?? Target Server: $CLEAN_SERVER"
-          echo "?? Target Directory: $CLEAN_DIR"
+          echo "Deploy Environment: $ENV_NAME"
+          echo "Base URL: $VITE_BASE"
+          echo "Target Server: $CLEAN_SERVER"
+          echo "Target Directory: $CLEAN_DIR"
 
-      - name: ?? Install Frontend Dependencies
+      - name: Install Frontend Dependencies
         working-directory: web_app
         run: npm ci || npm install
 
-      - name: ?? Build Frontend
+      - name: Build Frontend
         working-directory: web_app
         run: |
           VITE_BASE_PATH="${{ env.VITE_BASE }}" npm run build
 
-      - name: ?? Sync Built Files to Beget
+      - name: Sync Built Files to Beget
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ env.CLEAN_SERVER }}
