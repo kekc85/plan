@@ -608,6 +608,22 @@ def parse_pax_count(pax_str: str, load_list: list = None) -> str:
     return str(pax_str).strip()
 
 
+def normalize_plane_type(raw_type: str) -> str:
+    """
+    Нормализация типа ВС:
+    73H (и русское 73Н) -> 738 (Boeing 737-800)
+    73J (и русское 73Й) -> 739 (Boeing 737-900)
+    """
+    if not raw_type:
+        return ""
+    t = str(raw_type).strip().upper()
+    if t in ("73H", "73Н"):
+        return "738"
+    if t in ("73J", "73Й"):
+        return "739"
+    return t
+
+
 def process_flights(
     candidate_flights: list,
     preliminaries: dict = None,
@@ -729,10 +745,13 @@ def process_flights(
         if start_dt_msk and end_dt_msk and dt_msk:
             if dt_msk < start_dt_msk or dt_msk > end_dt_msk:
                 continue
-
         # Номер ВС (очищенный от префикса RA)
         raw_tail = (fl.get("pln") or "").strip()
         tail_clean = raw_tail.replace("RA-", "").replace("RA", "").replace("-", "").strip()
+
+        # Тип ВС (с нормализацией: 73H -> 738, 73J -> 739)
+        raw_type = (fl.get("plnType") or fl.get("planeType") or "").strip()
+        ac_type = normalize_plane_type(raw_type)
 
         # Компановка
         layout = (fl.get("prePlaneComponovkaInfo") or "").strip()
@@ -810,6 +829,7 @@ def process_flights(
             "route": route_str,
             "std": time_str,
             "tail": tail_clean,
+            "ac_type": ac_type,
             "layout": layout,
             "pax_notes": pax_notes,
             "crew": crew_str,
@@ -924,7 +944,15 @@ def export_to_excel(
         ws.row_dimensions[row_num].height = 36
 
         # Преобразование числовых полей в int для исключения зеленых уголков (число как текст)
-        tail_val = int(r_data["tail"]) if str(r_data.get("tail", "")).isdigit() else r_data.get("tail", "")
+        tail_raw = str(r_data.get("tail") or "").strip()
+        ac_t = normalize_plane_type(str(r_data.get("ac_type") or "").strip())
+        if tail_raw and ac_t:
+            tail_val = f"{tail_raw}\n{ac_t}"
+        elif tail_raw.isdigit():
+            tail_val = int(tail_raw)
+        else:
+            tail_val = tail_raw
+
         layout_val = int(r_data["layout"]) if str(r_data.get("layout", "")).isdigit() else r_data.get("layout", "")
         pax_val = int(r_data["pax_notes"]) if str(r_data.get("pax_notes", "")).isdigit() else r_data.get("pax_notes", "")
         mtow_val = int(r_data["mtow"]) if str(r_data.get("mtow", "")).isdigit() else r_data.get("mtow", "")

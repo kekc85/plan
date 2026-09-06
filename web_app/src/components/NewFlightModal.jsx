@@ -8,7 +8,8 @@ import {
   formatValidAcNum, 
   formatValidAcConfig,
   formatValidMtow,
-  formatValidDayMonth
+  formatValidDayMonth,
+  normalizePlaneType
 } from '../utils/validators';
 
 export default function NewFlightModal({ isOpen, onClose, onAdd }) {
@@ -20,6 +21,7 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
     time: '',
     release_time: '',
     ac_num: '',
+    ac_type: '',
     ac_config: '189',
     pax: '',
     crew: '2/4/0/0',
@@ -189,10 +191,10 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
             </div>
           </div>
 
-          {/* Row 2: Номер ВС, Комп., PAX, Экипаж */}
-          <div className="grid grid-cols-4 gap-2">
+          {/* Row 2: Номер ВС, Тип ВС, Комп., PAX, Экипаж */}
+          <div className="grid grid-cols-5 gap-2">
             <div>
-              <label className="block text-slate-600 dark:text-slate-400 mb-0.5 font-bold">Борт (5 цифр)</label>
+              <label className="block text-slate-600 dark:text-slate-400 mb-0.5 font-bold">Борт</label>
               <input
                 type="text"
                 value={formData.ac_num}
@@ -203,12 +205,23 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
               />
             </div>
             <div>
+              <label className="block text-slate-600 dark:text-slate-400 mb-0.5 font-bold">Тип ВС</label>
+              <input
+                type="text"
+                value={formData.ac_type}
+                onChange={(e) => setFormData(prev => ({ ...prev, ac_type: normalizePlaneType(e.target.value) }))}
+                placeholder="738"
+                maxLength={4}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-1 text-slate-900 dark:text-white font-mono font-bold focus:border-sky-500 focus:outline-none text-center"
+              />
+            </div>
+            <div>
               <label className="block text-slate-600 dark:text-slate-400 mb-0.5 font-bold">Компановка</label>
               <input
                 type="text"
                 value={formData.ac_config}
                 onChange={(e) => setFormData(prev => ({ ...prev, ac_config: formatValidAcConfig(e.target.value) }))}
-                placeholder="189 или 12/168"
+                placeholder="189"
                 maxLength={7}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-1 text-slate-900 dark:text-white font-mono font-semibold focus:border-sky-500 focus:outline-none text-center"
               />

@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { normalizePlaneType } from './validators';
 
 /**
  * Экспорт суточного плана в Excel (.xlsx) через ExcelJS
@@ -110,7 +111,16 @@ export async function exportShiftToExcel(flights, shiftInfo) {
         fuelStr = parts.join(' ');
       }
 
-      const tailVal = /^\d+$/.test(String(f.ac_num || '')) ? parseInt(f.ac_num, 10) : (f.ac_num || '');
+      const tailNum = /^\d+$/.test(String(f.ac_num || '')) ? String(f.ac_num) : (f.ac_num || '');
+      const acType = normalizePlaneType(f.ac_type || '');
+      let tailVal = '';
+      if (tailNum && acType) {
+        tailVal = `${tailNum}\n${acType}`;
+      } else if (tailNum) {
+        tailVal = /^\d+$/.test(tailNum) ? parseInt(tailNum, 10) : tailNum;
+      } else if (acType) {
+        tailVal = /^\d+$/.test(acType) ? parseInt(acType, 10) : acType;
+      }
       const layoutVal = /^\d+$/.test(String(f.ac_config || '')) ? parseInt(f.ac_config, 10) : (f.ac_config || '');
       const paxVal = /^\d+$/.test(String(f.pax || '')) ? parseInt(f.pax, 10) : (f.pax || '');
       const mtowVal = /^\d+$/.test(String(f.mtow || '')) ? parseInt(f.mtow, 10) : (f.mtow || '');

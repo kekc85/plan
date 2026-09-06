@@ -103,6 +103,18 @@ function initAirportsTable($db) {
         }
         $initialized = true;
     } catch (Exception $e) {}
+
+    try {
+        $db->exec("ALTER TABLE plan_flights ADD COLUMN ac_type VARCHAR(16) NULL AFTER ac_num");
+    } catch (Exception $e) {}
+}
+
+function normalizePlaneType($rawType) {
+    if (empty($rawType)) return '';
+    $t = strtoupper(trim((string)$rawType));
+    if ($t === '73H' || $t === '73Н') return '738';
+    if ($t === '73J' || $t === '73Й') return '739';
+    return $t;
 }
 
 // Fallback для заголовков
@@ -381,6 +393,7 @@ if ($route === '/shift/current') {
             'time' => (string)($r['departure_time'] ?? ''),
             'release_time' => (string)($r['release_time'] ?? ''),
             'ac_num' => (string)($r['ac_num'] ?? ''),
+            'ac_type' => (string)($r['ac_type'] ?? ''),
             'ac_config' => (string)($r['ac_config'] ?? ''),
             'pax' => (string)($r['pax'] ?? ''),
             'crew' => (string)($r['crew'] ?? ''),
@@ -440,13 +453,13 @@ if ($route === '/shift/save') {
     $insertFlight = $db->prepare("
         INSERT INTO plan_flights (
             id, shift_id, flight_number, flight_date, route_city, route_airports,
-            departure_time, release_time, ac_num, ac_config, pax, crew,
+            departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
             fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow,
             lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
             status, notes, sort_order, updated_at
         ) VALUES (
             ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?
@@ -464,6 +477,7 @@ if ($route === '/shift/save') {
             (string)($f['time'] ?? ''),
             (string)($f['release_time'] ?? ''),
             (string)($f['ac_num'] ?? ''),
+            normalizePlaneType($f['ac_type'] ?? ''),
             (string)($f['ac_config'] ?? ''),
             (string)($f['pax'] ?? ''),
             (string)($f['crew'] ?? ''),
@@ -528,7 +542,7 @@ if ($route === '/shift/smart_merge') {
             $item['astra_times_sent'] = !empty($old['astra_times_sent']);
             $item['notes'] = !empty($old['notes']) ? $old['notes'] : ($inc['notes'] ?? '');
 
-            foreach (['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'cargo', 'mail', 'baggage', 'pax', 'crew'] as $field) {
+            foreach (['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'cargo', 'mail', 'baggage', 'pax', 'crew', 'ac_type'] as $field) {
                 if (isset($old[$field]) && $old[$field] !== '') {
                     $item[$field] = $old[$field];
                 }
@@ -1156,6 +1170,7 @@ function parseTelegramLoad($text, $code = '') {
 
         $tailRaw = trim($fl['pln'] ?? '');
         $tail = str_replace(['RA-', 'RA', '-'], '', $tailRaw);
+        $acType = normalizePlaneType($fl['plnType'] ?? $fl['planeType'] ?? '');
         $layout = trim($fl['prePlaneComponovkaInfo'] ?? '');
 
         $relTime = '';
@@ -1277,6 +1292,7 @@ function parseTelegramLoad($text, $code = '') {
             'time' => $timeStr,
             'release_time' => $relTime,
             'ac_num' => $tail,
+            'ac_type' => $acType,
             'ac_config' => $layout,
             'pax' => $paxCount,
             'crew' => $crewStr,

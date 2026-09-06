@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS `plan_flights` (
     `departure_time` VARCHAR(16) NULL,
     `release_time` VARCHAR(16) NULL,
     `ac_num` VARCHAR(32) NULL,
+    `ac_type` VARCHAR(16) NULL,
     `ac_config` VARCHAR(32) NULL,
     `pax` VARCHAR(32) NULL,
     `crew` VARCHAR(32) NULL,

@@ -393,5 +393,15 @@ export function isRenDeparture(flight) {
   return false;
 }
 
-
-
+/**
+ * Нормализация типа ВС:
+ * 73H (и русское 73Н) -> 738 (Boeing 737-800)
+ * 73J (и русское 73Й) -> 739 (Boeing 737-900)
+ */
+export function normalizePlaneType(val) {
+  if (!val) return '';
+  const t = String(val).trim().toUpperCase();
+  if (t === '73H' || t === '73Н') return '738';
+  if (t === '73J' || t === '73Й') return '739';
+  return t;
+}

@@ -58,7 +58,10 @@ export default function ShiftTable({
                 Время<br/>
                 <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">Вып (-40)</span> / <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400">Вылет</span>
               </th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-16 shadow-sm">Номер ВС</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-16 shadow-sm">
+                Номер ВС<br/>
+                <span className="text-[9px] font-semibold text-slate-500 dark:text-slate-400">Тип ВС</span>
+              </th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-14 shadow-sm">Комп.</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-12 shadow-sm">PAX</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-16 shadow-sm">Экипаж<br/><span className="text-[10px] font-medium text-slate-500">Л/Б/И/П</span></th>

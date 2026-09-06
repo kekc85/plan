@@ -12,7 +12,8 @@ import {
   formatValidMtow,
   formatValidDayMonth,
   isFlightReleaseOverdue,
-  isRenDeparture
+  isRenDeparture,
+  normalizePlaneType
 } from '../utils/validators';
 
 export default function FlightRow({
@@ -380,20 +381,40 @@ export default function FlightRow({
         </div>
       </td>
 
-      {/* 5. Номер ВС */}
-      <td className={`py-2.5 px-1 font-mono text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap text-center ${overdueBorderTopBottom}`}>
-        <input
-          type="text"
-          value={flight.ac_num || ''}
-          onChange={(e) => handleCellChange('ac_num', formatValidAcNum(e.target.value))}
-          onFocus={(e) => e.target.select()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          placeholder="73314"
-          maxLength={5}
-          className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-sky-500 rounded px-1 py-0.5 w-16 text-center font-mono text-sm font-extrabold text-slate-900 dark:text-white outline-none cursor-text tracking-wider"
-        />
+      {/* 5. Номер ВС и Тип ВС */}
+      <td className={`py-1.5 px-1 font-mono whitespace-nowrap text-center ${overdueBorderTopBottom}`}>
+        <div className="flex flex-col items-center justify-center gap-0.5">
+          {/* Номер борта */}
+          <input
+            type="text"
+            value={flight.ac_num || ''}
+            onChange={(e) => handleCellChange('ac_num', formatValidAcNum(e.target.value))}
+            onFocus={(e) => e.target.select()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="73314"
+            maxLength={5}
+            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 w-16 text-center font-mono text-sm font-extrabold text-slate-900 dark:text-white outline-none cursor-text tracking-wider"
+            title="Бортовой номер ВС"
+          />
+          {/* Тип ВС под номером борта */}
+          <div className="border-t border-slate-200 dark:border-slate-800 w-full pt-0.5 flex items-center justify-center">
+            <input
+              type="text"
+              value={flight.ac_type || ''}
+              onChange={(e) => handleCellChange('ac_type', normalizePlaneType(e.target.value))}
+              onFocus={(e) => e.target.select()}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="738"
+              maxLength={4}
+              className="bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 focus:bg-white dark:focus:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0 text-center font-mono font-bold text-[11px] text-slate-700 dark:text-slate-300 outline-none w-14 cursor-text tracking-wider shadow-inner"
+              title="Тип ВС (например 738, 739, 321, 332)"
+            />
+          </div>
+        </div>
       </td>
 
       {/* 6. Компановка */}

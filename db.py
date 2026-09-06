@@ -124,6 +124,7 @@ def init_db():
             departure_time VARCHAR(16) NULL,
             release_time VARCHAR(16) NULL,
             ac_num VARCHAR(32) NULL,
+            ac_type VARCHAR(16) NULL,
             ac_config VARCHAR(32) NULL,
             pax VARCHAR(32) NULL,
             crew VARCHAR(32) NULL,
@@ -214,6 +215,13 @@ def init_db():
             """, ("dispatcher", disp_hash, disp_salt, "Диспетчер по центровке", "dispatcher", now_str))
             print("[MySQL] Созданы начальные учётные записи в MySQL на Beget")
 
+        # Автомиграция: добавление колонки ac_type если ее еще нет
+        try:
+            cursor.execute("ALTER TABLE plan_flights ADD COLUMN ac_type VARCHAR(16) NULL AFTER ac_num;")
+            conn.commit()
+        except Exception:
+            pass
+
     else:
         # SQLite таблицы
         cursor.execute("""
@@ -252,6 +260,7 @@ def init_db():
             departure_time TEXT,
             release_time TEXT,
             ac_num TEXT,
+            ac_type TEXT,
             ac_config TEXT,
             pax TEXT,
             crew TEXT,
@@ -341,6 +350,13 @@ def init_db():
             """, ("dispatcher", disp_hash, disp_salt, "Диспетчер по центровке", "dispatcher", now_str))
             conn.commit()
             print("[SQLite] Созданы базовые учётные записи admin / dispatcher")
+
+        # Автомиграция: добавление колонки ac_type если ее еще нет
+        try:
+            cursor.execute("ALTER TABLE plan_flights ADD COLUMN ac_type TEXT;")
+            conn.commit()
+        except Exception:
+            pass
 
     conn.close()
 

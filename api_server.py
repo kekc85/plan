@@ -47,7 +47,8 @@ from parser import (
     parse_date_arg,
     parse_time_arg,
     process_flights,
-    export_to_excel
+    export_to_excel,
+    normalize_plane_type
 )
 
 # Инициализируем таблицы БД при запуске
@@ -524,6 +525,7 @@ def get_current_shift():
             "time": str(r.get("departure_time") or ""),
             "release_time": str(r.get("release_time") or ""),
             "ac_num": str(r.get("ac_num") or ""),
+            "ac_type": str(r.get("ac_type") or ""),
             "ac_config": str(r.get("ac_config") or ""),
             "pax": str(r.get("pax") or ""),
             "crew": str(r.get("crew") or ""),
@@ -585,13 +587,13 @@ def save_shift_state(req: SaveShiftRequest, current_user: dict = Depends(get_cur
             q("""
             INSERT INTO plan_flights (
                 id, shift_id, flight_number, flight_date, route_city, route_airports,
-                departure_time, release_time, ac_num, ac_config, pax, crew,
+                departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
                 fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow,
                 lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
                 status, notes, sort_order, updated_at
             ) VALUES (
                 %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s
@@ -607,6 +609,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: dict = Depends(get_cur
                 f.get("time") or "",
                 f.get("release_time") or "",
                 f.get("ac_num") or "",
+                f.get("ac_type") or "",
                 f.get("ac_config") or "",
                 str(f.get("pax") or ""),
                 f.get("crew") or "",
@@ -673,7 +676,7 @@ def smart_merge_schedules(req: SmartMergeRequest, current_user: dict = Depends(g
             merged["astra_times_sent"] = old.get("astra_times_sent", False)
             merged["notes"] = old.get("notes") or inc.get("notes") or ""
             
-            for field in ["fuel_block", "fuel_trip", "fuel_taxi", "dow", "doi", "galley", "mtow", "cargo", "mail", "baggage", "pax", "crew"]:
+            for field in ["fuel_block", "fuel_trip", "fuel_taxi", "dow", "doi", "galley", "mtow", "cargo", "mail", "baggage", "pax", "crew", "ac_type"]:
                 if old.get(field):
                     merged[field] = old[field]
 
@@ -860,6 +863,7 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
             "time": std_time,
             "release_time": release_t,
             "ac_num": tail,
+            "ac_type": normalize_plane_type(str(row.get("ac_type") or "")),
             "ac_config": layout,
             "pax": pax,
             "crew": crew,
