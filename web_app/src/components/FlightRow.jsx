@@ -1,10 +1,10 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, ArrowUp, ArrowDown, Check } from 'lucide-react';
+import { GripVertical, Trash2, ArrowUp, ArrowDown, Check, Bell } from 'lucide-react';
 import { 
   formatValidTime, 
-  calcReleaseTime,
+  calcReleaseTime, 
   formatValidCrew, 
   formatValidFlight, 
   formatValidAcNum, 
@@ -17,6 +17,25 @@ import {
   detectPlaneType
 } from '../utils/validators';
 
+// Компактный бейдж для подтверждения изменившегося параметра
+function ChangeBadge({ change, onAcknowledge }) {
+  if (!change) return null;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onAcknowledge?.();
+      }}
+      className="inline-flex items-center gap-0.5 bg-amber-500 hover:bg-amber-600 text-white font-mono text-[9px] font-extrabold px-1 py-0.2 rounded shadow transition-transform active:scale-95 cursor-pointer shrink-0 mt-0.5"
+      title={`Изменено в AviaBit!\nБыло: ${change.old || '—'} → Стало: ${change.new}\nНажмите, чтобы подтвердить ознакомление`}
+    >
+      <span>было {change.old || '—'}</span>
+      <Check className="w-2.5 h-2.5 stroke-[3]" />
+    </button>
+  );
+}
+
 export default function FlightRow({
   flight,
   index,
@@ -24,6 +43,8 @@ export default function FlightRow({
   onDeleteFlight,
   onMoveUp,
   onMoveDown,
+  onAcknowledgeField,
+  onAcknowledgeFlight,
   isFirst,
   isLast
 }) {
@@ -36,12 +57,24 @@ export default function FlightRow({
     isDragging
   } = useSortable({ id: flight.id });
 
+  const unread = flight.unread_changes || {};
+  const unreadCount = Object.keys(unread).length;
+  const hasUnreadChanges = unreadCount > 0 || !!flight.is_new_flight;
+  const isChanged = (field) => !!unread[field];
+  const getChangedStyle = (field) => isChanged(field)
+    ? 'ring-2 ring-amber-500 bg-amber-100/90 dark:bg-amber-950/80 text-amber-950 dark:text-amber-100 font-bold'
+    : '';
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
   const handleCellChange = (field, value) => {
+    // При ручном редактировании поля диспетчером автоматически снимаем подсветку с этого поля
+    if (unread[field] && onAcknowledgeField) {
+      onAcknowledgeField(flight.id, field);
+    }
     onUpdateFlight(flight.id, { [field]: value });
   };
 
@@ -290,21 +323,36 @@ export default function FlightRow({
       <td className={`sticky left-8 z-20 py-2.5 px-1 font-mono font-extrabold text-base text-sky-700 dark:text-sky-400 whitespace-nowrap min-w-[82px] text-center bg-inherit shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${
         isOverdue ? 'border-t-2 border-b-2 border-rose-500' : ''
       }`}>
-        <input
-          type="text"
-          value={flight.flight || ''}
-          onChange={(e) => handleCellChange('flight', formatValidFlight(e.target.value))}
-          onFocus={(e) => e.target.select()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-sky-500 rounded px-1 py-0.5 w-20 font-extrabold font-mono text-base text-sky-700 dark:text-sky-400 outline-none cursor-text tracking-wide text-center"
-        />
+        <div className="flex flex-col items-center justify-center gap-0.5">
+          <input
+            type="text"
+            value={flight.flight || ''}
+            onChange={(e) => handleCellChange('flight', formatValidFlight(e.target.value))}
+            onFocus={(e) => e.target.select()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-sky-500 rounded px-1 py-0.5 w-20 font-extrabold font-mono text-base text-sky-700 dark:text-sky-400 outline-none cursor-text tracking-wide text-center"
+          />
+          {flight.is_new_flight && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
+              className="inline-flex items-center gap-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow animate-pulse cursor-pointer shrink-0"
+              title="Новый рейс из AviaBit! Нажмите для подтверждения"
+            >
+              <span>НОВЫЙ</span>
+              <Check className="w-2.5 h-2.5 stroke-[3]" />
+            </button>
+          )}
+        </div>
       </td>
 
       {/* 3. Маршрут (Выравнивание строго по центру: Город сверху, Коды снизу) */}
       <td className={`py-1.5 px-1.5 whitespace-nowrap leading-tight text-center min-w-[125px] ${overdueBorderTopBottom}`}>
-        <div className="flex flex-col items-center justify-center gap-0.5 w-full">
+        <div className={`flex flex-col items-center justify-center gap-0.5 w-full rounded p-0.5 ${
+          isChanged('route_city') || isChanged('route_airports') ? 'ring-2 ring-amber-500 bg-amber-50 dark:bg-amber-950/40' : ''
+        }`}>
           <input
             type="text"
             value={flight.route_city || ''}
@@ -314,9 +362,10 @@ export default function FlightRow({
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="Город"
-            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1.5 py-0.5 text-xs font-bold text-slate-900 dark:text-slate-100 outline-none w-full min-w-[110px] cursor-text text-center"
+            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1.5 py-0.5 text-xs font-bold text-slate-900 dark:text-slate-100 outline-none w-full min-w-[110px] cursor-text text-center ${getChangedStyle('route_city')}`}
             title={flight.route_city || ''}
           />
+          <ChangeBadge change={unread.route_city} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'route_city')} />
           <input
             type="text"
             value={flight.route_airports || ''}
@@ -326,8 +375,9 @@ export default function FlightRow({
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="DEP-ARR"
-            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400 outline-none w-full min-w-[110px] uppercase cursor-text tracking-wider text-center"
+            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400 outline-none w-full min-w-[110px] uppercase cursor-text tracking-wider text-center ${getChangedStyle('route_airports')}`}
           />
+          <ChangeBadge change={unread.route_airports} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'route_airports')} />
         </div>
       </td>
 
@@ -336,6 +386,8 @@ export default function FlightRow({
         <div className={`flex flex-col items-center gap-0.5 rounded-md p-1 min-w-[84px] transition-colors ${
           isOverdue
             ? 'bg-rose-100/95 dark:bg-rose-950/80 border-2 border-rose-500 shadow-sm'
+            : isChanged('time') || isChanged('flight_date')
+            ? 'bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-500 shadow-sm'
             : 'bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700'
         }`}>
           {/* 1. Время выпуска (-40 мин) */}
@@ -364,25 +416,28 @@ export default function FlightRow({
           </div>
 
           {/* 2. Время вылета */}
-          <div className="flex items-center justify-center gap-0.5 w-full border-t border-slate-200 dark:border-slate-800 pt-0.5">
-            <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase leading-none">ВЫЛ:</span>
-            <input
-              type="text"
-              value={flight.time || ''}
-              onChange={handleDepartureTimeChange}
-              onBlur={handleDepartureTimeBlur}
-              onKeyDown={handleDepartureTimeKeyDown}
-              onFocus={(e) => e.target.select()}
-              onPointerDown={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              placeholder="00:00"
-              className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-amber-500 rounded px-0.5 text-center font-mono font-extrabold text-sm text-amber-700 dark:text-amber-300 outline-none w-14 cursor-text"
-              title="Время вылета (МСК) — нажмите Enter или смените поле для авто-сортировки"
-            />
+          <div className="flex flex-col items-center justify-center w-full border-t border-slate-200 dark:border-slate-800 pt-0.5">
+            <div className="flex items-center justify-center gap-0.5 w-full">
+              <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase leading-none">ВЫЛ:</span>
+              <input
+                type="text"
+                value={flight.time || ''}
+                onChange={handleDepartureTimeChange}
+                onBlur={handleDepartureTimeBlur}
+                onKeyDown={handleDepartureTimeKeyDown}
+                onFocus={(e) => e.target.select()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                placeholder="00:00"
+                className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-amber-500 rounded px-0.5 text-center font-mono font-extrabold text-sm text-amber-700 dark:text-amber-300 outline-none w-14 cursor-text ${getChangedStyle('time')}`}
+                title="Время вылета (МСК) — нажмите Enter или смените поле для авто-сортировки"
+              />
+            </div>
+            <ChangeBadge change={unread.time} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'time')} />
           </div>
 
           {/* 3. Под временем вылета: Число и месяц (с маской ДД.ММ, например 25.08) */}
-          <div className="flex items-center justify-center w-full border-t border-slate-200 dark:border-slate-800 pt-0.5">
+          <div className="flex flex-col items-center justify-center w-full border-t border-slate-200 dark:border-slate-800 pt-0.5">
             <input
               type="text"
               value={flight.flight_date || ''}
@@ -399,9 +454,10 @@ export default function FlightRow({
               }}
               placeholder="25.08"
               maxLength={5}
-              className="bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-1 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-16 cursor-text tracking-wide"
+              className={`bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-1 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-16 cursor-text tracking-wide ${getChangedStyle('flight_date')}`}
               title="Дата рейса (число.месяц с маской, например 2608 -> 26.08) — нажмите Enter или смените поле для авто-сортировки"
             />
+            <ChangeBadge change={unread.flight_date} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'flight_date')} />
           </div>
         </div>
       </td>
@@ -420,11 +476,13 @@ export default function FlightRow({
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="73314"
             maxLength={5}
-            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 w-16 text-center font-mono text-sm font-extrabold text-slate-900 dark:text-white outline-none cursor-text tracking-wider"
+            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 w-16 text-center font-mono text-sm font-extrabold text-slate-900 dark:text-white outline-none cursor-text tracking-wider ${getChangedStyle('ac_num')}`}
             title="Бортовой номер ВС"
           />
+          <ChangeBadge change={unread.ac_num} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'ac_num')} />
+
           {/* Тип ВС под номером борта */}
-          <div className="border-t border-slate-200 dark:border-slate-800 w-full pt-0.5 flex items-center justify-center">
+          <div className="border-t border-slate-200 dark:border-slate-800 w-full pt-0.5 flex flex-col items-center justify-center">
             <input
               type="text"
               value={flight.ac_type || ''}
@@ -435,58 +493,68 @@ export default function FlightRow({
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="—"
               maxLength={4}
-              className="bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 focus:bg-white dark:focus:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0 text-center font-mono font-bold text-[11px] text-slate-700 dark:text-slate-300 outline-none w-14 cursor-text tracking-wider shadow-inner"
+              className={`bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 focus:bg-white dark:focus:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0 text-center font-mono font-bold text-[11px] text-slate-700 dark:text-slate-300 outline-none w-14 cursor-text tracking-wider shadow-inner ${getChangedStyle('ac_type')}`}
               title="Тип ВС (например 738, 739, 321, 332)"
             />
+            <ChangeBadge change={unread.ac_type} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'ac_type')} />
           </div>
         </div>
       </td>
 
       {/* 6. Компановка */}
       <td className={`py-2.5 px-1 font-mono text-xs text-slate-800 dark:text-slate-200 whitespace-nowrap text-center ${overdueBorderTopBottom}`}>
-        <input
-          type="text"
-          value={flight.ac_config || ''}
-          onChange={handleAcConfigChange}
-          onFocus={(e) => e.target.select()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          placeholder="189"
-          maxLength={7}
-          className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-14 text-center font-mono text-xs font-bold text-slate-800 dark:text-slate-200 outline-none cursor-text"
-        />
+        <div className="flex flex-col items-center justify-center">
+          <input
+            type="text"
+            value={flight.ac_config || ''}
+            onChange={handleAcConfigChange}
+            onFocus={(e) => e.target.select()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="189"
+            maxLength={7}
+            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-14 text-center font-mono text-xs font-bold text-slate-800 dark:text-slate-200 outline-none cursor-text ${getChangedStyle('ac_config')}`}
+          />
+          <ChangeBadge change={unread.ac_config} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'ac_config')} />
+        </div>
       </td>
 
       {/* 7. PAX */}
       <td className={`py-2.5 px-1 font-mono font-extrabold text-base text-slate-950 dark:text-white whitespace-nowrap text-center ${overdueBorderTopBottom}`}>
-        <input
-          type="text"
-          value={flight.pax || ''}
-          onChange={(e) => handleCellChange('pax', e.target.value.replace(/\D/g, '').slice(0, 4))}
-          onFocus={(e) => e.target.select()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          placeholder="0"
-          maxLength={4}
-          className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-sky-500 rounded px-0.5 py-0.5 w-12 text-center font-mono font-extrabold text-base text-slate-950 dark:text-white outline-none cursor-text"
-        />
+        <div className="flex flex-col items-center justify-center">
+          <input
+            type="text"
+            value={flight.pax || ''}
+            onChange={(e) => handleCellChange('pax', e.target.value.replace(/\D/g, '').slice(0, 4))}
+            onFocus={(e) => e.target.select()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="0"
+            maxLength={4}
+            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-sky-500 rounded px-0.5 py-0.5 w-12 text-center font-mono font-extrabold text-base text-slate-950 dark:text-white outline-none cursor-text ${getChangedStyle('pax')}`}
+          />
+          <ChangeBadge change={unread.pax} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'pax')} />
+        </div>
       </td>
 
       {/* 8. Экипаж */}
       <td className={`py-2.5 px-1 font-mono text-xs text-slate-900 dark:text-slate-200 whitespace-nowrap text-center ${overdueBorderTopBottom}`}>
-        <input
-          type="text"
-          value={flight.crew || ''}
-          onChange={(e) => handleCellChange('crew', formatValidCrew(e.target.value))}
-          onFocus={(e) => e.target.select()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          placeholder="2/4/0/0"
-          className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-16 text-center font-mono font-extrabold text-xs text-slate-900 dark:text-slate-100 outline-none cursor-text"
-        />
+        <div className="flex flex-col items-center justify-center">
+          <input
+            type="text"
+            value={flight.crew || ''}
+            onChange={(e) => handleCellChange('crew', formatValidCrew(e.target.value))}
+            onFocus={(e) => e.target.select()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="2/4/0/0"
+            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-16 text-center font-mono font-extrabold text-xs text-slate-900 dark:text-slate-100 outline-none cursor-text ${getChangedStyle('crew')}`}
+          />
+          <ChangeBadge change={unread.crew} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'crew')} />
+        </div>
       </td>
 
       {/* 9. ТОПЛИВО И ВЕСА (Кухня по умолчанию D) */}
@@ -630,44 +698,50 @@ export default function FlightRow({
 
       {/* 12. Груз */}
       <td className={`py-1 px-1 text-center w-[120px] min-w-[120px] max-w-[130px] ${overdueBorderTopBottom}`}>
-        <textarea
-          rows={2}
-          value={flight.cargo || ''}
-          onChange={(e) => handleCellChange('cargo', e.target.value)}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          placeholder="Груз..."
-          title={flight.cargo || ''}
-          className={`w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1.5 py-1 text-center outline-none cursor-text transition-all shadow-sm break-words [word-break:break-word] ${
-            (flight.cargo || '').length > 15
-              ? 'text-[10px] leading-[1.2] font-mono font-semibold tracking-tight'
-              : (flight.cargo || '').length > 8
-              ? 'text-[11px] leading-snug font-medium'
-              : 'text-xs font-medium'
-          } text-slate-900 dark:text-slate-200`}
-        />
+        <div className="flex flex-col items-center justify-center">
+          <textarea
+            rows={2}
+            value={flight.cargo || ''}
+            onChange={(e) => handleCellChange('cargo', e.target.value)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="Груз..."
+            title={flight.cargo || ''}
+            className={`w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1.5 py-1 text-center outline-none cursor-text transition-all shadow-sm break-words [word-break:break-word] ${
+              (flight.cargo || '').length > 15
+                ? 'text-[10px] leading-[1.2] font-mono font-semibold tracking-tight'
+                : (flight.cargo || '').length > 8
+                ? 'text-[11px] leading-snug font-medium'
+                : 'text-xs font-medium'
+            } text-slate-900 dark:text-slate-200 ${getChangedStyle('cargo')}`}
+          />
+          <ChangeBadge change={unread.cargo} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'cargo')} />
+        </div>
       </td>
 
       {/* 13. Почта */}
       <td className={`py-1 px-0.5 text-center min-w-[70px] ${overdueBorderTopBottom}`}>
-        <textarea
-          rows={2}
-          value={flight.mail || ''}
-          onChange={(e) => handleCellChange('mail', e.target.value)}
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          placeholder="Почта..."
-          title={flight.mail || ''}
-          className={`w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1 py-1 text-center outline-none cursor-text transition-all shadow-sm break-words [word-break:break-word] ${
-            (flight.mail || '').length > 12
-              ? 'text-[10px] leading-[1.2] font-mono font-semibold tracking-tight'
-              : (flight.mail || '').length > 7
-              ? 'text-[11px] leading-snug font-medium'
-              : 'text-xs font-medium'
-          } text-slate-900 dark:text-slate-200`}
-        />
+        <div className="flex flex-col items-center justify-center">
+          <textarea
+            rows={2}
+            value={flight.mail || ''}
+            onChange={(e) => handleCellChange('mail', e.target.value)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="Почта..."
+            title={flight.mail || ''}
+            className={`w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1 py-1 text-center outline-none cursor-text transition-all shadow-sm break-words [word-break:break-word] ${
+              (flight.mail || '').length > 12
+                ? 'text-[10px] leading-[1.2] font-mono font-semibold tracking-tight'
+                : (flight.mail || '').length > 7
+                ? 'text-[11px] leading-snug font-medium'
+                : 'text-xs font-medium'
+            } text-slate-900 dark:text-slate-200 ${getChangedStyle('mail')}`}
+          />
+          <ChangeBadge change={unread.mail} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'mail')} />
+        </div>
       </td>
 
       {/* 14. Багаж */}
@@ -800,36 +874,50 @@ export default function FlightRow({
       <td className={`py-2.5 px-1 text-center whitespace-nowrap no-print rounded-r-2xl ${
         isOverdue ? 'border-r-2 border-r-rose-500 border-t-2 border-b-2 border-rose-500' : 'border-r border-t border-b border-slate-200/80 dark:border-slate-800/80'
       }`}>
-        <div className="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={(e) => { e.stopPropagation(); onMoveUp(index); }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            disabled={isFirst}
-            className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800"
-            title="Переместить вверх"
-          >
-            <ArrowUp className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onMoveDown(index); }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            disabled={isLast}
-            className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800"
-            title="Переместить вниз"
-          >
-            <ArrowDown className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDeleteFlight(flight.id); }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="p-1 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-colors ml-0.5"
-            title="Удалить рейс"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+        <div className="flex items-center justify-center gap-1">
+          {hasUnreadChanges && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
+              className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-extrabold px-2 py-1 rounded-lg shadow-md transition-all active:scale-95 animate-pulse shrink-0 cursor-pointer"
+              title="Подтвердить ознакомление со всеми изменениями в этом рейсе"
+            >
+              <Check className="w-3 h-3 stroke-[3]" />
+              <span>Ознакомлен{unreadCount > 0 ? ` (${unreadCount})` : ''}</span>
+            </button>
+          )}
+
+          <div className="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={(e) => { e.stopPropagation(); onMoveUp(index); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              disabled={isFirst}
+              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800"
+              title="Переместить вверх"
+            >
+              <ArrowUp className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onMoveDown(index); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              disabled={isLast}
+              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800"
+              title="Переместить вниз"
+            >
+              <ArrowDown className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDeleteFlight(flight.id); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="p-1 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-colors ml-0.5"
+              title="Удалить рейс"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </td>
     </tr>

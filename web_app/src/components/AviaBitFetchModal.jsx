@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Plane, Zap, Calendar, Clock, AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import { formatValidFullDate, formatValidTime, sortFlightsChronologically } from '../utils/validators';
 import { fetchAviaBitSchedule, smartMergeSchedules } from '../utils/api';
+import { smartMergeWithDelta } from '../utils/deltaSync';
 
 export default function AviaBitFetchModal({
   isOpen,
@@ -132,57 +133,24 @@ export default function AviaBitFetchModal({
       }
 
       let finalFlights = result.flights || [];
+      let totalChanges = 0;
+      let newCount = 0;
 
-      // Умное слияние с сохранением данных предыдущего диспетчера
+      // Умное слияние с сохранением данных предыдущего диспетчера и детекцией изменений
       if (useSmartMerge && currentFlights && currentFlights.length > 0) {
-        const existingMap = new Map();
-        currentFlights.forEach(f => {
-          const flNum = (f.flight || '').replace(/[-\s]/g, '').toUpperCase();
-          const flDate = (f.flight_date || '').trim();
-          const key = `${flNum}_${flDate}`;
-          existingMap.set(key, f);
-        });
-
-        // Обогащаем только входящие рейсы нового расписания
-        finalFlights = finalFlights.map(inc => {
-          const flNum = (inc.flight || '').replace(/[-\s]/g, '').toUpperCase();
-          const flDate = (inc.flight_date || '').trim();
-          const key = `${flNum}_${flDate}`;
-          const old = existingMap.get(key);
-          if (!old) return inc;
-
-          const merged = { ...inc };
-          if (old.id) merged.id = old.id;
-          if (old.lir_sent !== undefined) merged.lir_sent = old.lir_sent;
-          if (old.szv_sent !== undefined) merged.szv_sent = old.szv_sent;
-          if (old.ldm_sent !== undefined) merged.ldm_sent = old.ldm_sent;
-          if (old.astra_times_sent !== undefined) merged.astra_times_sent = old.astra_times_sent;
-          if (old.notes) merged.notes = old.notes;
-
-          let hasManualWork = false;
-          ['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'cargo', 'mail', 'baggage'].forEach(field => {
-            if (old[field] !== undefined && old[field] !== '') {
-              merged[field] = old[field];
-              hasManualWork = true;
-            }
-          });
-
-          // Сохраняем статус только если была реальная работа или чекбоксы
-          if (old.status === 'closed' || old.status === 'released' || old.status === 'lir_sent') {
-            merged.status = old.status;
-          } else if (old.status === 'prepared' && (hasManualWork || (old.notes && old.notes.trim()))) {
-            merged.status = 'prepared';
-          } else {
-            merged.status = 'pending';
-          }
-
-          return merged;
-        });
+        const mergeResult = smartMergeWithDelta(currentFlights, finalFlights);
+        finalFlights = mergeResult.mergedFlights;
+        totalChanges = mergeResult.totalNewChanges;
+        newCount = mergeResult.newFlightsCount;
       }
 
       finalFlights = sortFlightsChronologically(finalFlights);
 
-      setSuccessMsg(`Успешно загружено ${finalFlights.length} рейсов!`);
+      let successText = `Успешно загружено ${finalFlights.length} рейсов!`;
+      if (totalChanges > 0 || newCount > 0) {
+        successText += ` Изменений: ${totalChanges}${newCount > 0 ? `, новых: ${newCount}` : ''}`;
+      }
+      setSuccessMsg(successText);
       setTimeout(() => {
         onScheduleLoaded(finalFlights, {
           date_interval: `${cleanFrom} — ${cleanTo}`,

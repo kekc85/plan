@@ -18,7 +18,9 @@ import {
   ArrowRightLeft,
   LogOut,
   LogIn,
-  BookOpen
+  BookOpen,
+  Bell,
+  RefreshCw
 } from 'lucide-react';
 import { formatValidDateInterval } from '../utils/validators';
 
@@ -42,7 +44,16 @@ export default function Header({
   onOpenAdminModal,
   onOpenHandoverModal,
   onOpenManualModal,
-  onLogout
+  onLogout,
+  autoSyncEnabled = true,
+  autoSyncInterval = 10,
+  onToggleAutoSync,
+  onChangeAutoSyncInterval,
+  onTriggerAutoSync,
+  isSyncing = false,
+  lastSyncTime = '',
+  unreadChangesCount = 0,
+  onAcknowledgeAll
 }) {
   const [utcTime, setUtcTime] = useState('');
   const [mskTime, setMskTime] = useState('');
@@ -296,11 +307,85 @@ export default function Header({
           {/* Action Buttons Toolbar */}
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             
-            {/* КНОПКА 1: ЗАГРУЗКА ИЗ AVIABIT */}
+            {/* БЕЙДЖ НЕПОДТВЕРЖДЕННЫХ ИЗМЕНЕНИЙ В РЕЙСАХ */}
+            {unreadChangesCount > 0 && (
+              <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/80 border-2 border-amber-500 rounded-xl px-2.5 py-1 text-xs text-amber-950 dark:text-amber-200 shadow-md animate-pulse">
+                <Bell className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 fill-current" />
+                <span className="font-extrabold whitespace-nowrap">
+                  Изменений: <span className="underline decoration-amber-500 font-mono text-sm">{unreadChangesCount}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={onAcknowledgeAll}
+                  className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-lg shadow transition-all active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
+                  title="Подтвердить ознакомление со всеми изменениями во всех рейсах смены"
+                >
+                  Ознакомиться со всеми ✓
+                </button>
+              </div>
+            )}
+
+            {/* ВИДЖЕТ УМНОЙ АВТО-ПОДКАЧКИ AVIABIT */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-xl px-2 py-1 shadow-sm text-xs">
+              {/* Кнопка принудительной проверки / Индикатор пульса */}
+              <button
+                type="button"
+                onClick={onTriggerAutoSync}
+                disabled={isSyncing}
+                className="flex items-center gap-1 text-sky-700 dark:text-sky-300 hover:text-sky-900 dark:hover:text-sky-100 cursor-pointer disabled:opacity-50 transition-colors"
+                title={
+                  autoSyncEnabled
+                    ? `Авто-сверка включена (каждые ${autoSyncInterval} мин). Нажмите для немедленной проверки.`
+                    : 'Авто-сверка выключена. Нажмите для ручной проверки.'
+                }
+              >
+                {isSyncing ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600 shrink-0" />
+                ) : (
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                      autoSyncEnabled ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.7)]' : 'bg-slate-400'
+                    }`}
+                  />
+                )}
+                <span className="text-[11px] font-mono font-bold whitespace-nowrap">
+                  {isSyncing ? 'Сверка...' : (lastSyncTime ? `Сверка ${lastSyncTime}` : 'Авто')}
+                </span>
+              </button>
+
+              {/* Выбор интервала авто-сверки */}
+              <select
+                value={autoSyncInterval}
+                onChange={(e) => onChangeAutoSyncInterval?.(Number(e.target.value))}
+                disabled={!autoSyncEnabled}
+                className="bg-transparent text-[11px] font-mono font-extrabold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer disabled:opacity-40"
+                title="Интервал авто-сверки расписания с серверами AviaBit"
+              >
+                <option value={5} className="bg-white dark:bg-slate-900">5 мин</option>
+                <option value={10} className="bg-white dark:bg-slate-900">10 мин</option>
+                <option value={15} className="bg-white dark:bg-slate-900">15 мин</option>
+              </select>
+
+              {/* Тумблер ВКЛ / ВЫКЛ */}
+              <button
+                type="button"
+                onClick={onToggleAutoSync}
+                className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded cursor-pointer transition-all active:scale-95 ${
+                  autoSyncEnabled
+                    ? 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-500'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300'
+                }`}
+                title={autoSyncEnabled ? 'Нажмите, чтобы отключить фоновую авто-подкачку' : 'Нажмите, чтобы включить фоновую авто-подкачку'}
+              >
+                {autoSyncEnabled ? 'ВКЛ' : 'ВЫКЛ'}
+              </button>
+            </div>
+
+            {/* КНОПКА 1: ЗАГРУЗКА ИЗ AVIABIT (МОДАЛЬНОЕ ОКНО) */}
             <button
               onClick={onOpenAviaBitModal}
-              className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-extrabold px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 border border-sky-500"
-              title="Загрузить расписание напрямую из AviaBit"
+              className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-extrabold px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 border border-sky-500 cursor-pointer"
+              title="Открыть расширенное окно загрузки из AviaBit"
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
               <span>AviaBit</span>

@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS `plan_flights` (
     `astra_times_sent` TINYINT(1) DEFAULT 0,
     `status` VARCHAR(32) DEFAULT 'pending',
     `notes` TEXT NULL,
+    `unread_changes` TEXT NULL,
     `sort_order` INT DEFAULT 0,
     `updated_at` VARCHAR(64) NULL,
     `updated_by` VARCHAR(128) NULL,

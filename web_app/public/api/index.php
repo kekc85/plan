@@ -384,7 +384,7 @@ if ($route === '/shift/current') {
     $flights = [];
 
     foreach ($rawFlights as $r) {
-        $flights[] = [
+        $flItem = [
             'id' => (string)$r['id'],
             'flight' => (string)($r['flight_number'] ?? ''),
             'flight_date' => (string)($r['flight_date'] ?? ''),
@@ -414,6 +414,13 @@ if ($route === '/shift/current') {
             'status' => (string)($r['status'] ?? 'pending'),
             'notes' => (string)($r['notes'] ?? '')
         ];
+        if (!empty($r['unread_changes'])) {
+            $parsedUnread = json_decode($r['unread_changes'], true);
+            if ($parsedUnread) {
+                $flItem['unread_changes'] = $parsedUnread;
+            }
+        }
+        $flights[] = $flItem;
     }
 
     echo json_encode(['shiftInfo' => $shiftInfo, 'flights' => $flights]);
@@ -456,17 +463,18 @@ if ($route === '/shift/save') {
             departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
             fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow,
             lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
-            status, notes, sort_order, updated_at
+            status, notes, unread_changes, sort_order, updated_at
         ) VALUES (
             ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?
+            ?, ?, ?, ?, ?
         )
     ");
 
     foreach ($flights as $index => $f) {
+        $unreadChangesJson = !empty($f['unread_changes']) ? json_encode($f['unread_changes'], JSON_UNESCAPED_UNICODE) : null;
         $insertFlight->execute([
             (string)$f['id'],
             $shiftId,
@@ -497,6 +505,7 @@ if ($route === '/shift/save') {
             !empty($f['astra_times_sent']) ? 1 : 0,
             (string)($f['status'] ?? 'pending'),
             (string)($f['notes'] ?? ''),
+            $unreadChangesJson,
             $index,
             $nowStr
         ]);
@@ -542,11 +551,53 @@ if ($route === '/shift/smart_merge') {
             $item['astra_times_sent'] = !empty($old['astra_times_sent']);
             $item['notes'] = !empty($old['notes']) ? $old['notes'] : ($inc['notes'] ?? '');
 
-            foreach (['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'cargo', 'mail', 'baggage', 'pax', 'crew', 'ac_type'] as $field) {
+            // 1. Сохраняем ручные диспетчерские поля
+            foreach (['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'baggage'] as $field) {
                 if (isset($old[$field]) && $old[$field] !== '') {
                     $item[$field] = $old[$field];
                 }
             }
+
+            // 2. Выявляем изменения в оперативных полях AviaBit
+            $trackedFields = [
+                ['time', 'departure_time'],
+                ['flight_date', 'flight_date'],
+                ['ac_num', 'ac_num'],
+                ['ac_type', 'ac_type'],
+                ['ac_config', 'ac_config'],
+                ['pax', 'pax'],
+                ['crew', 'crew'],
+                ['cargo', 'cargo'],
+                ['mail', 'mail'],
+                ['route_city', 'route_city'],
+                ['route_airports', 'route_airports']
+            ];
+
+            $changes = !empty($old['unread_changes']) ? $old['unread_changes'] : [];
+            if (is_string($changes)) {
+                $decoded = json_decode($changes, true);
+                $changes = $decoded ?: [];
+            }
+
+            foreach ($trackedFields as $tf) {
+                $fKey = $tf[0];
+                $altKey = $tf[1];
+                $oldVal = trim((string)($old[$fKey] ?? $old[$altKey] ?? ''));
+                $newVal = trim((string)($inc[$fKey] ?? $inc[$altKey] ?? ''));
+                if ($newVal !== '' && $oldVal !== '' && $oldVal !== $newVal) {
+                    $prevOld = isset($changes[$fKey]['old']) ? $changes[$fKey]['old'] : $oldVal;
+                    $changes[$fKey] = [
+                        'old' => $prevOld ?: '—',
+                        'new' => $newVal,
+                        'ts' => (int)(microtime(true) * 1000)
+                    ];
+                }
+            }
+
+            if (!empty($changes)) {
+                $item['unread_changes'] = $changes;
+            }
+
             $merged[] = $item;
         } else {
             $merged[] = $inc;

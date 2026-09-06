@@ -21,6 +21,8 @@ export default function ShiftTable({
   onDeleteFlight,
   onMoveUp,
   onMoveDown,
+  onAcknowledgeField,
+  onAcknowledgeFlight,
   onAddFlight
 }) {
   const sensors = useSensors(
@@ -101,6 +103,8 @@ export default function ShiftTable({
                       onDeleteFlight={onDeleteFlight}
                       onMoveUp={onMoveUp}
                       onMoveDown={onMoveDown}
+                      onAcknowledgeField={onAcknowledgeField}
+                      onAcknowledgeFlight={onAcknowledgeFlight}
                       isFirst={index === 0}
                       isLast={index === flights.length - 1}
                     />

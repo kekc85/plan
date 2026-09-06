@@ -222,6 +222,13 @@ def init_db():
         except Exception:
             pass
 
+        # Автомиграция: добавление колонки unread_changes если ее еще нет
+        try:
+            cursor.execute("ALTER TABLE plan_flights ADD COLUMN unread_changes TEXT NULL;")
+            conn.commit()
+        except Exception:
+            pass
+
     else:
         # SQLite таблицы
         cursor.execute("""
@@ -280,6 +287,7 @@ def init_db():
             astra_times_sent INTEGER DEFAULT 0,
             status TEXT DEFAULT 'pending',
             notes TEXT,
+            unread_changes TEXT,
             sort_order INTEGER DEFAULT 0,
             updated_at TEXT,
             updated_by TEXT
@@ -354,6 +362,13 @@ def init_db():
         # Автомиграция: добавление колонки ac_type если ее еще нет
         try:
             cursor.execute("ALTER TABLE plan_flights ADD COLUMN ac_type TEXT;")
+            conn.commit()
+        except Exception:
+            pass
+
+        # Автомиграция: добавление колонки unread_changes если ее еще нет
+        try:
+            cursor.execute("ALTER TABLE plan_flights ADD COLUMN unread_changes TEXT;")
             conn.commit()
         except Exception:
             pass

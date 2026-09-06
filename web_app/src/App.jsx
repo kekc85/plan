@@ -29,8 +29,16 @@ import {
   fetchCurrentShift, 
   saveShift, 
   smartMergeSchedules,
-  fetchDepartureAirports
+  fetchDepartureAirports,
+  fetchAviaBitSchedule
 } from './utils/api';
+import {
+  smartMergeWithDelta,
+  acknowledgeFieldChange,
+  acknowledgeFlightChanges,
+  acknowledgeAllChanges,
+  countUnreadChanges
+} from './utils/deltaSync';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Bell, CheckCircle2, X, Volume2, MessageSquare } from 'lucide-react';
 
@@ -62,7 +70,14 @@ function normalizeFlight(f) {
   // Интеллектуальное определение типа ВС (332, 333, 321, 772, 739, 738, 190)
   const ac_type = f.ac_type ? normalizePlaneType(f.ac_type) : detectPlaneType(f);
 
-  return { ...f, status, astra_times_sent, ac_type };
+  return { 
+    ...f, 
+    status, 
+    astra_times_sent, 
+    ac_type,
+    unread_changes: f.unread_changes || undefined,
+    is_new_flight: !!f.is_new_flight
+  };
 }
 
 export default function App() {
@@ -99,6 +114,19 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [lastSaved, setLastSaved] = useState('');
+
+  // Состояние умной авто-подкачки AviaBit (Smart Delta Polling)
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => {
+    const saved = localStorage.getItem(`${STORAGE_KEY}_auto_sync_enabled`);
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [autoSyncInterval, setAutoSyncInterval] = useState(() => {
+    const saved = localStorage.getItem(`${STORAGE_KEY}_auto_sync_interval`);
+    return saved ? Number(saved) : 10;
+  });
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState('');
+  const [changeToast, setChangeToast] = useState(null);
 
   const [activeAlert, setActiveAlert] = useState(null);
   const [dismissedAlerts, setDismissedAlerts] = useState(() => {
@@ -384,9 +412,130 @@ export default function App() {
     setFlights(prev => sortFlightsChronologically([...prev, newFlight]));
   };
 
+  // Подтверждение ознакомления с отдельным измененным параметром
+  const handleAcknowledgeField = (flightId, fieldName) => {
+    setFlights(prev => prev.map(f => f.id === flightId ? acknowledgeFieldChange(f, fieldName) : f));
+  };
+
+  // Подтверждение ознакомления со всеми изменениями конкретного рейса
+  const handleAcknowledgeFlight = (flightId) => {
+    setFlights(prev => prev.map(f => f.id === flightId ? acknowledgeFlightChanges(f) : f));
+  };
+
+  // Подтверждение ознакомления со всеми изменениями суточного плана
+  const handleAcknowledgeAll = () => {
+    setFlights(prev => acknowledgeAllChanges(prev));
+  };
+
+  // Переключение тумблера авто-подкачки
+  const handleToggleAutoSync = () => {
+    setAutoSyncEnabled(prev => {
+      const next = !prev;
+      localStorage.setItem(`${STORAGE_KEY}_auto_sync_enabled`, String(next));
+      return next;
+    });
+  };
+
+  // Смена интервала авто-подкачки
+  const handleChangeAutoSyncInterval = (val) => {
+    setAutoSyncInterval(val);
+    localStorage.setItem(`${STORAGE_KEY}_auto_sync_interval`, String(val));
+  };
+
+  // Фоновая умная сверка с AviaBit (Smart Delta Polling)
+  const triggerAutoSync = React.useCallback(async (isManual = false) => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+
+    try {
+      let dateFrom = '';
+      let dateTo = '';
+      const timeFrom = '08:00';
+      const timeTo = '14:00';
+
+      const intervalStr = shiftInfo.date_interval || shiftInfo.date || '';
+      const parts = intervalStr.split('—').map(s => s.trim());
+      if (parts.length >= 2) {
+        dateFrom = parts[0];
+        dateTo = parts[1];
+      } else {
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const formatD = (d) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+        dateFrom = formatD(today);
+        dateTo = formatD(tomorrow);
+      }
+
+      const activeAirportCodes = (departureAirports && departureAirports.length > 0)
+        ? departureAirports.filter(a => a.is_enabled).map(a => a.code)
+        : undefined;
+
+      const payload = {
+        date_from: dateFrom,
+        time_from: timeFrom,
+        date_to: dateTo,
+        time_to: timeTo,
+        airline: 'both',
+        filter_name: 'WBGarantiya',
+        allowed_departures: activeAirportCodes
+      };
+
+      const result = await fetchAviaBitSchedule(payload);
+      if (result && result.success && Array.isArray(result.flights) && result.flights.length > 0) {
+        setFlights(prevFlights => {
+          const { mergedFlights, totalNewChanges, newFlightsCount } = smartMergeWithDelta(prevFlights, result.flights);
+
+          if (totalNewChanges > 0 || newFlightsCount > 0) {
+            playReleaseAlertSound();
+            const msgParts = [];
+            if (totalNewChanges > 0) msgParts.push(`изменено ${totalNewChanges} параметров`);
+            if (newFlightsCount > 0) msgParts.push(`новых рейсов: ${newFlightsCount}`);
+            setChangeToast(`AviaBit: ${msgParts.join(', ')}`);
+            setTimeout(() => setChangeToast(null), 8000);
+          }
+
+          return sortFlightsChronologically(mergedFlights.map(normalizeFlight));
+        });
+      }
+
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      setLastSyncTime(timeStr);
+    } catch (err) {
+      console.warn('Auto-sync note:', err.message);
+      if (isManual) {
+        alert('Не удалось выполнить авто-сверку с AviaBit: ' + (err.message || 'Ошибка сети'));
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isSyncing, shiftInfo, departureAirports]);
+
+  // Фоновый таймер авто-подкачки AviaBit
+  useEffect(() => {
+    if (!autoSyncEnabled) return;
+    const intervalMs = (autoSyncInterval || 10) * 60 * 1000;
+    const intervalId = setInterval(() => {
+      triggerAutoSync(false);
+    }, intervalMs);
+
+    return () => clearInterval(intervalId);
+  }, [autoSyncEnabled, autoSyncInterval, triggerAutoSync]);
+
   // Загрузка расписания из AviaBit
   const handleAviaBitScheduleLoaded = (loadedFlights, newShiftInfo) => {
-    setFlights(loadedFlights.map(normalizeFlight));
+    setFlights(prev => {
+      if (prev && prev.length > 0) {
+        const { mergedFlights, totalNewChanges } = smartMergeWithDelta(prev, loadedFlights);
+        if (totalNewChanges > 0) {
+          setChangeToast(`AviaBit: обнаружено ${totalNewChanges} изменений`);
+          setTimeout(() => setChangeToast(null), 8000);
+        }
+        return sortFlightsChronologically(mergedFlights.map(normalizeFlight));
+      }
+      return sortFlightsChronologically(loadedFlights.map(normalizeFlight));
+    });
     if (newShiftInfo) {
       setShiftInfo(prev => ({
         ...prev,
@@ -544,6 +693,15 @@ export default function App() {
         onOpenHandoverModal={() => setIsHandoverModalOpen(true)}
         onOpenManualModal={() => setIsManualModalOpen(true)}
         onLogout={handleLogout}
+        autoSyncEnabled={autoSyncEnabled}
+        autoSyncInterval={autoSyncInterval}
+        onToggleAutoSync={handleToggleAutoSync}
+        onChangeAutoSyncInterval={handleChangeAutoSyncInterval}
+        onTriggerAutoSync={() => triggerAutoSync(true)}
+        isSyncing={isSyncing}
+        lastSyncTime={lastSyncTime}
+        unreadChangesCount={unreadChangesCount}
+        onAcknowledgeAll={handleAcknowledgeAll}
       />
 
       {/* Main Content Area */}
@@ -558,6 +716,34 @@ export default function App() {
             Смена: <strong>{shiftInfo.date_interval || shiftInfo.date} (09:00 - 09:00)</strong> | Диспетчер: <strong>{shiftInfo.dispatcher || currentUser?.full_name || '—'}</strong>
           </p>
         </div>
+
+        {/* Всплывающее уведомление об обнаруженных изменениях из AviaBit */}
+        {changeToast && (
+          <div className="mb-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-xs px-4 py-2.5 rounded-2xl shadow-lg flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 no-print border border-amber-400">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-white/20 rounded-lg">
+                <Bell className="w-4 h-4 fill-current animate-bounce" />
+              </div>
+              <span className="tracking-wide">{changeToast}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleAcknowledgeAll}
+                className="bg-white hover:bg-slate-100 text-amber-900 font-extrabold text-[11px] px-2.5 py-1 rounded-lg shadow transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              >
+                Ознакомиться со всеми ✓
+              </button>
+              <button
+                type="button"
+                onClick={() => setChangeToast(null)}
+                className="p-1 hover:bg-black/20 rounded-lg text-white/80 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Карточка особых замечаний по смене (переданных сменщиком) */}
         {shiftInfo?.handover?.notes && shiftInfo.handover.notes.trim() && !shiftInfo.handover.is_read && !isHandoverNotesDismissed && (
@@ -609,6 +795,8 @@ export default function App() {
           onDeleteFlight={handleDeleteFlight}
           onMoveUp={handleMoveUp}
           onMoveDown={handleMoveDown}
+          onAcknowledgeField={handleAcknowledgeField}
+          onAcknowledgeFlight={handleAcknowledgeFlight}
           onAddFlight={() => setIsAddModalOpen(true)}
         />
       </main>

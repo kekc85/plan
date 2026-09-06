@@ -518,7 +518,15 @@ def get_current_shift():
     flights = []
     for row in rows:
         r = dict(row)
-        flights.append({
+        unread_raw = r.get("unread_changes")
+        unread_obj = None
+        if unread_raw:
+            try:
+                unread_obj = json.loads(unread_raw) if isinstance(unread_raw, str) else unread_raw
+            except Exception:
+                unread_obj = None
+
+        fl_item = {
             "id": str(r.get("id", "")),
             "flight": str(r.get("flight_number") or ""),
             "flight_date": str(r.get("flight_date") or ""),
@@ -547,7 +555,11 @@ def get_current_shift():
             "astra_times_sent": bool(r.get("astra_times_sent")),
             "status": str(r.get("status") or "pending"),
             "notes": str(r.get("notes") or "")
-        })
+        }
+        if unread_obj:
+            fl_item["unread_changes"] = unread_obj
+
+        flights.append(fl_item)
 
     return {"shiftInfo": shift_info if shift_info else None, "flights": flights}
 
@@ -585,6 +597,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: dict = Depends(get_cur
     # Синхронизируем рейсы
     cursor.execute("DELETE FROM plan_flights;")
     for index, f in enumerate(req.flights):
+        unread_json = json.dumps(f.get("unread_changes")) if f.get("unread_changes") else None
         cursor.execute(
             q("""
             INSERT INTO plan_flights (
@@ -592,13 +605,13 @@ def save_shift_state(req: SaveShiftRequest, current_user: dict = Depends(get_cur
                 departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
                 fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow,
                 lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
-                status, notes, sort_order, updated_at
+                status, notes, unread_changes, sort_order, updated_at
             ) VALUES (
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s
+                %s, %s, %s, %s, %s
             );
             """, engine),
             (
@@ -631,6 +644,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: dict = Depends(get_cur
                 1 if f.get("astra_times_sent") else 0,
                 f.get("status") or "pending",
                 f.get("notes") or "",
+                unread_json,
                 index,
                 now_str
             )
@@ -678,9 +692,43 @@ def smart_merge_schedules(req: SmartMergeRequest, current_user: dict = Depends(g
             merged["astra_times_sent"] = old.get("astra_times_sent", False)
             merged["notes"] = old.get("notes") or inc.get("notes") or ""
             
-            for field in ["fuel_block", "fuel_trip", "fuel_taxi", "dow", "doi", "galley", "mtow", "cargo", "mail", "baggage", "pax", "crew", "ac_type"]:
+            # 1. Сохраняем ручные диспетчерские поля
+            for field in ["fuel_block", "fuel_trip", "fuel_taxi", "dow", "doi", "galley", "mtow", "baggage"]:
                 if old.get(field):
                     merged[field] = old[field]
+
+            # 2. Выявляем изменения в оперативных полях AviaBit
+            tracked_fields = [
+                ("time", "departure_time"),
+                ("flight_date", "flight_date"),
+                ("ac_num", "ac_num"),
+                ("ac_type", "ac_type"),
+                ("ac_config", "ac_config"),
+                ("pax", "pax"),
+                ("crew", "crew"),
+                ("cargo", "cargo"),
+                ("mail", "mail"),
+                ("route_city", "route_city"),
+                ("route_airports", "route_airports")
+            ]
+            changes = old.get("unread_changes") or {}
+            if isinstance(changes, str):
+                try:
+                    changes = json.loads(changes)
+                except Exception:
+                    changes = {}
+            else:
+                changes = dict(changes)
+
+            for f_key, alt_key in tracked_fields:
+                old_val = str(old.get(f_key) if old.get(f_key) is not None else old.get(alt_key, "")).strip()
+                new_val = str(inc.get(f_key) if inc.get(f_key) is not None else inc.get(alt_key, "")).strip()
+                if new_val and old_val and old_val != new_val:
+                    prev_old = changes.get(f_key, {}).get("old") if isinstance(changes.get(f_key), dict) else old_val
+                    changes[f_key] = {"old": prev_old or "—", "new": new_val, "ts": int(datetime.now().timestamp() * 1000)}
+
+            if changes:
+                merged["unread_changes"] = changes
 
             merged_flights.append(merged)
         else:
