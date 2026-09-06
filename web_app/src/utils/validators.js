@@ -123,6 +123,58 @@ export function formatValidMtow(raw) {
   return raw.replace(/\D/g, '').slice(0, 6);
 }
 
+// Авто-маска для ввода полной календарной даты (ДД.ММ.ГГГГ)
+export function formatValidFullDate(raw) {
+  if (!raw) return '';
+  // Разрешаем только цифры и точки
+  const clean = raw.replace(/[^\d.]/g, '');
+  if (!clean) return '';
+
+  // Если в строке есть точки (пользователь вводит с точками или редактирует)
+  if (clean.includes('.')) {
+    const parts = clean.split('.');
+    let p0 = parts[0].slice(0, 2);
+    let p1 = parts[1] !== undefined ? parts[1].slice(0, 2) : '';
+    let p2 = parts[2] !== undefined ? parts[2].slice(0, 4) : '';
+
+    if (p0.length === 2 && parseInt(p0, 10) > 31) p0 = '31';
+    if (p1.length === 2 && parseInt(p1, 10) > 12) p1 = '12';
+
+    if (parts.length === 2 && parts[1] === '' && clean.endsWith('.')) {
+      return `${p0}.`;
+    }
+    if (parts.length >= 3 && parts[2] === '' && clean.endsWith('.')) {
+      return `${p0}.${p1}.`;
+    }
+
+    let res = p0;
+    if (parts.length > 1) res += `.${p1}`;
+    if (parts.length > 2) res += `.${p2}`;
+    return res;
+  }
+
+  // Если сплошной ввод цифр без точек (например, 05092026 или 0509)
+  const digits = clean.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) {
+    let d = digits;
+    if (d.length === 2 && parseInt(d, 10) > 31) d = '31';
+    return d;
+  }
+  if (digits.length <= 4) {
+    let d = digits.slice(0, 2);
+    let m = digits.slice(2);
+    if (parseInt(d, 10) > 31) d = '31';
+    if (m.length === 2 && parseInt(m, 10) > 12) m = '12';
+    return `${d}.${m}`;
+  }
+  let d = digits.slice(0, 2);
+  let m = digits.slice(2, 4);
+  let y = digits.slice(4, 8);
+  if (parseInt(d, 10) > 31) d = '31';
+  if (parseInt(m, 10) > 12) m = '12';
+  return `${d}.${m}.${y}`;
+}
+
 // Авто-маска даты и автоматический расчет суточного интервала (09:00 - 09:00)
 export function formatValidDateInterval(raw) {
   if (!raw) return '';

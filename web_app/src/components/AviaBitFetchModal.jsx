@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Plane, Zap, Calendar, Clock, AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
-import { formatValidDateInterval, formatValidTime, sortFlightsChronologically } from '../utils/validators';
+import { formatValidFullDate, formatValidTime, sortFlightsChronologically } from '../utils/validators';
 import { fetchAviaBitSchedule, smartMergeSchedules } from '../utils/api';
 
 export default function AviaBitFetchModal({
@@ -33,6 +33,18 @@ export default function AviaBitFetchModal({
   if (!isOpen) return null;
 
   // Быстрые пресеты дат
+  const setPresetYesterday = () => {
+    const d1 = new Date();
+    d1.setDate(d1.getDate() - 1);
+    const d2 = new Date();
+    setDateFrom(formatD(d1));
+    setDateTo(formatD(d2));
+    setTimeFrom('08:00');
+    setTimeTo('14:00');
+    setActivePreset('yesterday');
+    setErrorMsg('');
+  };
+
   const setPresetToday = () => {
     const d1 = new Date();
     const d2 = new Date(d1);
@@ -58,20 +70,55 @@ export default function AviaBitFetchModal({
     setErrorMsg('');
   };
 
+  const normalizeFullDate = (str) => {
+    if (!str) return '';
+    const parts = str.split('.');
+    if (parts.length === 3 && parts[2].length === 4) {
+      const d = parts[0].padStart(2, '0');
+      const m = parts[1].padStart(2, '0');
+      return `${d}.${m}.${parts[2]}`;
+    }
+    return str;
+  };
+
   const handleFetch = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
 
+    const cleanFrom = normalizeFullDate(dateFrom);
+    const cleanTo = normalizeFullDate(dateTo);
+
+    const pFrom = cleanFrom.split('.');
+    const pTo = cleanTo.split('.');
+    if (pFrom.length < 3 || (pFrom[2] && pFrom[2].length < 4)) {
+      setErrorMsg('Укажите полную дату начала периода в формате ДД.ММ.ГГГГ');
+      setIsLoading(false);
+      return;
+    }
+    if (pTo.length < 3 || (pTo[2] && pTo[2].length < 4)) {
+      setErrorMsg('Укажите полную дату окончания периода в формате ДД.ММ.ГГГГ');
+      setIsLoading(false);
+      return;
+    }
+
+    const d1 = new Date(parseInt(pFrom[2], 10), parseInt(pFrom[1], 10) - 1, parseInt(pFrom[0], 10));
+    const d2 = new Date(parseInt(pTo[2], 10), parseInt(pTo[1], 10) - 1, parseInt(pTo[0], 10));
+    if (d2 < d1) {
+      setErrorMsg('Дата окончания периода не может быть раньше даты начала');
+      setIsLoading(false);
+      return;
+    }
+
     const activeAirportCodes = (airports && airports.length > 0)
       ? airports.filter(a => a.is_enabled).map(a => a.code)
       : undefined;
 
     const payload = {
-      date_from: dateFrom,
+      date_from: cleanFrom,
       time_from: timeFrom,
-      date_to: dateTo,
+      date_to: cleanTo,
       time_to: timeTo,
       airline: airline,
       filter_name: 'WBGarantiya',
@@ -138,8 +185,8 @@ export default function AviaBitFetchModal({
       setSuccessMsg(`Успешно загружено ${finalFlights.length} рейсов!`);
       setTimeout(() => {
         onScheduleLoaded(finalFlights, {
-          date_interval: `${dateFrom} — ${dateTo}`,
-          date: dateFrom
+          date_interval: `${cleanFrom} — ${cleanTo}`,
+          date: cleanFrom
         });
         onClose();
       }, 500);
@@ -179,8 +226,19 @@ export default function AviaBitFetchModal({
         <form onSubmit={handleFetch} className="space-y-4">
           
           {/* Пресеты дат */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 font-medium">Быстрый выбор:</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-slate-500 font-medium mr-1">Быстрый выбор:</span>
+            <button
+              type="button"
+              onClick={setPresetYesterday}
+              className={`text-xs px-3 py-1.5 rounded-xl transition-all duration-150 ${
+                activePreset === 'yesterday'
+                  ? 'bg-sky-600 text-white font-extrabold border-2 border-sky-400 shadow-md shadow-sky-600/30 ring-2 ring-sky-500/20'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-750'
+              }`}
+            >
+              Смена Вчера
+            </button>
             <button
               type="button"
               onClick={setPresetToday}
@@ -218,10 +276,15 @@ export default function AviaBitFetchModal({
                   type="text"
                   value={dateFrom}
                   onChange={(e) => {
-                    setDateFrom(formatValidDateInterval(e.target.value));
+                    setDateFrom(formatValidFullDate(e.target.value));
                     setActivePreset('custom');
                   }}
-                  placeholder="25.08.2026"
+                  onBlur={() => {
+                    if (dateFrom) {
+                      setDateFrom(normalizeFullDate(dateFrom));
+                    }
+                  }}
+                  placeholder="07.09.2026"
                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
                   required
                 />
@@ -256,10 +319,15 @@ export default function AviaBitFetchModal({
                   type="text"
                   value={dateTo}
                   onChange={(e) => {
-                    setDateTo(formatValidDateInterval(e.target.value));
+                    setDateTo(formatValidFullDate(e.target.value));
                     setActivePreset('custom');
                   }}
-                  placeholder="26.08.2026"
+                  onBlur={() => {
+                    if (dateTo) {
+                      setDateTo(normalizeFullDate(dateTo));
+                    }
+                  }}
+                  placeholder="08.09.2026"
                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
                   required
                 />
