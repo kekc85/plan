@@ -14,7 +14,7 @@ import { INITIAL_FLIGHTS } from './utils/mockData';
 import { exportShiftToExcel } from './utils/excelExport';
 import { parseExcelToFlights } from './utils/excelImport';
 import { playReleaseAlertSound, initAudioUnlock } from './utils/audioAlert';
-import { sortFlightsChronologically, isFlightReleaseOverdue, isFlightInAlertWindow } from './utils/validators';
+import { sortFlightsChronologically, isFlightReleaseOverdue, isFlightInAlertWindow, isRenDeparture } from './utils/validators';
 import { 
   getStoredUser, 
   authGetMe, 
@@ -35,7 +35,7 @@ function normalizeFlight(f) {
   if (status === 'in_progress') status = 'pending';
 
   const hasManualWork = !!(f.fuel_block || f.dow || f.doi || (f.notes && f.notes.trim()));
-  const isRen = (f.route_airports || '').toUpperCase().includes('REN') || (f.route_city || '').toUpperCase().includes('ОРЕНБУРГ');
+  const isRen = isRenDeparture(f);
 
   if (f.astra_times_sent && isRen) {
     status = 'closed';
@@ -49,7 +49,10 @@ function normalizeFlight(f) {
     status = 'pending';
   }
 
-  return { ...f, status };
+  // Для рейсов, вылетающих НЕ из Оренбурга, чекбокс Времена (Astra) не применяется
+  const astra_times_sent = isRen ? !!f.astra_times_sent : false;
+
+  return { ...f, status, astra_times_sent };
 }
 
 export default function App() {

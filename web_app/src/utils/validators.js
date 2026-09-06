@@ -364,17 +364,31 @@ export function isFlightReleaseOverdue(flight) {
   return mskNow.getTime() >= relDt.getTime();
 }
 
-// Проверка, вылетает ли рейс из Оренбурга (REN)
+// Проверка, вылетает ли рейс из Оренбурга (REN / UWOO)
 export function isRenDeparture(flight) {
   if (!flight) return false;
-  const routeAirports = (flight.route_airports || '').toUpperCase();
-  const routeCity = (flight.route_city || '').toUpperCase();
-  const dep = (flight.dep_airport || '').toUpperCase();
-  const origin = (flight.origin || '').toUpperCase();
 
-  if (dep === 'REN' || origin === 'REN') return true;
-  if (routeAirports.startsWith('REN') || routeAirports.startsWith('UWSG')) return true;
-  if (routeCity.includes('ОРЕНБУРГ') || routeCity.startsWith('REN')) return true;
+  // 1. Прямая проверка кода аэропорта вылета (если поле задано отдельно)
+  const dep = (flight.dep_airport || flight.origin || flight.dep || '').toUpperCase().trim();
+  if (dep === 'REN' || dep === 'UWOO' || dep === 'ОРЕНБУРГ') {
+    return true;
+  }
+
+  // 2. Проверка первого сегмента маршрута аэропортов (например "REN-SVO", "REN - AER", "UWOO-URSS", "REN/LED")
+  // ВНИМАНИЕ: route_city в системе хранит город ПРИЛЁТА, поэтому проверять route_city на Оренбург нельзя!
+  const routeAirports = (
+    flight.route_airports ||
+    (flight.route && flight.route.includes('\n') ? flight.route.split('\n')[1] : flight.route) ||
+    ''
+  ).toUpperCase().trim();
+
+  if (routeAirports) {
+    const parts = routeAirports.split(/[-–—/\\]+/);
+    const firstCode = (parts[0] || '').trim();
+    if (firstCode === 'REN' || firstCode === 'UWOO' || firstCode === 'ОРЕНБУРГ') {
+      return true;
+    }
+  }
 
   return false;
 }
