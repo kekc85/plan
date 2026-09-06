@@ -52,7 +52,7 @@ if (!defined('DB_HOST')) define('DB_HOST', getenv('DB_HOST') ?: ($_ENV['DB_HOST'
 if (!defined('DB_PORT')) define('DB_PORT', (int)(getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? 3306)));
 if (!defined('DB_NAME')) define('DB_NAME', getenv('DB_NAME') ?: ($_ENV['DB_NAME'] ?? 'kekc8584_plan'));
 if (!defined('DB_USER')) define('DB_USER', getenv('DB_USER') ?: ($_ENV['DB_USER'] ?? 'kekc8584_plan'));
-if (!defined('DB_PASS')) define('DB_PASS', getenv('DB_PASSWORD') ?: ($_ENV['DB_PASSWORD'] ?? 'bTe&R3xCLmiH'));
+if (!defined('DB_PASS')) define('DB_PASS', getenv('DB_PASSWORD') ?: ($_ENV['DB_PASSWORD'] ?? ''));
 if (!defined('JWT_SECRET')) define('JWT_SECRET', getenv('PLAN_JWT_SECRET') ?: ($_ENV['PLAN_JWT_SECRET'] ?? 'aeroplan_wb_secret_beget_2026_andrey'));
 
 function getDb() {
