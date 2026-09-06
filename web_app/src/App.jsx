@@ -14,7 +14,14 @@ import { INITIAL_FLIGHTS } from './utils/mockData';
 import { exportShiftToExcel } from './utils/excelExport';
 import { parseExcelToFlights } from './utils/excelImport';
 import { playReleaseAlertSound, initAudioUnlock } from './utils/audioAlert';
-import { sortFlightsChronologically, isFlightReleaseOverdue, isFlightInAlertWindow, isRenDeparture } from './utils/validators';
+import { 
+  sortFlightsChronologically, 
+  isFlightReleaseOverdue, 
+  isFlightInAlertWindow, 
+  isRenDeparture,
+  normalizePlaneType,
+  detectPlaneType
+} from './utils/validators';
 import { 
   getStoredUser, 
   authGetMe, 
@@ -52,7 +59,10 @@ function normalizeFlight(f) {
   // Для рейсов, вылетающих НЕ из Оренбурга, чекбокс Времена (Astra) не применяется
   const astra_times_sent = isRen ? !!f.astra_times_sent : false;
 
-  return { ...f, status, astra_times_sent };
+  // Интеллектуальное определение типа ВС (332, 333, 321, 772, 739, 738, 190)
+  const ac_type = f.ac_type ? normalizePlaneType(f.ac_type) : detectPlaneType(f);
+
+  return { ...f, status, astra_times_sent, ac_type };
 }
 
 export default function App() {
@@ -367,16 +377,16 @@ export default function App() {
 
   // Добавление нового рейса
   const handleAddFlight = (newFlightData) => {
-    const newFlight = {
+    const newFlight = normalizeFlight({
       id: `flight_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       ...newFlightData
-    };
+    });
     setFlights(prev => sortFlightsChronologically([...prev, newFlight]));
   };
 
   // Загрузка расписания из AviaBit
   const handleAviaBitScheduleLoaded = (loadedFlights, newShiftInfo) => {
-    setFlights(loadedFlights);
+    setFlights(loadedFlights.map(normalizeFlight));
     if (newShiftInfo) {
       setShiftInfo(prev => ({
         ...prev,
@@ -403,7 +413,7 @@ export default function App() {
           }
         }
 
-        setFlights(finalFlights);
+        setFlights(finalFlights.map(normalizeFlight));
         if (parsedData.shiftInfo?.date_interval) {
           setShiftInfo(prev => ({
             ...prev,

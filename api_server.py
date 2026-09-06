@@ -48,7 +48,8 @@ from parser import (
     parse_time_arg,
     process_flights,
     export_to_excel,
-    normalize_plane_type
+    normalize_plane_type,
+    detect_plane_type
 )
 
 # Инициализируем таблицы БД при запуске
@@ -863,7 +864,7 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
             "time": std_time,
             "release_time": release_t,
             "ac_num": tail,
-            "ac_type": normalize_plane_type(str(row.get("ac_type") or "")),
+            "ac_type": detect_plane_type(raw_type=str(row.get("ac_type") or ""), tail=tail, layout=layout),
             "ac_config": layout,
             "pax": pax,
             "crew": crew,

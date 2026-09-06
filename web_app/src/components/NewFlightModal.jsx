@@ -9,7 +9,8 @@ import {
   formatValidAcConfig,
   formatValidMtow,
   formatValidDayMonth,
-  normalizePlaneType
+  normalizePlaneType,
+  detectPlaneType
 } from '../utils/validators';
 
 export default function NewFlightModal({ isOpen, onClose, onAdd }) {
@@ -22,7 +23,7 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
     release_time: '',
     ac_num: '',
     ac_type: '',
-    ac_config: '189',
+    ac_config: '',
     pax: '',
     crew: '2/4/0/0',
     fuel_block: '',
@@ -61,6 +62,30 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
   const handleCrewInput = (e) => {
     const formatted = formatValidCrew(e.target.value);
     setFormData(prev => ({ ...prev, crew: formatted }));
+  };
+
+  const handleAcNumInput = (e) => {
+    const formatted = formatValidAcNum(e.target.value);
+    setFormData(prev => {
+      const updates = { ac_num: formatted };
+      if (!prev.ac_type) {
+        const detected = detectPlaneType({ ...prev, ac_num: formatted });
+        if (detected) updates.ac_type = detected;
+      }
+      return { ...prev, ...updates };
+    });
+  };
+
+  const handleAcConfigInput = (e) => {
+    const formatted = formatValidAcConfig(e.target.value);
+    setFormData(prev => {
+      const updates = { ac_config: formatted };
+      if (!prev.ac_type) {
+        const detected = detectPlaneType({ ...prev, ac_config: formatted });
+        if (detected) updates.ac_type = detected;
+      }
+      return { ...prev, ...updates };
+    });
   };
 
   const handleStatusChange = (e) => {
@@ -198,7 +223,7 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
               <input
                 type="text"
                 value={formData.ac_num}
-                onChange={(e) => setFormData(prev => ({ ...prev, ac_num: formatValidAcNum(e.target.value) }))}
+                onChange={handleAcNumInput}
                 placeholder="73314"
                 maxLength={5}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-1 text-slate-900 dark:text-white font-mono font-bold focus:border-sky-500 focus:outline-none text-center"
@@ -210,7 +235,7 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
                 type="text"
                 value={formData.ac_type}
                 onChange={(e) => setFormData(prev => ({ ...prev, ac_type: normalizePlaneType(e.target.value) }))}
-                placeholder="738"
+                placeholder="738 / 321"
                 maxLength={4}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-1 text-slate-900 dark:text-white font-mono font-bold focus:border-sky-500 focus:outline-none text-center"
               />
@@ -220,7 +245,7 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
               <input
                 type="text"
                 value={formData.ac_config}
-                onChange={(e) => setFormData(prev => ({ ...prev, ac_config: formatValidAcConfig(e.target.value) }))}
+                onChange={handleAcConfigInput}
                 placeholder="189"
                 maxLength={7}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-1 text-slate-900 dark:text-white font-mono font-semibold focus:border-sky-500 focus:outline-none text-center"

@@ -608,11 +608,56 @@ def parse_pax_count(pax_str: str, load_list: list = None) -> str:
     return str(pax_str).strip()
 
 
+FLEET_TAIL_TO_TYPE = {
+    # Airbus A330-200
+    "73270": "332",
+    # Airbus A330-300
+    "73849": "333",
+    # Airbus A321
+    "73273": "321",
+    "73326": "321",
+    # Boeing 777-200ER
+    "73272": "772",
+    "73347": "772",
+    # Boeing 737-900ER (73J -> 739)
+    "73343": "739",
+    "73344": "739",
+    # Embraer E190
+    "02740": "190",
+    "02741": "190",
+    "02743": "190",
+    # Boeing 737-800 (73H -> 738)
+    "73269": "738",
+    "73312": "738",
+    "73313": "738",
+    "73314": "738",
+    "73315": "738",
+    "73316": "738",
+    "73317": "738",
+    "73318": "738",
+    "73319": "738",
+    "73321": "738",
+    "73325": "738",
+}
+
+LAYOUT_TO_TYPE = {
+    "365": "332",  # A330-200
+    "379": "333",  # A330-300
+    "440": "772",  # B777-200
+    "220": "321",  # A321
+    "214": "321",  # A321
+    "215": "739",  # B737-900
+    "189": "738",  # B737-800
+    "110": "190",  # E190
+}
+
+
 def normalize_plane_type(raw_type: str) -> str:
     """
     Нормализация типа ВС:
     73H (и русское 73Н) -> 738 (Boeing 737-800)
     73J (и русское 73Й) -> 739 (Boeing 737-900)
+    E90 -> 190 (Embraer E190)
     """
     if not raw_type:
         return ""
@@ -621,7 +666,32 @@ def normalize_plane_type(raw_type: str) -> str:
         return "738"
     if t in ("73J", "73Й"):
         return "739"
+    if t == "E90":
+        return "190"
     return t
+
+
+def detect_plane_type(raw_type: str = None, tail: str = None, layout: str = None) -> str:
+    """
+    Интеллектуальное определение типа ВС:
+    1. По переданному значению типа с нормализацией (73H->738, 73J->739, E90->190)
+    2. По реестру флота авиакомпаний Nordwind / Ikar (хвостовой номер)
+    3. По характерной пассажирской компоновке (например 365->332, 220->321, 189->738)
+    """
+    if raw_type:
+        norm = normalize_plane_type(raw_type)
+        if norm:
+            return norm
+    if tail:
+        clean_tail = str(tail).upper().replace("RA-", "").replace("RA", "").replace("-", "").strip()
+        clean_digits = re.sub(r"\D", "", clean_tail)
+        if clean_digits in FLEET_TAIL_TO_TYPE:
+            return FLEET_TAIL_TO_TYPE[clean_digits]
+    if layout:
+        clean_layout = str(layout).strip()
+        if clean_layout in LAYOUT_TO_TYPE:
+            return LAYOUT_TO_TYPE[clean_layout]
+    return ""
 
 
 def process_flights(
@@ -749,9 +819,9 @@ def process_flights(
         raw_tail = (fl.get("pln") or "").strip()
         tail_clean = raw_tail.replace("RA-", "").replace("RA", "").replace("-", "").strip()
 
-        # Тип ВС (с нормализацией: 73H -> 738, 73J -> 739)
+        # Тип ВС (с нормализацией: 73H -> 738, 73J -> 739, авто-определением по борту/компоновке)
         raw_type = (fl.get("plnType") or fl.get("planeType") or "").strip()
-        ac_type = normalize_plane_type(raw_type)
+        ac_type = detect_plane_type(raw_type=raw_type, tail=tail_clean, layout=layout)
 
         # Компановка
         layout = (fl.get("prePlaneComponovkaInfo") or "").strip()
@@ -773,6 +843,9 @@ def process_flights(
                 # Если компоновка в основном списке была пустой, берем из preliminary
                 if not layout:
                     layout = (leg0.get("prePlaneComponovkaInfo") or "").strip()
+
+        if not ac_type and layout:
+            ac_type = detect_plane_type(raw_type=raw_type, tail=tail_clean, layout=layout)
 
         pax_notes = parse_pax_count(pax_raw, load_list)
 

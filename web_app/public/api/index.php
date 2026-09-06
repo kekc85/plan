@@ -889,6 +889,70 @@ if ($route === '/fetch_schedule') {
         $candidates[] = $fl;
     }
 
+function normalizePlaneType($val) {
+    if (!$val) return '';
+    $t = strtoupper(trim((string)$val));
+    if ($t === '73H' || $t === '73Н') return '738';
+    if ($t === '73J' || $t === '73Й') return '739';
+    if ($t === 'E90') return '190';
+    return $t;
+}
+
+function detectPlaneType($rawType = '', $tail = '', $layout = '') {
+    if ($rawType) {
+        $norm = normalizePlaneType($rawType);
+        if ($norm) return $norm;
+    }
+    static $fleetMap = [
+        '73270' => '332',
+        '73849' => '333',
+        '73273' => '321',
+        '73326' => '321',
+        '73272' => '772',
+        '73347' => '772',
+        '73343' => '739',
+        '73344' => '739',
+        '02740' => '190',
+        '02741' => '190',
+        '02743' => '190',
+        '73269' => '738',
+        '73312' => '738',
+        '73313' => '738',
+        '73314' => '738',
+        '73315' => '738',
+        '73316' => '738',
+        '73317' => '738',
+        '73318' => '738',
+        '73319' => '738',
+        '73321' => '738',
+        '73325' => '738'
+    ];
+    static $layoutMap = [
+        '365' => '332',
+        '379' => '333',
+        '440' => '772',
+        '220' => '321',
+        '214' => '321',
+        '215' => '739',
+        '189' => '738',
+        '110' => '190'
+    ];
+
+    if ($tail) {
+        $cleanTail = preg_replace('/\D/', '', str_replace(['RA-', 'RA', '-'], '', (string)$tail));
+        if (isset($fleetMap[$cleanTail])) {
+            return $fleetMap[$cleanTail];
+        }
+    }
+    if ($layout) {
+        $cleanLayout = trim((string)$layout);
+        if (isset($layoutMap[$cleanLayout])) {
+            return $layoutMap[$cleanLayout];
+        }
+    }
+    return '';
+}
+
 function parseTelegramLoad($text, $code = '') {
     if (!$text) {
         return ['cargo' => '', 'mail' => '', 'baggage' => ''];
@@ -1170,8 +1234,8 @@ function parseTelegramLoad($text, $code = '') {
 
         $tailRaw = trim($fl['pln'] ?? '');
         $tail = str_replace(['RA-', 'RA', '-'], '', $tailRaw);
-        $acType = normalizePlaneType($fl['plnType'] ?? $fl['planeType'] ?? '');
         $layout = trim($fl['prePlaneComponovkaInfo'] ?? '');
+        $acType = detectPlaneType($fl['plnType'] ?? $fl['planeType'] ?? '', $tail, $layout);
 
         $relTime = '';
         if ($timeStr && strpos($timeStr, ':') !== false) {
@@ -1198,6 +1262,10 @@ function parseTelegramLoad($text, $code = '') {
                     $layout = trim($leg0['prePlaneComponovkaInfo'] ?? '');
                 }
             }
+        }
+
+        if (empty($acType) && !empty($layout)) {
+            $acType = detectPlaneType('', $tail, $layout);
         }
 
         $paxCount = '';

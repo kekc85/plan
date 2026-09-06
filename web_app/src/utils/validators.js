@@ -393,15 +393,84 @@ export function isRenDeparture(flight) {
   return false;
 }
 
+export const FLEET_TAIL_TO_TYPE = {
+  // Airbus A330-200
+  '73270': '332',
+  // Airbus A330-300
+  '73849': '333',
+  // Airbus A321
+  '73273': '321',
+  '73326': '321',
+  // Boeing 777-200ER
+  '73272': '772',
+  '73347': '772',
+  // Boeing 737-900ER (73J -> 739)
+  '73343': '739',
+  '73344': '739',
+  // Embraer E190
+  '02740': '190',
+  '02741': '190',
+  '02743': '190',
+  // Boeing 737-800 (73H -> 738)
+  '73269': '738',
+  '73312': '738',
+  '73313': '738',
+  '73314': '738',
+  '73315': '738',
+  '73316': '738',
+  '73317': '738',
+  '73318': '738',
+  '73319': '738',
+  '73321': '738',
+  '73325': '738'
+};
+
+export const LAYOUT_TO_TYPE = {
+  '365': '332', // A330-200
+  '379': '333', // A330-300
+  '440': '772', // B777-200
+  '220': '321', // A321
+  '214': '321', // A321
+  '215': '739', // B737-900
+  '189': '738', // B737-800
+  '110': '190'  // E190
+};
+
 /**
  * Нормализация типа ВС:
  * 73H (и русское 73Н) -> 738 (Boeing 737-800)
  * 73J (и русское 73Й) -> 739 (Boeing 737-900)
+ * E90 -> 190 (Embraer E190)
  */
 export function normalizePlaneType(val) {
   if (!val) return '';
   const t = String(val).trim().toUpperCase();
   if (t === '73H' || t === '73Н') return '738';
   if (t === '73J' || t === '73Й') return '739';
+  if (t === 'E90') return '190';
   return t;
+}
+
+/**
+ * Определение типа ВС по явным данным, бортовому номеру или компоновке
+ */
+export function detectPlaneType(flight = {}) {
+  if (!flight) return '';
+  if (flight.ac_type) {
+    const norm = normalizePlaneType(flight.ac_type);
+    if (norm) return norm;
+  }
+  const cleanTail = String(flight.ac_num || flight.tail || '')
+    .toUpperCase()
+    .replace(/RA-?/, '')
+    .replace(/\D/g, '')
+    .trim();
+  if (cleanTail && FLEET_TAIL_TO_TYPE[cleanTail]) {
+    return FLEET_TAIL_TO_TYPE[cleanTail];
+  }
+  const cleanLayout = String(flight.ac_config || flight.layout || '').trim();
+  if (cleanLayout && LAYOUT_TO_TYPE[cleanLayout]) {
+    return LAYOUT_TO_TYPE[cleanLayout];
+  }
+  return '';
 }

@@ -13,7 +13,8 @@ import {
   formatValidDayMonth,
   isFlightReleaseOverdue,
   isRenDeparture,
-  normalizePlaneType
+  normalizePlaneType,
+  detectPlaneType
 } from '../utils/validators';
 
 export default function FlightRow({
@@ -74,6 +75,30 @@ export default function FlightRow({
     const rawVal = e.target.value;
     const formatted = formatValidTime(rawVal);
     handleCellChange('release_time', formatted);
+  };
+
+  // Изменение бортового номера (с интеллектуальным определением типа ВС, если еще не задан)
+  const handleAcNumChange = (e) => {
+    const rawVal = e.target.value;
+    const formatted = formatValidAcNum(rawVal);
+    const updates = { ac_num: formatted };
+    if (!flight.ac_type) {
+      const detected = detectPlaneType({ ...flight, ac_num: formatted });
+      if (detected) updates.ac_type = detected;
+    }
+    onUpdateFlight(flight.id, updates);
+  };
+
+  // Изменение компоновки (с интеллектуальным определением типа ВС, если еще не задан)
+  const handleAcConfigChange = (e) => {
+    const rawVal = e.target.value;
+    const formatted = formatValidAcConfig(rawVal);
+    const updates = { ac_config: formatted };
+    if (!flight.ac_type) {
+      const detected = detectPlaneType({ ...flight, ac_config: formatted });
+      if (detected) updates.ac_type = detected;
+    }
+    onUpdateFlight(flight.id, updates);
   };
 
   // Смена статуса из выпадающего списка (с двусторонней синхронизацией чек-боксов)
@@ -388,7 +413,7 @@ export default function FlightRow({
           <input
             type="text"
             value={flight.ac_num || ''}
-            onChange={(e) => handleCellChange('ac_num', formatValidAcNum(e.target.value))}
+            onChange={handleAcNumChange}
             onFocus={(e) => e.target.select()}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
@@ -408,7 +433,7 @@ export default function FlightRow({
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
-              placeholder="738"
+              placeholder="—"
               maxLength={4}
               className="bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 focus:bg-white dark:focus:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0 text-center font-mono font-bold text-[11px] text-slate-700 dark:text-slate-300 outline-none w-14 cursor-text tracking-wider shadow-inner"
               title="Тип ВС (например 738, 739, 321, 332)"
@@ -422,7 +447,7 @@ export default function FlightRow({
         <input
           type="text"
           value={flight.ac_config || ''}
-          onChange={(e) => handleCellChange('ac_config', formatValidAcConfig(e.target.value))}
+          onChange={handleAcConfigChange}
           onFocus={(e) => e.target.select()}
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
