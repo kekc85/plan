@@ -123,56 +123,81 @@ export function formatValidMtow(raw) {
   return raw.replace(/\D/g, '').slice(0, 6);
 }
 
-// Авто-маска для ввода полной календарной даты (ДД.ММ.ГГГГ)
-export function formatValidFullDate(raw) {
+// Авто-маска для ввода полной календарной даты (ДД.ММ.ГГГГ) без необходимости вручную ставить точки
+export function formatValidFullDate(raw, prev = '') {
   if (!raw) return '';
-  // Разрешаем только цифры и точки
-  const clean = raw.replace(/[^\d.]/g, '');
-  if (!clean) return '';
 
-  // Если в строке есть точки (пользователь вводит с точками или редактирует)
-  if (clean.includes('.')) {
-    const parts = clean.split('.');
-    let p0 = parts[0].slice(0, 2);
-    let p1 = parts[1] !== undefined ? parts[1].slice(0, 2) : '';
-    let p2 = parts[2] !== undefined ? parts[2].slice(0, 4) : '';
+  // Если пользователь нажал Backspace на точке (например было '06.', стало '06')
+  if (prev && prev.endsWith('.') && prev.slice(0, -1) === raw) {
+    raw = raw.slice(0, -1);
+  }
 
-    if (p0.length === 2 && parseInt(p0, 10) > 31) p0 = '31';
-    if (p1.length === 2 && parseInt(p1, 10) > 12) p1 = '12';
+  // Если введена строка с точками (например вставка 07.09.2026 или 7.9.2026)
+  if (raw.includes('.')) {
+    const parts = raw.split('.');
+    if (parts.length >= 2) {
+      let p0 = parts[0].replace(/\D/g, '').slice(0, 2);
+      let p1 = parts[1].replace(/\D/g, '').slice(0, 2);
+      let p2 = parts[2] !== undefined ? parts[2].replace(/\D/g, '').slice(0, 4) : '';
 
-    if (parts.length === 2 && parts[1] === '' && clean.endsWith('.')) {
-      return `${p0}.`;
+      if (parts.length === 2 && parts[1] === '' && raw.endsWith('.')) {
+        let d = parseInt(p0, 10) || 1;
+        if (d > 31) d = 31;
+        return `${String(d).padStart(2, '0')}.`;
+      }
+      if (parts.length === 3 && parts[2] === '' && raw.endsWith('.')) {
+        let d = parseInt(p0, 10) || 1;
+        if (d > 31) d = 31;
+        let m = parseInt(p1, 10) || 1;
+        if (m > 12) m = 12;
+        return `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.`;
+      }
+      if (parts.length === 3 && p2.length === 4) {
+        let d = parseInt(p0, 10) || 1;
+        if (d > 31) d = 31;
+        let m = parseInt(p1, 10) || 1;
+        if (m > 12) m = 12;
+        return `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.${p2}`;
+      }
     }
-    if (parts.length >= 3 && parts[2] === '' && clean.endsWith('.')) {
-      return `${p0}.${p1}.`;
+  }
+
+  // Сплошной ввод цифр (пользователь набирает только цифры, точки ставятся автоматически)
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  if (digits.length === 0) return '';
+
+  if (digits.length === 1) {
+    const d = parseInt(digits, 10);
+    if (d > 3) return `0${d}.`;
+    return digits;
+  }
+
+  let day = parseInt(digits.slice(0, 2), 10);
+  if (day > 31) day = 31;
+  const dayStr = String(day).padStart(2, '0');
+
+  if (digits.length === 2) {
+    return `${dayStr}.`;
+  }
+
+  if (digits.length === 3) {
+    let m1 = parseInt(digits[2], 10);
+    if (m1 > 1) {
+      return `${dayStr}.0${m1}.`;
     }
-
-    let res = p0;
-    if (parts.length > 1) res += `.${p1}`;
-    if (parts.length > 2) res += `.${p2}`;
-    return res;
+    return `${dayStr}.${digits[2]}`;
   }
 
-  // Если сплошной ввод цифр без точек (например, 05092026 или 0509)
-  const digits = clean.replace(/\D/g, '').slice(0, 8);
-  if (digits.length <= 2) {
-    let d = digits;
-    if (d.length === 2 && parseInt(d, 10) > 31) d = '31';
-    return d;
+  let month = parseInt(digits.slice(2, 4), 10);
+  if (month > 12) month = 12;
+  const monthStr = String(month).padStart(2, '0');
+
+  if (digits.length === 4) {
+    return `${dayStr}.${monthStr}.`;
   }
-  if (digits.length <= 4) {
-    let d = digits.slice(0, 2);
-    let m = digits.slice(2);
-    if (parseInt(d, 10) > 31) d = '31';
-    if (m.length === 2 && parseInt(m, 10) > 12) m = '12';
-    return `${d}.${m}`;
-  }
-  let d = digits.slice(0, 2);
-  let m = digits.slice(2, 4);
-  let y = digits.slice(4, 8);
-  if (parseInt(d, 10) > 31) d = '31';
-  if (parseInt(m, 10) > 12) m = '12';
-  return `${d}.${m}.${y}`;
+
+  const yearStr = digits.slice(4, 8);
+  return `${dayStr}.${monthStr}.${yearStr}`;
 }
 
 // Авто-маска даты и автоматический расчет суточного интервала (09:00 - 09:00)

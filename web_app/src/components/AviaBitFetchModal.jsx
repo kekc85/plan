@@ -226,41 +226,43 @@ export default function AviaBitFetchModal({
         <form onSubmit={handleFetch} className="space-y-4">
           
           {/* Пресеты дат */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-slate-500 font-medium mr-1">Быстрый выбор:</span>
-            <button
-              type="button"
-              onClick={setPresetYesterday}
-              className={`text-xs px-3 py-1.5 rounded-xl transition-all duration-150 ${
-                activePreset === 'yesterday'
-                  ? 'bg-sky-600 text-white font-extrabold border-2 border-sky-400 shadow-md shadow-sky-600/30 ring-2 ring-sky-500/20'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-750'
-              }`}
-            >
-              Смена Вчера
-            </button>
-            <button
-              type="button"
-              onClick={setPresetToday}
-              className={`text-xs px-3 py-1.5 rounded-xl transition-all duration-150 ${
-                activePreset === 'today'
-                  ? 'bg-sky-600 text-white font-extrabold border-2 border-sky-400 shadow-md shadow-sky-600/30 ring-2 ring-sky-500/20'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-750'
-              }`}
-            >
-              Смена Сегодня (08:00 - 14:00)
-            </button>
-            <button
-              type="button"
-              onClick={setPresetTomorrow}
-              className={`text-xs px-3 py-1.5 rounded-xl transition-all duration-150 ${
-                activePreset === 'tomorrow'
-                  ? 'bg-sky-600 text-white font-extrabold border-2 border-sky-400 shadow-md shadow-sky-600/30 ring-2 ring-sky-500/20'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-750'
-              }`}
-            >
-              Смена Завтра
-            </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 font-medium whitespace-nowrap shrink-0">Быстрый выбор:</span>
+            <div className="grid grid-cols-3 gap-1.5 flex-1">
+              <button
+                type="button"
+                onClick={setPresetYesterday}
+                className={`text-xs py-1.5 px-2 text-center rounded-xl transition-all duration-150 font-bold truncate ${
+                  activePreset === 'yesterday'
+                    ? 'bg-sky-600 text-white font-extrabold border-2 border-sky-400 shadow-md shadow-sky-600/30 ring-2 ring-sky-500/20'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-750'
+                }`}
+              >
+                Смена Вчера
+              </button>
+              <button
+                type="button"
+                onClick={setPresetToday}
+                className={`text-xs py-1.5 px-2 text-center rounded-xl transition-all duration-150 font-bold truncate ${
+                  activePreset === 'today'
+                    ? 'bg-sky-600 text-white font-extrabold border-2 border-sky-400 shadow-md shadow-sky-600/30 ring-2 ring-sky-500/20'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-750'
+                }`}
+              >
+                Смена Сегодня
+              </button>
+              <button
+                type="button"
+                onClick={setPresetTomorrow}
+                className={`text-xs py-1.5 px-2 text-center rounded-xl transition-all duration-150 font-bold truncate ${
+                  activePreset === 'tomorrow'
+                    ? 'bg-sky-600 text-white font-extrabold border-2 border-sky-400 shadow-md shadow-sky-600/30 ring-2 ring-sky-500/20'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-750'
+                }`}
+              >
+                Смена Завтра
+              </button>
+            </div>
           </div>
 
           {/* Дата и время начала */}
@@ -275,8 +277,9 @@ export default function AviaBitFetchModal({
                 <input
                   type="text"
                   value={dateFrom}
+                  maxLength={10}
                   onChange={(e) => {
-                    setDateFrom(formatValidFullDate(e.target.value));
+                    setDateFrom(formatValidFullDate(e.target.value, dateFrom));
                     setActivePreset('custom');
                   }}
                   onBlur={() => {
@@ -318,8 +321,9 @@ export default function AviaBitFetchModal({
                 <input
                   type="text"
                   value={dateTo}
+                  maxLength={10}
                   onChange={(e) => {
-                    setDateTo(formatValidFullDate(e.target.value));
+                    setDateTo(formatValidFullDate(e.target.value, dateTo));
                     setActivePreset('custom');
                   }}
                   onBlur={() => {
