@@ -18,7 +18,8 @@ from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, HTTPException, Depends, Body, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
 
@@ -1041,6 +1042,17 @@ def get_shift_legacy():
 def save_shift_legacy(data: dict = Body(...), current_user: dict = Depends(get_current_user)):
     req = SaveShiftRequest(shiftInfo=data.get("shiftInfo"), flights=data.get("flights", []))
     return save_shift_state(req, current_user)
+
+
+# --- 9. РАЗДАЧА СТАТИКИ ВЕБ-ПРИЛОЖЕНИЯ (PRODUCTION UI) ---
+
+dist_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_app", "dist")
+if os.path.exists(dist_dir):
+    app.mount("/plan", StaticFiles(directory=dist_dir, html=True), name="plan")
+
+    @app.get("/")
+    def redirect_to_plan():
+        return RedirectResponse(url="/plan/")
 
 
 if __name__ == "__main__":
