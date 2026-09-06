@@ -1016,15 +1016,23 @@ def export_to_excel(
         row_num = idx + 2
         ws.row_dimensions[row_num].height = 36
 
-        # Преобразование числовых полей в int для исключения зеленых уголков (число как текст)
-        tail_raw = str(r_data.get("tail") or "").strip()
-        ac_t = normalize_plane_type(str(r_data.get("ac_type") or "").strip())
-        if tail_raw and ac_t:
-            tail_val = f"{tail_raw}\n{ac_t}"
-        elif tail_raw.isdigit():
-            tail_val = int(tail_raw)
+        # Номер ВС и Тип ВС (в 2 строки)
+        tail_raw = str(r_data.get("tail") or r_data.get("ac_num") or "").strip().replace("RA-", "").replace("RA", "")
+        clean_tail = re.sub(r"\D", "", tail_raw) if tail_raw else ""
+        tail_num = clean_tail if clean_tail else tail_raw
+        ac_t = detect_plane_type(
+            raw_type=r_data.get("ac_type"),
+            tail=tail_raw,
+            layout=r_data.get("layout") or r_data.get("ac_config")
+        )
+        if tail_num and ac_t:
+            tail_val = f"{tail_num}\n{ac_t}"
+        elif tail_num and str(tail_num).isdigit():
+            tail_val = int(tail_num)
+        elif ac_t:
+            tail_val = ac_t
         else:
-            tail_val = tail_raw
+            tail_val = tail_num
 
         layout_val = int(r_data["layout"]) if str(r_data.get("layout", "")).isdigit() else r_data.get("layout", "")
         pax_val = int(r_data["pax_notes"]) if str(r_data.get("pax_notes", "")).isdigit() else r_data.get("pax_notes", "")
@@ -1073,23 +1081,23 @@ def export_to_excel(
             cell.alignment = align_center
             cell.border = thin_border
 
-    # Настройка пропорциональных ширин колонок для полного заполнения листа А4 Альбом
+    # Настройка пропорциональных ширин колонок для максимального заполнения листа А4 Альбом
     col_widths = {
-        "A": 11.0,  # № рейса
-        "B": 14.5,  # Маршрут
-        "C": 8.5,   # Время
-        "D": 9.5,   # Номер ВС
-        "E": 11.0,  # Компановка
-        "F": 10.0,  # PAX, NOTES
-        "G": 10.0,  # Экипаж
-        "H": 14.0,  # Топливо
-        "I": 9.0,   # MTOW
-        "J": 5.5,   # LIR
-        "K": 9.5,   # Груз
+        "A": 12.0,  # № рейса
+        "B": 16.0,  # Маршрут
+        "C": 9.0,   # Время
+        "D": 11.0,  # Номер ВС
+        "E": 11.5,  # Компановка
+        "F": 12.0,  # PAX, NOTES
+        "G": 11.5,  # Экипаж
+        "H": 15.0,  # Топливо
+        "I": 9.5,   # MTOW
+        "J": 6.0,   # LIR
+        "K": 18.0,  # Груз
         "L": 9.5,   # Почта
-        "M": 9.5,   # Багаж
-        "N": 4.5,   # СЗВ (вертикально)
-        "O": 4.5    # ЛДМ (вертикально)
+        "M": 12.0,  # Багаж
+        "N": 5.0,   # СЗВ (вертикально)
+        "O": 5.0    # ЛДМ (вертикально)
     }
 
     for col_letter, width in col_widths.items():
@@ -1098,14 +1106,14 @@ def export_to_excel(
     # Фиксация шапки таблицы
     ws.freeze_panes = "A3"
 
-    # Параметры печати: Альбомная ориентация A4 с минимальными полями как на образце
+    # Параметры печати: Альбомная ориентация A4 с минимальными полями для максимального заполнения листа
     ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
-    ws.page_margins.left = 0.25
-    ws.page_margins.right = 0.25
+    ws.page_margins.left = 0.15
+    ws.page_margins.right = 0.15
     ws.page_margins.top = 0.2
     ws.page_margins.bottom = 0.2
     ws.page_margins.header = 0.0

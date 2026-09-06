@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import { normalizePlaneType } from './validators';
+import { normalizePlaneType, detectPlaneType } from './validators';
 
 /**
  * Экспорт суточного плана в Excel (.xlsx) через ExcelJS
@@ -7,7 +7,7 @@ import { normalizePlaneType } from './validators';
  * - Шрифты Calibri 11 (Bold для PAX), Calibri 9 для маршрута
  * - Вертикальный поворот текста для колонок СЗВ и ЛДМ (90°)
  * - Точные границы ячеек и пропорциональные ширины
- * - Альбомная ориентация страницы A4 (fit to page)
+ * - Альбомная ориентация страницы A4 с минимальными полями печати (максимальное заполнение листа)
  * - Окно выбора места сохранения без закрытия или перехода страницы
  * - Полная автономность: работает прямо в браузере без зависимости от серверов
  */
@@ -28,7 +28,17 @@ export async function exportShiftToExcel(flights, shiftInfo) {
         paperSize: 9, // A4
         fitToPage: true,
         fitToWidth: 1,
-        fitToHeight: 0
+        fitToHeight: 0,
+        horizontalCentered: true,
+        verticalCentered: false,
+        margins: {
+          left: 0.15,   // ~3.8 мм (минимальные поля для максимального заполнения листа)
+          right: 0.15,  // ~3.8 мм
+          top: 0.2,     // ~5.0 мм
+          bottom: 0.2,  // ~5.0 мм
+          header: 0.0,
+          footer: 0.0
+        }
       },
       views: [{ state: 'frozen', ySplit: 2 }]
     });
@@ -111,8 +121,9 @@ export async function exportShiftToExcel(flights, shiftInfo) {
         fuelStr = parts.join(' ');
       }
 
-      const tailNum = /^\d+$/.test(String(f.ac_num || '')) ? String(f.ac_num) : (f.ac_num || '');
-      const acType = normalizePlaneType(f.ac_type || '');
+      const rawTail = String(f.ac_num || f.tail || '').trim().replace(/^RA-?/i, '');
+      const tailNum = /^\d+$/.test(rawTail) ? rawTail : (rawTail || '');
+      const acType = detectPlaneType(f);
       let tailVal = '';
       if (tailNum && acType) {
         tailVal = `${tailNum}\n${acType}`;
@@ -164,8 +175,8 @@ export async function exportShiftToExcel(flights, shiftInfo) {
       });
     });
 
-    // Настройка пропорциональных ширин колонок
-    const colWidths = [11.0, 14.5, 8.5, 9.5, 11.0, 10.0, 10.0, 14.0, 9.0, 5.5, 9.5, 9.5, 9.5, 4.5, 4.5];
+    // Настройка пропорциональных ширин колонок для максимального заполнения листа А4 Альбом
+    const colWidths = [12.0, 16.0, 9.0, 11.0, 11.5, 12.0, 11.5, 15.0, 9.5, 6.0, 18.0, 9.5, 12.0, 5.0, 5.0];
     colWidths.forEach((w, idx) => {
       ws.getColumn(idx + 1).width = w;
     });
