@@ -42,26 +42,20 @@ jobs:
           DISPATCH_CHOICE="${{ github.event.inputs.target_env }}"
           
           IS_TEST=false
-          if [ "$DISPATCH_CHOICE" = "test" ] || ([ "$DISPATCH_CHOICE" = "auto" ] && [ "$BRANCH" = "dev" ]); then
+          if [ "$DISPATCH_CHOICE" = "test" ] || [ "$BRANCH" = "dev" ]; then
             IS_TEST=true
           fi
           
           if [ "$IS_TEST" = true ]; then
-            echo "ENV_NAME=Test" >> $GITHUB_ENV
-            echo "VITE_BASE=/plan_test/" >> $GITHUB_ENV
-            
+            ENV_NAME="Test"
+            VITE_BASE="/plan_test/"
             RAW_DIR="${{ secrets.BEGET_TEST_REMOTE_DIR }}"
-            if [ -z "$RAW_DIR" ]; then
-              RAW_DIR="boostandgo.ru/public_html/plan_test/"
-            fi
+            [ -z "$RAW_DIR" ] && RAW_DIR="boostandgo.ru/public_html/plan_test/"
           else
-            echo "ENV_NAME=Production" >> $GITHUB_ENV
-            echo "VITE_BASE=/plan/" >> $GITHUB_ENV
-            
+            ENV_NAME="Production"
+            VITE_BASE="/plan/"
             RAW_DIR="${{ secrets.BEGET_REMOTE_DIR }}"
-            if [ -z "$RAW_DIR" ]; then
-              RAW_DIR="boostandgo.ru/public_html/plan/"
-            fi
+            [ -z "$RAW_DIR" ] && RAW_DIR="boostandgo.ru/public_html/plan/"
           fi
           
           # Clean FTP directory
@@ -72,13 +66,15 @@ jobs:
           RAW_SERVER="${{ secrets.BEGET_FTP_SERVER }}"
           CLEAN_SERVER=$(echo "$RAW_SERVER" | sed -e 's|^[^/]*://||' -e 's|/.*$||' | tr -d '[:space:]')
           
+          echo "ENV_NAME=${ENV_NAME}" >> $GITHUB_ENV
+          echo "VITE_BASE=${VITE_BASE}" >> $GITHUB_ENV
           echo "CLEAN_SERVER=${CLEAN_SERVER}" >> $GITHUB_ENV
           echo "CLEAN_DIR=${CLEAN_DIR}" >> $GITHUB_ENV
           
-          echo "Deploy Environment: $ENV_NAME"
-          echo "Base URL: $VITE_BASE"
-          echo "Target Server: $CLEAN_SERVER"
-          echo "Target Directory: $CLEAN_DIR"
+          echo "Deploy Environment: ${ENV_NAME}"
+          echo "Base URL: ${VITE_BASE}"
+          echo "Target Server: ${CLEAN_SERVER}"
+          echo "Target Directory: ${CLEAN_DIR}"
 
       - name: Install Frontend Dependencies
         working-directory: web_app
