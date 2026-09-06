@@ -3,7 +3,6 @@ DirectoryIndex index.html index.php
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /plan/
 
     # 1. Если запрашивается существующий файл или папка (CSS, JS, картинки) - отдавать напрямую
     RewriteCond %{REQUEST_FILENAME} -f [OR]
