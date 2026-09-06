@@ -123,7 +123,173 @@ function normalizePlaneType($rawType) {
     $t = strtoupper(trim((string)$rawType));
     if ($t === '73H' || $t === '73Н') return '738';
     if ($t === '73J' || $t === '73Й') return '739';
+    if ($t === 'E90') return '190';
     return $t;
+}
+
+function detectPlaneType($rawType = '', $tail = '', $layout = '') {
+    if ($rawType) {
+        $norm = normalizePlaneType($rawType);
+        if ($norm) return $norm;
+    }
+    static $fleetMap = [
+        '73270' => '332',
+        '73849' => '333',
+        '73273' => '321',
+        '73326' => '321',
+        '73272' => '772',
+        '73347' => '772',
+        '73343' => '739',
+        '73344' => '739',
+        '02740' => '190',
+        '02741' => '190',
+        '02743' => '190',
+        '73269' => '738',
+        '73312' => '738',
+        '73313' => '738',
+        '73314' => '738',
+        '73315' => '738',
+        '73316' => '738',
+        '73317' => '738',
+        '73318' => '738',
+        '73319' => '738',
+        '73321' => '738',
+        '73325' => '738'
+    ];
+    static $layoutMap = [
+        '365' => '332',
+        '379' => '333',
+        '440' => '772',
+        '220' => '321',
+        '214' => '321',
+        '215' => '739',
+        '189' => '738',
+        '110' => '190'
+    ];
+
+    if ($tail) {
+        $cleanTail = preg_replace('/\D/', '', str_replace(['RA-', 'RA', '-'], '', (string)$tail));
+        if (isset($fleetMap[$cleanTail])) {
+            return $fleetMap[$cleanTail];
+        }
+    }
+    if ($layout) {
+        $cleanLayout = trim((string)$layout);
+        if (isset($layoutMap[$cleanLayout])) {
+            return $layoutMap[$cleanLayout];
+        }
+    }
+    return '';
+}
+
+function parseTelegramLoad($text, $code = '') {
+    if (!$text) {
+        return ['cargo' => '', 'mail' => '', 'baggage' => ''];
+    }
+
+    $lines = array_values(array_filter(array_map('trim', explode("\n", $text))));
+    if (empty($lines)) {
+        return ['cargo' => '', 'mail' => '', 'baggage' => ''];
+    }
+
+    $codeUpper = $code ? strtoupper(trim($code)) : '';
+    $firstLineUpper = strtoupper($lines[0]);
+    $secondLineUpper = isset($lines[1]) ? strtoupper($lines[1]) : '';
+
+    // 1. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ FBL (Freight Bill List) / FFM (Manifest)
+    $isFblOrFfm = (
+        in_array($codeUpper, ['FBL', 'FFM']) ||
+        strpos($firstLineUpper, 'FBL') === 0 ||
+        strpos($firstLineUpper, 'FFM') === 0 ||
+        strpos($secondLineUpper, 'FBL') === 0 ||
+        strpos($secondLineUpper, 'FFM') === 0
+    );
+
+    if ($isFblOrFfm) {
+        $fblItems = [];
+        $totalLines = count($lines);
+        for ($i = 0; $i < $totalLines; $i++) {
+            $line = $lines[$i];
+            if (preg_match('/\/T(\d+)K([\d.]+)(?:[A-Z0-9.]+)?\/([A-Z0-9А-Яа-я\s_\-]+)/i', $line, $m)) {
+                $pieces = (int)$m[1];
+                $rawWeight = (float)$m[2];
+                $weightRounded = (int)ceil($rawWeight);
+                $nature = strtoupper(trim($m[3]));
+
+                // Проверяем следующую строку на наличие IATA-кода (например /PEF, /PER, /VAL)
+                $iataCode = '';
+                if ($i + 1 < $totalLines) {
+                    $nextLine = $lines[$i + 1];
+                    if (preg_match('/^\/([A-Z]{3,4})(?:\/[A-Z]{3,4})*$/i', $nextLine) && strtoupper($nextLine) !== '/LAST') {
+                        $iataCode = strtoupper(ltrim($nextLine, '/'));
+                        $i++; // пропускаем строку кода
+                    }
+                }
+
+                if ($iataCode) {
+                    $fblItems[] = "{$pieces}/{$weightRounded}/{$iataCode}/{$nature}";
+                } else {
+                    $fblItems[] = "{$pieces}/{$weightRounded}/{$nature}";
+                }
+            }
+        }
+        if (!empty($fblItems)) {
+            return [
+                'cargo' => implode(', ', $fblItems),
+                'mail' => '',
+                'baggage' => ''
+            ];
+        }
+    }
+
+    // 2. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ UWS (Unit Weight Signal)
+    $isUws = (
+        $codeUpper === 'UWS' ||
+        strpos($firstLineUpper, 'UWS') === 0 ||
+        strpos($secondLineUpper, 'UWS') === 0
+    );
+
+    if (!$isUws) {
+        return ['cargo' => '', 'mail' => '', 'baggage' => ''];
+    }
+
+    $cargoTotal = 0;
+    $mailTotal = 0;
+    $baggageTotal = 0;
+    $hasCargo = false;
+    $hasMail = false;
+    $hasBaggage = false;
+
+    // Регулярное выражение для строк UWS:
+    // -KEJ/154P/C или KEJ/154/C или /154P/C или -KEJ/154K/C или -KEJ/20P/M
+    foreach ($lines as $line) {
+        if (strtoupper($line) === 'UWS' || preg_match('/^[A-Z0-9]{2,6}\/\d{1,2}\.[A-Z]{3}/i', $line)) {
+            continue;
+        }
+
+        if (preg_match_all('/(?:^|[-.\/\s])(?:[A-Z]{3}\/)?(\d+)(?:P|K|KG|PC)?\/([CMBE])(?:\b|[\/\s]|$)/i', $line, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $m) {
+                $weight = (int)$m[1];
+                $type = strtoupper($m[2]);
+                if ($type === 'C') { // Cargo
+                    $cargoTotal += $weight;
+                    $hasCargo = true;
+                } elseif ($type === 'M') { // Mail
+                    $mailTotal += $weight;
+                    $hasMail = true;
+                } elseif ($type === 'B' || $type === 'E') { // Baggage / Equipment
+                    $baggageTotal += $weight;
+                    $hasBaggage = true;
+                }
+            }
+        }
+    }
+
+    return [
+        'cargo' => ($hasCargo && $cargoTotal > 0) ? (string)$cargoTotal : '',
+        'mail' => ($hasMail && $mailTotal > 0) ? (string)$mailTotal : '',
+        'baggage' => ($hasBaggage && $baggageTotal > 0) ? (string)$baggageTotal : ''
+    ];
 }
 
 // Fallback для заголовков
@@ -193,8 +359,8 @@ function verifyJwtToken($token) {
 
 function getAuthUser() {
     $headers = getallheaders();
-    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-    if (!preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? ($_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
+    if (!preg_match('/Bearer\s(\S+)/i', $authHeader, $matches)) {
         http_response_code(401);
         echo json_encode(['detail' => 'Требуется авторизация']);
         exit;
@@ -948,180 +1114,6 @@ if ($route === '/fetch_schedule') {
         $fl['_time_str'] = $timeStr;
         $candidates[] = $fl;
     }
-
-function normalizePlaneType($val) {
-    if (!$val) return '';
-    $t = strtoupper(trim((string)$val));
-    if ($t === '73H' || $t === '73Н') return '738';
-    if ($t === '73J' || $t === '73Й') return '739';
-    if ($t === 'E90') return '190';
-    return $t;
-}
-
-function detectPlaneType($rawType = '', $tail = '', $layout = '') {
-    if ($rawType) {
-        $norm = normalizePlaneType($rawType);
-        if ($norm) return $norm;
-    }
-    static $fleetMap = [
-        '73270' => '332',
-        '73849' => '333',
-        '73273' => '321',
-        '73326' => '321',
-        '73272' => '772',
-        '73347' => '772',
-        '73343' => '739',
-        '73344' => '739',
-        '02740' => '190',
-        '02741' => '190',
-        '02743' => '190',
-        '73269' => '738',
-        '73312' => '738',
-        '73313' => '738',
-        '73314' => '738',
-        '73315' => '738',
-        '73316' => '738',
-        '73317' => '738',
-        '73318' => '738',
-        '73319' => '738',
-        '73321' => '738',
-        '73325' => '738'
-    ];
-    static $layoutMap = [
-        '365' => '332',
-        '379' => '333',
-        '440' => '772',
-        '220' => '321',
-        '214' => '321',
-        '215' => '739',
-        '189' => '738',
-        '110' => '190'
-    ];
-
-    if ($tail) {
-        $cleanTail = preg_replace('/\D/', '', str_replace(['RA-', 'RA', '-'], '', (string)$tail));
-        if (isset($fleetMap[$cleanTail])) {
-            return $fleetMap[$cleanTail];
-        }
-    }
-    if ($layout) {
-        $cleanLayout = trim((string)$layout);
-        if (isset($layoutMap[$cleanLayout])) {
-            return $layoutMap[$cleanLayout];
-        }
-    }
-    return '';
-}
-
-function parseTelegramLoad($text, $code = '') {
-    if (!$text) {
-        return ['cargo' => '', 'mail' => '', 'baggage' => ''];
-    }
-
-    $lines = array_values(array_filter(array_map('trim', explode("\n", $text))));
-    if (empty($lines)) {
-        return ['cargo' => '', 'mail' => '', 'baggage' => ''];
-    }
-
-    $codeUpper = $code ? strtoupper(trim($code)) : '';
-    $firstLineUpper = strtoupper($lines[0]);
-    $secondLineUpper = isset($lines[1]) ? strtoupper($lines[1]) : '';
-
-    // 1. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ FBL (Freight Bill List) / FFM (Manifest)
-    $isFblOrFfm = (
-        in_array($codeUpper, ['FBL', 'FFM']) ||
-        strpos($firstLineUpper, 'FBL') === 0 ||
-        strpos($firstLineUpper, 'FFM') === 0 ||
-        strpos($secondLineUpper, 'FBL') === 0 ||
-        strpos($secondLineUpper, 'FFM') === 0
-    );
-
-    if ($isFblOrFfm) {
-        $fblItems = [];
-        $totalLines = count($lines);
-        for ($i = 0; $i < $totalLines; $i++) {
-            $line = $lines[$i];
-            if (preg_match('/\/T(\d+)K([\d.]+)(?:[A-Z0-9.]+)?\/([A-Z0-9А-Яа-я\s_\-]+)/i', $line, $m)) {
-                $pieces = (int)$m[1];
-                $rawWeight = (float)$m[2];
-                $weightRounded = (int)ceil($rawWeight);
-                $nature = strtoupper(trim($m[3]));
-
-                // Проверяем следующую строку на наличие IATA-кода (например /PEF, /PER, /VAL)
-                $iataCode = '';
-                if ($i + 1 < $totalLines) {
-                    $nextLine = $lines[$i + 1];
-                    if (preg_match('/^\/([A-Z]{3,4})(?:\/[A-Z]{3,4})*$/i', $nextLine) && strtoupper($nextLine) !== '/LAST') {
-                        $iataCode = strtoupper(ltrim($nextLine, '/'));
-                        $i++; // пропускаем строку кода
-                    }
-                }
-
-                if ($iataCode) {
-                    $fblItems[] = "{$pieces}/{$weightRounded}/{$iataCode}/{$nature}";
-                } else {
-                    $fblItems[] = "{$pieces}/{$weightRounded}/{$nature}";
-                }
-            }
-        }
-        if (!empty($fblItems)) {
-            return [
-                'cargo' => implode(', ', $fblItems),
-                'mail' => '',
-                'baggage' => ''
-            ];
-        }
-    }
-
-    // 2. ПРОВЕРКА И ПАРСИНГ ТЕЛЕГРАММЫ UWS (Unit Weight Signal)
-    $isUws = (
-        $codeUpper === 'UWS' ||
-        strpos($firstLineUpper, 'UWS') === 0 ||
-        strpos($secondLineUpper, 'UWS') === 0
-    );
-
-    if (!$isUws) {
-        return ['cargo' => '', 'mail' => '', 'baggage' => ''];
-    }
-
-    $cargoTotal = 0;
-    $mailTotal = 0;
-    $baggageTotal = 0;
-    $hasCargo = false;
-    $hasMail = false;
-    $hasBaggage = false;
-
-    // Регулярное выражение для строк UWS:
-    // -KEJ/154P/C или KEJ/154/C или /154P/C или -KEJ/154K/C или -KEJ/20P/M
-    foreach ($lines as $line) {
-        if (strtoupper($line) === 'UWS' || preg_match('/^[A-Z0-9]{2,6}\/\d{1,2}\.[A-Z]{3}/i', $line)) {
-            continue;
-        }
-
-        if (preg_match_all('/(?:^|[-.\/\s])(?:[A-Z]{3}\/)?(\d+)(?:P|K|KG|PC)?\/([CMBE])(?:\b|[\/\s]|$)/i', $line, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $m) {
-                $weight = (int)$m[1];
-                $type = strtoupper($m[2]);
-                if ($type === 'C') { // Cargo
-                    $cargoTotal += $weight;
-                    $hasCargo = true;
-                } elseif ($type === 'M') { // Mail
-                    $mailTotal += $weight;
-                    $hasMail = true;
-                } elseif ($type === 'B' || $type === 'E') { // Baggage / Equipment
-                    $baggageTotal += $weight;
-                    $hasBaggage = true;
-                }
-            }
-        }
-    }
-
-    return [
-        'cargo' => ($hasCargo && $cargoTotal > 0) ? (string)$cargoTotal : '',
-        'mail' => ($hasMail && $mailTotal > 0) ? (string)$mailTotal : '',
-        'baggage' => ($hasBaggage && $baggageTotal > 0) ? (string)$baggageTotal : ''
-    ];
-}
 
     // 2. Параллельная загрузка оперативной информации (пассажиры, загрузка, экипаж) и списка телеграмм
     $preliminaries = [];

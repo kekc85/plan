@@ -1,4 +1,7 @@
 - 2026-09-07:
+  - Устранена ошибка парсинга AviaBit на хостинге:
+    1. В `web_app/public/api/index.php` устранены повторные объявления вспомогательных функций (`normalizePlaneType`, `detectPlaneType`, `parseTelegramLoad`), вынесены на верхний уровень.
+    2. Добавлена поддержка передачи `Authorization` заголовка через переменные FastCGI на Beget (`HTTP_AUTHORIZATION`, `REDIRECT_HTTP_AUTHORIZATION`).
   - Безопасность и изоляция секретов БД:
     1. Из открытого кода в Git (`index.php`) полностью удален пароль базы данных.
     2. Реализована безопасная загрузка реквизитов через локальный `db_config.php` на Beget и переменные окружения.
