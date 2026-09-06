@@ -1,3 +1,7 @@
+- 2026-09-07:
+  - Исправлено подключение к MySQL на хостинге Beget:
+    1. В `web_app/public/api/index.php` обновлен пароль доступа к базе `kekc8584_plan`.
+    2. Добавлено автоматическое считывание изолированного файла конфигурации `db_config.php` с защитой от перезаписи в GitHub Actions CI/CD.
 - 2026-09-06:
   - Настроен GitHub Actions CI/CD автодеплой на хостинг Beget:
     1. Создан workflow `.github/workflows/deploy.yml` с автоматической сборкой и деплоем по FTP.

@@ -21,6 +21,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // ----------------------------------------------------
 // 1. КОНФИГУРАЦИЯ БАЗЫ ДАННЫХ MYSQL (BEGET)
 // ----------------------------------------------------
+// Подключение изолированной конфигурации базы данных Beget (если существует)
+$configPaths = [__DIR__ . '/db_config.php', dirname(__DIR__) . '/db_config.php', __DIR__ . '/../db_config.php'];
+foreach ($configPaths as $cfgFile) {
+    if (file_exists($cfgFile)) {
+        require_once $cfgFile;
+        break;
+    }
+}
+
 // Автоматическая загрузка .env файла (если он загружен на сервер)
 $envPaths = [__DIR__ . '/.env', dirname(__DIR__) . '/.env', __DIR__ . '/../.env'];
 foreach ($envPaths as $envFile) {
@@ -39,12 +48,12 @@ foreach ($envPaths as $envFile) {
     }
 }
 
-define('DB_HOST', getenv('DB_HOST') ?: $_ENV['DB_HOST'] ?? 'localhost');
-define('DB_PORT', (int)(getenv('DB_PORT') ?: $_ENV['DB_PORT'] ?? 3306));
-define('DB_NAME', getenv('DB_NAME') ?: $_ENV['DB_NAME'] ?? 'kekc8584_plan');
-define('DB_USER', getenv('DB_USER') ?: $_ENV['DB_USER'] ?? 'kekc8584_plan');
-define('DB_PASS', getenv('DB_PASSWORD') ?: $_ENV['DB_PASSWORD'] ?? 'Y4vZI5p*0dmQ');
-define('JWT_SECRET', getenv('PLAN_JWT_SECRET') ?: $_ENV['PLAN_JWT_SECRET'] ?? 'aeroplan_wb_secret_beget_2026_andrey');
+if (!defined('DB_HOST')) define('DB_HOST', getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? 'localhost'));
+if (!defined('DB_PORT')) define('DB_PORT', (int)(getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? 3306)));
+if (!defined('DB_NAME')) define('DB_NAME', getenv('DB_NAME') ?: ($_ENV['DB_NAME'] ?? 'kekc8584_plan'));
+if (!defined('DB_USER')) define('DB_USER', getenv('DB_USER') ?: ($_ENV['DB_USER'] ?? 'kekc8584_plan'));
+if (!defined('DB_PASS')) define('DB_PASS', getenv('DB_PASSWORD') ?: ($_ENV['DB_PASSWORD'] ?? 'bTe&R3xCLmiH'));
+if (!defined('JWT_SECRET')) define('JWT_SECRET', getenv('PLAN_JWT_SECRET') ?: ($_ENV['PLAN_JWT_SECRET'] ?? 'aeroplan_wb_secret_beget_2026_andrey'));
 
 function getDb() {
     static $pdo = null;
