@@ -583,7 +583,7 @@ export default function FlightRow({
       </td>
 
       {/* 12. Груз */}
-      <td className={`py-1 px-0.5 text-center min-w-[70px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-1 text-center w-[120px] min-w-[120px] max-w-[130px] ${overdueBorderTopBottom}`}>
         <textarea
           rows={2}
           value={flight.cargo || ''}
@@ -593,7 +593,13 @@ export default function FlightRow({
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="Груз..."
           title={flight.cargo || ''}
-          className="w-full resize-none overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1 py-1 text-xs font-medium text-slate-900 dark:text-slate-200 outline-none cursor-text transition-all shadow-sm text-center"
+          className={`w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1.5 py-1 text-center outline-none cursor-text transition-all shadow-sm break-words [word-break:break-word] ${
+            (flight.cargo || '').length > 15
+              ? 'text-[10px] leading-[1.2] font-mono font-semibold tracking-tight'
+              : (flight.cargo || '').length > 8
+              ? 'text-[11px] leading-snug font-medium'
+              : 'text-xs font-medium'
+          } text-slate-900 dark:text-slate-200`}
         />
       </td>
 
@@ -608,7 +614,13 @@ export default function FlightRow({
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="Почта..."
           title={flight.mail || ''}
-          className="w-full resize-none overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1 py-1 text-xs font-medium text-slate-900 dark:text-slate-200 outline-none cursor-text transition-all shadow-sm text-center"
+          className={`w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1 py-1 text-center outline-none cursor-text transition-all shadow-sm break-words [word-break:break-word] ${
+            (flight.mail || '').length > 12
+              ? 'text-[10px] leading-[1.2] font-mono font-semibold tracking-tight'
+              : (flight.mail || '').length > 7
+              ? 'text-[11px] leading-snug font-medium'
+              : 'text-xs font-medium'
+          } text-slate-900 dark:text-slate-200`}
         />
       </td>
 

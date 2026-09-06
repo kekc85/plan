@@ -65,7 +65,7 @@ export default function ShiftTable({
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-[200px] text-sky-800 dark:text-sky-300 shadow-sm">Топливо и Веса<br/><span className="text-[10px] font-medium text-slate-500">Block / Trip / Taxi / DOW / DOI / Кухня</span></th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-0.5 text-center font-extrabold tracking-wider uppercase w-15 min-w-[58px] shadow-sm">MTOW</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-14 text-indigo-700 dark:text-indigo-300 shadow-sm">LIR</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[70px] shadow-sm">Груз</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 text-center font-extrabold tracking-wider uppercase w-[120px] min-w-[120px] shadow-sm">Груз</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[70px] shadow-sm">Почта</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-1 font-extrabold tracking-wider uppercase min-w-[140px] shadow-sm">Багаж (особенности)</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-3 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 text-amber-700 dark:text-amber-300 shadow-sm">СЗВ</th>
