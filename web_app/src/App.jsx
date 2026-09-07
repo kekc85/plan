@@ -645,24 +645,21 @@ export default function App() {
   // Загрузка расписания из AviaBit
   const handleAviaBitScheduleLoaded = (loadedFlights, newShiftInfo) => {
     hasUserModifiedRef.current = true;
-    setFlights(prev => {
-      if (prev && prev.length > 0) {
-        const { mergedFlights, totalNewChanges } = smartMergeWithDelta(prev, loadedFlights);
-        if (totalNewChanges > 0) {
-          setChangeToast(`AviaBit: обнаружено ${totalNewChanges} изменений`);
-          setTimeout(() => setChangeToast(null), 8000);
-        }
-        return sortFlightsChronologically(mergedFlights.map(normalizeFlight));
-      }
-      return sortFlightsChronologically(loadedFlights.map(normalizeFlight));
-    });
+    const normalized = sortFlightsChronologically(loadedFlights.map(normalizeFlight));
+    setFlights(normalized);
+    const updatedShift = newShiftInfo ? { ...shiftInfo, ...newShiftInfo } : shiftInfo;
     if (newShiftInfo) {
-      setShiftInfo(prev => ({
-        ...prev,
-        ...newShiftInfo
-      }));
+      setShiftInfo(updatedShift);
     }
+    try {
+      localStorage.setItem(`${STORAGE_KEY}_flights`, JSON.stringify(normalized));
+      localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(updatedShift));
+    } catch (e) {}
+
+    // Мгновенное сохранение в базу данных
+    saveShift(updatedShift, normalized).catch(err => console.warn('Instant save error:', err));
   };
+
 
   // Импорт из файла Excel
   const handleImportExcelFile = async (file) => {

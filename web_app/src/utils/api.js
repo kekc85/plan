@@ -29,17 +29,27 @@ function getAuthHeader() {
 }
 
 async function request(endpoint, options = {}) {
-  const url = `${API_BASE}${endpoint}`;
+  // Защита от кэширования GET-запросов мобильными браузерами (Safari/Chrome на смартфонах)
+  const isGet = !options.method || options.method.toUpperCase() === 'GET';
+  const separator = endpoint.includes('?') ? '&' : '?';
+  const finalEndpoint = isGet ? `${endpoint}${separator}_t=${Date.now()}` : endpoint;
+  const url = `${API_BASE}${finalEndpoint}`;
+
   const headers = {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
     ...getAuthHeader(),
     ...(options.headers || {})
   };
 
   const response = await fetch(url, {
+    cache: 'no-store',
     ...options,
     headers
   });
+
 
   if (response.status === 401 && !endpoint.includes('/auth/login')) {
     // Токен истек или недействителен (для защищенных эндпоинтов)
