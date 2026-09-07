@@ -70,6 +70,26 @@ function getDb() {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false
             ]);
+            // Автоматическая безопасная миграция колонок в MySQL (если они отсутствуют)
+            $migrations = [
+                "ALTER TABLE plan_flights ADD COLUMN ac_type VARCHAR(16) NULL AFTER ac_num",
+                "ALTER TABLE plan_flights ADD COLUMN unread_changes TEXT NULL",
+                "ALTER TABLE plan_flights ADD COLUMN astra_times_sent TINYINT(1) DEFAULT 0",
+                "ALTER TABLE plan_flights ADD COLUMN inbound_flight VARCHAR(32) NULL",
+                "ALTER TABLE plan_flights ADD COLUMN inbound_dep VARCHAR(16) NULL",
+                "ALTER TABLE plan_flights ADD COLUMN inbound_takeoff_time VARCHAR(16) NULL",
+                "ALTER TABLE plan_flights ADD COLUMN inbound_landing_calc VARCHAR(16) NULL",
+                "ALTER TABLE plan_flights ADD COLUMN inbound_landing_time VARCHAR(16) NULL",
+                "ALTER TABLE plan_flights ADD COLUMN outbound_takeoff_time VARCHAR(16) NULL",
+                "ALTER TABLE plan_flights ADD COLUMN plane_status VARCHAR(32) NULL",
+                "ALTER TABLE plan_flights ADD COLUMN updated_by VARCHAR(128) NULL"
+            ];
+            foreach ($migrations as $mSql) {
+                try {
+                    $pdo->exec($mSql);
+                } catch (Exception $ign) {}
+            }
+
             // Автоматическое обновление имени диспетчера по умолчанию на реальное имя и удаление старых резервных рейсов
             try {
                 $pdo->exec("UPDATE plan_users SET full_name = 'Иван Иванов' WHERE username = 'dispatcher' AND full_name = 'Диспетчер по центровке'");
@@ -83,6 +103,7 @@ function getDb() {
     }
     return $pdo;
 }
+
 
 function initAirportsTable($db) {
     static $initialized = false;
@@ -653,91 +674,102 @@ if ($route === '/shift/save') {
     $nowStr = date('Y-m-d H:i:s');
 
     $db = getDb();
-    $db->beginTransaction();
+    try {
+        $db->beginTransaction();
 
-    $stmt = $db->query("SELECT id FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1");
-    $activeShift = $stmt->fetch();
+        $stmt = $db->query("SELECT id FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1");
+        $activeShift = $stmt->fetch();
 
-    if ($activeShift) {
-        $shiftId = $activeShift['id'];
-        $upd = $db->prepare("UPDATE plan_shifts SET date_interval = ?, dispatcher_name = ? WHERE id = ?");
-        $upd->execute([$dateInterval, $dispatcher, $shiftId]);
-    } else {
-        $ins = $db->prepare("INSERT INTO plan_shifts (date_interval, dispatcher_name, started_at, status, created_at) VALUES (?, ?, ?, 'active', ?)");
-        $ins->execute([$dateInterval, $dispatcher, $nowStr, $nowStr]);
-        $shiftId = $db->lastInsertId();
+        if ($activeShift) {
+            $shiftId = $activeShift['id'];
+            $upd = $db->prepare("UPDATE plan_shifts SET date_interval = ?, dispatcher_name = ? WHERE id = ?");
+            $upd->execute([$dateInterval, $dispatcher, $shiftId]);
+        } else {
+            $ins = $db->prepare("INSERT INTO plan_shifts (date_interval, dispatcher_name, started_at, status, created_at) VALUES (?, ?, ?, 'active', ?)");
+            $ins->execute([$dateInterval, $dispatcher, $nowStr, $nowStr]);
+            $shiftId = $db->lastInsertId();
+        }
+
+        $db->exec("DELETE FROM plan_flights");
+        $insertFlight = $db->prepare("
+            INSERT INTO plan_flights (
+                id, shift_id, flight_number, flight_date, route_city, route_airports,
+                departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
+                fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow,
+                lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
+                status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
+                inbound_landing_calc, inbound_landing_time, outbound_takeoff_time,
+                plane_status, unread_changes, sort_order, updated_at
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?, ?
+            )
+        ");
+
+        foreach ($flights as $index => $f) {
+            $unreadChangesJson = !empty($f['unread_changes']) ? json_encode($f['unread_changes'], JSON_UNESCAPED_UNICODE) : null;
+            $flightId = !empty($f['id']) ? (string)$f['id'] : ('fl_' . time() . '_' . $index . '_' . mt_rand(100, 999));
+            $insertFlight->execute([
+                $flightId,
+                $shiftId,
+                (string)($f['flight'] ?? ''),
+                (string)($f['flight_date'] ?? ''),
+                (string)($f['route_city'] ?? ''),
+                (string)($f['route_airports'] ?? ''),
+                (string)($f['time'] ?? ''),
+                (string)($f['release_time'] ?? ''),
+                (string)($f['ac_num'] ?? ''),
+                normalizePlaneType($f['ac_type'] ?? ''),
+                (string)($f['ac_config'] ?? ''),
+                (string)($f['pax'] ?? ''),
+                (string)($f['crew'] ?? ''),
+                (string)($f['fuel_block'] ?? ''),
+                (string)($f['fuel_trip'] ?? ''),
+                (string)($f['fuel_taxi'] ?? ''),
+                (string)($f['dow'] ?? ''),
+                (string)($f['doi'] ?? ''),
+                (string)($f['galley'] ?? 'D'),
+                (string)($f['mtow'] ?? ''),
+                !empty($f['lir_sent']) ? 1 : 0,
+                (string)($f['cargo'] ?? ''),
+                (string)($f['mail'] ?? ''),
+                (string)($f['baggage'] ?? ''),
+                !empty($f['szv_sent']) ? 1 : 0,
+                !empty($f['ldm_sent']) ? 1 : 0,
+                !empty($f['astra_times_sent']) ? 1 : 0,
+                (string)($f['status'] ?? 'pending'),
+                (string)($f['notes'] ?? ''),
+                (string)($f['inbound_flight'] ?? ''),
+                (string)($f['inbound_dep'] ?? ''),
+                (string)($f['inbound_takeoff_time'] ?? ''),
+                (string)($f['inbound_landing_calc'] ?? ''),
+                (string)($f['inbound_landing_time'] ?? ''),
+                (string)($f['outbound_takeoff_time'] ?? ''),
+                (string)($f['plane_status'] ?? ''),
+                $unreadChangesJson,
+                $index,
+                $nowStr
+            ]);
+        }
+
+        $db->commit();
+        echo json_encode(['success' => true, 'saved_count' => count($flights)]);
+        exit;
+    } catch (Exception $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        http_response_code(500);
+        echo json_encode(['detail' => 'Ошибка сохранения смены в MySQL: ' . $e->getMessage()]);
+        exit;
     }
-
-    $db->exec("DELETE FROM plan_flights");
-    $insertFlight = $db->prepare("
-        INSERT INTO plan_flights (
-            id, shift_id, flight_number, flight_date, route_city, route_airports,
-            departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
-            fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow,
-            lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
-            status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
-            inbound_landing_calc, inbound_landing_time, outbound_takeoff_time,
-            plane_status, unread_changes, sort_order, updated_at
-        ) VALUES (
-            ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?,
-            ?, ?, ?, ?
-        )
-    ");
-
-    foreach ($flights as $index => $f) {
-        $unreadChangesJson = !empty($f['unread_changes']) ? json_encode($f['unread_changes'], JSON_UNESCAPED_UNICODE) : null;
-        $insertFlight->execute([
-            (string)$f['id'],
-            $shiftId,
-            (string)($f['flight'] ?? ''),
-            (string)($f['flight_date'] ?? ''),
-            (string)($f['route_city'] ?? ''),
-            (string)($f['route_airports'] ?? ''),
-            (string)($f['time'] ?? ''),
-            (string)($f['release_time'] ?? ''),
-            (string)($f['ac_num'] ?? ''),
-            normalizePlaneType($f['ac_type'] ?? ''),
-            (string)($f['ac_config'] ?? ''),
-            (string)($f['pax'] ?? ''),
-            (string)($f['crew'] ?? ''),
-            (string)($f['fuel_block'] ?? ''),
-            (string)($f['fuel_trip'] ?? ''),
-            (string)($f['fuel_taxi'] ?? ''),
-            (string)($f['dow'] ?? ''),
-            (string)($f['doi'] ?? ''),
-            (string)($f['galley'] ?? 'D'),
-            (string)($f['mtow'] ?? ''),
-            !empty($f['lir_sent']) ? 1 : 0,
-            (string)($f['cargo'] ?? ''),
-            (string)($f['mail'] ?? ''),
-            (string)($f['baggage'] ?? ''),
-            !empty($f['szv_sent']) ? 1 : 0,
-            !empty($f['ldm_sent']) ? 1 : 0,
-            !empty($f['astra_times_sent']) ? 1 : 0,
-            (string)($f['status'] ?? 'pending'),
-            (string)($f['notes'] ?? ''),
-            (string)($f['inbound_flight'] ?? ''),
-            (string)($f['inbound_dep'] ?? ''),
-            (string)($f['inbound_takeoff_time'] ?? ''),
-            (string)($f['inbound_landing_calc'] ?? ''),
-            (string)($f['inbound_landing_time'] ?? ''),
-            (string)($f['outbound_takeoff_time'] ?? ''),
-            (string)($f['plane_status'] ?? ''),
-            $unreadChangesJson,
-            $index,
-            $nowStr
-        ]);
-    }
-
-    $db->commit();
-    echo json_encode(['success' => true, 'saved_count' => count($flights)]);
-    exit;
 }
+
 
 // ----------------------------------------------------
 // ЭНДПОИНТ: /shift/smart_merge
