@@ -326,7 +326,7 @@ export default function FlightRow({
       </td>
 
       {/* 2. № Рейса */}
-      <td className={`sticky left-7 z-20 py-1 px-0.5 font-mono font-extrabold text-sm text-sky-700 dark:text-sky-400 whitespace-nowrap w-18 min-w-[72px] max-w-[78px] text-center bg-inherit shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${
+      <td className={`sticky left-7 z-20 py-1 px-0.5 font-mono font-extrabold text-sm text-sky-700 dark:text-sky-400 whitespace-nowrap w-[74px] min-w-[72px] max-w-[78px] text-center bg-inherit shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${
         isOverdue ? 'border-t-2 border-b-2 border-rose-500' : ''
       }`}>
         <div className="flex flex-col items-center justify-center gap-0.5">
@@ -389,7 +389,7 @@ export default function FlightRow({
 
       {/* 4. ВРЕМЯ */}
       <td className={`py-0.5 px-0.5 whitespace-nowrap text-center min-w-[78px] max-w-[85px] ${overdueBorderTopBottom}`}>
-        <div className={`flex flex-col items-center gap-0.5 rounded-md p-0.5 min-w-[76px] transition-colors ${
+        <div className={`flex flex-col items-center gap-0.5 rounded-md p-0.5 w-full transition-colors ${
           isOverdue
             ? 'bg-rose-100/95 dark:bg-rose-950/80 border-2 border-rose-500 shadow-sm'
             : isChanged('time') || isChanged('flight_date')
@@ -460,7 +460,7 @@ export default function FlightRow({
               }}
               placeholder="25.08"
               maxLength={5}
-              className={`bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-0.5 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-13 cursor-text tracking-wide ${getChangedStyle('flight_date')}`}
+              className={`bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-0.5 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-12 cursor-text tracking-wide ${getChangedStyle('flight_date')}`}
               title="Дата рейса (число.месяц)"
             />
             <ChangeBadge change={unread.flight_date} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'flight_date')} />

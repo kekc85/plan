@@ -54,7 +54,7 @@ export default function ShiftTable({
           <thead className="sticky top-0 z-30 shadow-sm">
             <tr className="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-b border-slate-300 dark:border-slate-700 select-none text-xs">
               <th className="sticky top-0 left-0 z-40 bg-slate-100 dark:bg-slate-900 py-2.5 px-0.5 text-center font-extrabold tracking-wider uppercase w-7 min-w-[28px] max-w-[28px] no-print shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155]">#</th>
-              <th className="sticky top-0 left-7 z-40 bg-slate-100 dark:bg-slate-900 py-2.5 px-0.5 font-extrabold tracking-wider uppercase w-18 min-w-[72px] max-w-[78px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] text-center">№ Рейса</th>
+              <th className="sticky top-0 left-7 z-40 bg-slate-100 dark:bg-slate-900 py-2.5 px-0.5 font-extrabold tracking-wider uppercase w-[74px] min-w-[72px] max-w-[78px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] text-center">№ Рейса</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2.5 px-1 font-extrabold tracking-wider uppercase min-w-[95px] max-w-[115px] shadow-sm text-center">Маршрут</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2.5 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[78px] max-w-[85px] text-amber-700 dark:text-amber-300 shadow-sm">
                 Время<br/>
