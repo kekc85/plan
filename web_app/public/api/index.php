@@ -383,6 +383,28 @@ function getAuthUser() {
     return $user;
 }
 
+function getOptionalAuthUser() {
+    $headers = getallheaders();
+    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? ($_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
+    if (!preg_match('/Bearer\s(\S+)/i', $authHeader, $matches)) {
+        return null;
+    }
+    $payload = verifyJwtToken($matches[1]);
+    if (!$payload) {
+        return null;
+    }
+    try {
+        $db = getDb();
+        $stmt = $db->prepare("SELECT id, username, full_name, role, is_active FROM plan_users WHERE id = ?");
+        $stmt->execute([$payload['user_id']]);
+        $user = $stmt->fetch();
+        if ($user && $user['is_active']) {
+            return $user;
+        }
+    } catch (Exception $e) {}
+    return null;
+}
+
 function getJsonInput() {
     $raw = file_get_contents('php://input');
     return json_decode($raw, true) ?: [];
@@ -606,13 +628,13 @@ if ($route === '/shift/current') {
 // ЭНДПОИНТ: /shift/save
 // ----------------------------------------------------
 if ($route === '/shift/save') {
-    getAuthUser();
+    $authUser = getOptionalAuthUser();
     $input = getJsonInput();
     $shiftInfo = $input['shiftInfo'] ?? [];
     $flights = $input['flights'] ?? [];
 
     $dateInterval = $shiftInfo['date_interval'] ?? $shiftInfo['date'] ?? date('d.m.Y');
-    $dispatcher = $shiftInfo['dispatcher'] ?? 'Диспетчер по центровке';
+    $dispatcher = $shiftInfo['dispatcher'] ?? ($authUser['full_name'] ?? 'Диспетчер по центровке');
     $nowStr = date('Y-m-d H:i:s');
 
     $db = getDb();
@@ -695,7 +717,7 @@ if ($route === '/shift/save') {
 // ЭНДПОИНТ: /shift/smart_merge
 // ----------------------------------------------------
 if ($route === '/shift/smart_merge') {
-    getAuthUser();
+    $authUser = getOptionalAuthUser();
     $input = getJsonInput();
     $current = $input['current_flights'] ?? [];
     $incoming = $input['incoming_flights'] ?? [];

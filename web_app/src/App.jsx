@@ -43,7 +43,30 @@ import {
 import { arrayMove } from '@dnd-kit/sortable';
 import { Bell, CheckCircle2, X, Volume2, MessageSquare } from 'lucide-react';
 
-const STORAGE_KEY = 'aviabit_shift_journal_v4';
+const STORAGE_KEY = 'aeroplan_shift_journal_active';
+
+// Безопасное чтение из LocalStorage с автоматической миграцией с предыдущих версий ключей
+function getStoredWithMigration(subKey, fallback = null) {
+  const currentKey = `${STORAGE_KEY}_${subKey}`;
+  const val = localStorage.getItem(currentKey);
+  if (val !== null) return val;
+  const legacyKeys = [
+    `aviabit_shift_journal_v4_${subKey}`,
+    `aviabit_shift_journal_v3_${subKey}`,
+    `aviabit_shift_journal_v2_${subKey}`,
+    `aviabit_shift_journal_${subKey}`
+  ];
+  for (const lk of legacyKeys) {
+    const legacyVal = localStorage.getItem(lk);
+    if (legacyVal !== null) {
+      try {
+        localStorage.setItem(currentKey, legacyVal);
+      } catch (e) {}
+      return legacyVal;
+    }
+  }
+  return fallback;
+}
 
 function normalizeFlight(f) {
   if (!f) return f;
@@ -86,7 +109,7 @@ function normalizeFlight(f) {
 
 export default function App() {
   const [isDark, setIsDark] = useState(() => {
-    const savedTheme = localStorage.getItem(`${STORAGE_KEY}_theme`);
+    const savedTheme = getStoredWithMigration('theme');
     if (savedTheme !== null) {
       return savedTheme === 'dark';
     }
@@ -101,7 +124,7 @@ export default function App() {
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isHandoverNotesDismissed, setIsHandoverNotesDismissed] = useState(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_dismissed_handover_note`);
+    const saved = getStoredWithMigration('dismissed_handover_note');
     return !!saved;
   });
 
@@ -121,11 +144,11 @@ export default function App() {
 
   // Состояние умной авто-подкачки AviaBit (Smart Delta Polling)
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_auto_sync_enabled`);
+    const saved = getStoredWithMigration('auto_sync_enabled');
     return saved !== null ? saved === 'true' : true;
   });
   const [autoSyncInterval, setAutoSyncInterval] = useState(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_auto_sync_interval`);
+    const saved = getStoredWithMigration('auto_sync_interval');
     return saved ? Number(saved) : 10;
   });
   const [isSyncing, setIsSyncing] = useState(false);
@@ -150,7 +173,7 @@ export default function App() {
 
   // Shift metadata (интервал 24-часовой смены 09:00 - 09:00)
   const [shiftInfo, setShiftInfo] = useState(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_info`);
+    const saved = getStoredWithMigration('info');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) {}
     }
@@ -174,7 +197,7 @@ export default function App() {
 
   // Flights list
   const [flights, setFlights] = useState(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_flights`);
+    const saved = getStoredWithMigration('flights');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -187,13 +210,24 @@ export default function App() {
   // Подсчет общего количества неподтвержденных изменений
   const unreadChangesCount = React.useMemo(() => countUnreadChanges(flights), [flights]);
 
-  // Автозагрузка с сервера SQLite при старте
+  // Автозагрузка с сервера SQLite/MySQL при старте
   useEffect(() => {
     fetchCurrentShift()
       .then((data) => {
         if (data) {
           if (data.flights && data.flights.length > 0) {
             setFlights(data.flights.map(normalizeFlight));
+          } else {
+            // Если на сервере пусто, но локально у диспетчера уже есть расписание - сохраняем в БД
+            const localSaved = getStoredWithMigration('flights');
+            if (localSaved) {
+              try {
+                const parsed = JSON.parse(localSaved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  saveShift(shiftInfo, parsed).catch(() => {});
+                }
+              } catch (e) {}
+            }
           }
           if (data.shiftInfo) {
             setShiftInfo(prev => ({
@@ -204,7 +238,7 @@ export default function App() {
             // Проверяем, было ли уже подтверждено ознакомление с этим замечанием
             if (data.shiftInfo.handover) {
               const noteKey = `${data.shiftInfo.handover.handover_time || ''}_${data.shiftInfo.handover.notes || ''}`;
-              const dismissedKey = localStorage.getItem(`${STORAGE_KEY}_dismissed_handover_note`);
+              const dismissedKey = getStoredWithMigration('dismissed_handover_note');
               if (dismissedKey === noteKey || data.shiftInfo.handover.is_read || !data.shiftInfo.handover.notes?.trim()) {
                 setIsHandoverNotesDismissed(true);
               } else {

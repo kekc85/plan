@@ -35,6 +35,7 @@ from db import (
 from auth import (
     create_jwt_token,
     get_current_user,
+    get_optional_user,
     require_admin
 )
 
@@ -565,15 +566,15 @@ def get_current_shift():
 
 
 @app.post("/api/shift/save")
-def save_shift_state(req: SaveShiftRequest, current_user: dict = Depends(get_current_user)):
-    """Атомарно сохраняет состояние смены и рейсов в MySQL / SQLite базе данных (требуется авторизация)"""
+def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depends(get_optional_user)):
+    """Атомарно сохраняет состояние смены и рейсов в MySQL / SQLite базе данных"""
     conn, engine = DatabaseConnection.get_connection()
     cursor = conn.cursor()
     now_str = datetime.now(MSK_TZ).isoformat()
 
     shift_info = req.shiftInfo or {}
     date_interval = shift_info.get("date_interval") or shift_info.get("date") or datetime.now(MSK_TZ).strftime("%d.%m.%Y")
-    dispatcher = shift_info.get("dispatcher") or "Диспетчер по центровке"
+    dispatcher = shift_info.get("dispatcher") or (current_user.get("full_name") if current_user else "Диспетчер по центровке")
 
     # Проверяем или создаем активную смену
     cursor.execute("SELECT id FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1;")
@@ -633,12 +634,12 @@ def save_shift_state(req: SaveShiftRequest, current_user: dict = Depends(get_cur
                 str(f.get("fuel_taxi") or ""),
                 str(f.get("dow") or ""),
                 str(f.get("doi") or ""),
-                f.get("galley") or "D",
+                str(f.get("galley") or "D"),
                 str(f.get("mtow") or ""),
                 1 if f.get("lir_sent") else 0,
-                f.get("cargo") or "",
-                f.get("mail") or "",
-                f.get("baggage") or "",
+                str(f.get("cargo") or ""),
+                str(f.get("mail") or ""),
+                str(f.get("baggage") or ""),
                 1 if f.get("szv_sent") else 0,
                 1 if f.get("ldm_sent") else 0,
                 1 if f.get("astra_times_sent") else 0,
@@ -659,7 +660,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: dict = Depends(get_cur
 # --- 4. УМНОЕ СЛИЯНИЕ РАСПИСАНИЙ (SMART MERGE) ---
 
 @app.post("/api/shift/smart_merge")
-def smart_merge_schedules(req: SmartMergeRequest, current_user: dict = Depends(get_current_user)):
+def smart_merge_schedules(req: SmartMergeRequest, current_user: Optional[dict] = Depends(get_optional_user)):
     """
     Умное слияние нового расписания (из AviaBit или Excel) с текущим планом (требуется авторизация):
     - Для рейсов, которые УЖЕ БЫЛИ в плане: сохраняются все введенные веса, топливо,

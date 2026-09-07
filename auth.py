@@ -101,6 +101,33 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, A
     return user_dict
 
 
+def get_optional_user(authorization: Optional[str] = Header(None)) -> Optional[Dict[str, Any]]:
+    """Извлекает аутентифицированного пользователя, если токен предоставлен, либо возвращает None без ошибки 401"""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization[len("Bearer "):].strip()
+    payload = verify_jwt_token(token)
+    if not payload:
+        return None
+    user_id = payload.get("user_id")
+    try:
+        conn, engine = DatabaseConnection.get_connection()
+        cursor = conn.cursor()
+        if engine == "mysql":
+            cursor.execute("SELECT id, username, full_name, role, is_active FROM plan_users WHERE id = %s;", (user_id,))
+        else:
+            cursor.execute("SELECT id, username, full_name, role, is_active FROM plan_users WHERE id = ?;", (user_id,))
+        user = cursor.fetchone()
+        conn.close()
+        if user:
+            user_dict = dict(user)
+            if user_dict.get("is_active"):
+                return user_dict
+    except Exception:
+        pass
+    return None
+
+
 def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Зависимость FastAPI для проверки прав администратора"""
     if current_user.get("role") != "admin":
