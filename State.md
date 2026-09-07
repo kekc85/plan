@@ -1,4 +1,14 @@
 - 2026-09-07:
+  - Подсветка статуса для крайних колонок и плановое время вылета:
+    1. `FlightRow.jsx`: к закрепленным левым колонкам (# и № Рейса) подключен `activeStickyBg` и `leftStatusBorderColor` — крайние столбцы теперь окрашиваются в цвет соответствующего статуса рейса (pending, prepared, lir_sent, released, closed, overdue) вместо белого фона.
+    2. `parser.py` & `index.php`: в парсинге времени вылета приоритет отдан исходному плановому времени по расписанию (`dateTakeoff` -> `dateTakeoffCalculation` -> `dateTakeoffReal`), устранена замена планового времени на расчетное/фактическое.
+    3. Проект протестирован и пересобран (`npm run build`).
+
+  - Звуковые оповещения (Airport PA Chime & Mute Delta):
+    1. `App.jsx`: отключен звуковой сигнал при авто-синхронизации и дельта-изменениях расписания (оставлен только визуальный тост и подсветка ячеек).
+    2. `audioAlert.js`: сигнал выпуска документов за 40 минут заменен на аутентичный 4-нотный перезвон гонга аэропорта перед объявлением рейсов (F4->A4->C5->F5 / Фа-Ля-До-Фа с колокольными обертонами, Web Audio API).
+    3. Проект протестирован и успешно собран (`npm run build`).
+
   - Внедрен индикатор движения борта (Подлёт / Посадка / Вылет) в ветке `feat/aircraft-flight-status`:
     1. Автоматический поиск входящего плеча по номеру борта в `parser.py` и `index.php`, извлечение `dateTakeoffReal`, `dateLandingReal`, `dateLandingCalculation`.
     2. База данных: добавлены колонки `inbound_flight`, `inbound_dep`, `inbound_takeoff_time`, `inbound_landing_calc`, `inbound_landing_time`, `outbound_takeoff_time`, `plane_status` (MySQL/SQLite автомиграция).

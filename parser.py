@@ -803,9 +803,9 @@ def process_flights(
         # Номер рейса без дефисов (например N4-1442 -> N41442, EO-487 -> EO487)
         flight_clean = flight_no.replace("-", "").replace(" ", "")
 
-        # Парсим актуальное время вылета (ATD/ETD с учетом задержек)
-        # Приоритет: 1. Фактическое (dateTakeoffReal) -> 2. Расчетное с задержкой (dateTakeoffCalculation) -> 3. Плановое (dateTakeoff)
-        takeoff_raw = fl.get("dateTakeoffReal") or fl.get("dateTakeoffCalculation") or fl.get("dateTakeoff")
+        # Исходное плановое время вылета по расписанию
+        # Приоритет: 1. Плановое (dateTakeoff) -> 2. Расчетное (dateTakeoffCalculation) -> 3. Фактическое (dateTakeoffReal)
+        takeoff_raw = fl.get("dateTakeoff") or fl.get("dateTakeoffCalculation") or fl.get("dateTakeoffReal")
         time_str = ""
         sort_timestamp = 0
         dt_msk = None

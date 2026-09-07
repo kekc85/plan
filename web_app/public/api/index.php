@@ -1181,7 +1181,8 @@ if ($route === '/fetch_schedule') {
         if (!empty($fl['isSpecialFlight'])) continue;
 
         $flClean = str_replace(['-', ' '], '', $flightNo);
-        $takeoffRaw = $fl['dateTakeoffReal'] ?? $fl['dateTakeoffCalculation'] ?? $fl['dateTakeoff'] ?? '';
+        // Исходное плановое время вылета по расписанию
+        $takeoffRaw = $fl['dateTakeoff'] ?? $fl['dateTakeoffCalculation'] ?? $fl['dateTakeoffReal'] ?? '';
 
         $timeStr = '';
         $flightDate = date('d.m', $shiftStartTs);

@@ -286,9 +286,21 @@ export default function FlightRow({
     closed: 'bg-slate-300 dark:bg-black/95 hover:bg-slate-350 dark:hover:bg-black text-slate-950 dark:text-zinc-400 border-l-4 border-l-slate-800 dark:border-l-zinc-600 opacity-80 dark:opacity-60 font-semibold',
   };
 
+  const stickyStatusTheme = {
+    pending: 'bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-850',
+    prepared: 'bg-sky-50 dark:bg-sky-950 group-hover:bg-sky-100 dark:group-hover:bg-sky-900',
+    lir_sent: 'bg-indigo-50 dark:bg-indigo-950 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900',
+    released: 'bg-emerald-50 dark:bg-emerald-950 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900',
+    closed: 'bg-slate-300 dark:bg-black group-hover:bg-slate-350 dark:group-hover:bg-black',
+  };
+
   const activeRowTheme = isOverdue
     ? 'bg-rose-50/95 dark:bg-rose-950/40 hover:bg-rose-100/90 dark:hover:bg-rose-950/60 text-slate-950 dark:text-rose-100 shadow-sm'
     : (rowStatusTheme[currentStatus] || rowStatusTheme.pending);
+
+  const activeStickyBg = isOverdue
+    ? 'bg-rose-50 dark:bg-rose-950 group-hover:bg-rose-100 dark:group-hover:bg-rose-900'
+    : (stickyStatusTheme[currentStatus] || stickyStatusTheme.pending);
 
   const overdueBorderTopBottom = isOverdue
     ? 'border-t-2 border-b-2 border-rose-500'
@@ -302,6 +314,18 @@ export default function FlightRow({
     closed: 'bg-slate-400 dark:bg-slate-800 text-slate-950 dark:text-zinc-300 border-slate-500 dark:border-slate-700 font-extrabold',
   };
 
+  const leftStatusBorderColor = isOverdue
+    ? 'border-l-rose-500'
+    : currentStatus === 'prepared'
+    ? 'border-l-sky-500'
+    : currentStatus === 'lir_sent'
+    ? 'border-l-indigo-500'
+    : currentStatus === 'released'
+    ? 'border-l-emerald-500'
+    : currentStatus === 'closed'
+    ? 'border-l-slate-800 dark:border-l-zinc-600'
+    : 'border-l-slate-400 dark:border-l-slate-500';
+
   return (
     <tr
       ref={setNodeRef}
@@ -314,8 +338,8 @@ export default function FlightRow({
     >
       {/* 1. Drag Handle & Index */}
       <td
-        className={`sticky left-0 z-20 py-1 px-0.5 text-center whitespace-nowrap no-print w-7 min-w-[28px] max-w-[28px] bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 transition-colors shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155] rounded-l-2xl ${
-          isOverdue ? 'border-l-2 border-l-rose-500 border-t-2 border-b-2 border-rose-500' : 'border-l border-t border-b border-slate-200/80 dark:border-slate-800/80'
+        className={`sticky left-0 z-20 py-1 px-0.5 text-center whitespace-nowrap no-print w-7 min-w-[28px] max-w-[28px] ${activeStickyBg} transition-colors shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155] rounded-l-2xl border-l-4 ${leftStatusBorderColor} ${
+          isOverdue ? 'border-t-2 border-b-2 border-rose-500' : 'border-t border-b border-slate-200/80 dark:border-slate-800/80'
         }`}
         title="Хватайте и перетаскивайте в любое место"
       >
@@ -326,9 +350,7 @@ export default function FlightRow({
       </td>
 
       {/* 2. № Рейса */}
-      <td className={`sticky left-[28px] z-20 py-1 px-0.5 font-mono font-extrabold text-sm text-sky-700 dark:text-sky-400 whitespace-nowrap w-[74px] min-w-[72px] max-w-[76px] text-center bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${
-        isOverdue ? 'border-t-2 border-b-2 border-rose-500' : ''
-      }`}>
+      <td className={`sticky left-[28px] z-20 py-1 px-0.5 font-mono font-extrabold text-sm text-sky-700 dark:text-sky-400 whitespace-nowrap w-[74px] min-w-[72px] max-w-[76px] text-center ${activeStickyBg} transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${overdueBorderTopBottom}`}>
         <div className="flex flex-col items-center justify-center gap-0.5">
           <input
             type="text"

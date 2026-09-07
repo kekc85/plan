@@ -606,7 +606,6 @@ export default function App() {
           const { mergedFlights, totalNewChanges, newFlightsCount } = smartMergeWithDelta(prevFlights, result.flights);
 
           if (totalNewChanges > 0 || newFlightsCount > 0) {
-            playReleaseAlertSound();
             const msgParts = [];
             if (totalNewChanges > 0) msgParts.push(`изменено ${totalNewChanges} параметров`);
             if (newFlightsCount > 0) msgParts.push(`новых рейсов: ${newFlightsCount}`);
