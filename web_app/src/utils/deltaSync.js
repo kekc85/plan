@@ -194,20 +194,53 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = []) {
 }
 
 /**
- * Подтверждение ознакомления с отдельным измененным полем рейса
+ * Безопасное извлечение объекта unread_changes
+ */
+export function getSafeUnreadChanges(flight) {
+  if (!flight || !flight.unread_changes) return {};
+  let unread = flight.unread_changes;
+  if (typeof unread === 'string') {
+    try {
+      unread = JSON.parse(unread);
+    } catch {
+      return {};
+    }
+  }
+  return (unread && typeof unread === 'object') ? unread : {};
+}
+
+/**
+ * Подтверждение ознакомления с отдельным измененным полем рейса.
+ * Если все видимые изменения в строке прокликаны, полностью удаляет unread_changes и is_new_flight.
  */
 export function acknowledgeFieldChange(flight, fieldName) {
-  if (!flight || !flight.unread_changes) return flight;
+  if (!flight) return flight;
 
-  const updatedUnread = { ...flight.unread_changes };
+  const unread = getSafeUnreadChanges(flight);
+  const updatedUnread = { ...unread };
+
   delete updatedUnread[fieldName];
+  // Время выпуска release_time связано со временем вылета time
+  if (fieldName === 'time') {
+    delete updatedUnread['release_time'];
+  }
+
+  // Проверяем, остались ли еще какие-либо видимые изменения в рейсе
+  const remainingVisibleKeys = Object.keys(updatedUnread).filter(
+    k => TRACKED_AVIABIT_FIELDS.includes(k) && k !== 'release_time'
+  );
 
   const updatedFlight = { ...flight };
-  if (Object.keys(updatedUnread).length === 0) {
+
+  // Если видимых изменений больше нет (или прокликано последнее), полностью очищаем статус новизны и подсветку
+  if (remainingVisibleKeys.length === 0) {
     delete updatedFlight.unread_changes;
     delete updatedFlight.is_new_flight;
   } else {
     updatedFlight.unread_changes = updatedUnread;
+    if (fieldName === '_is_new') {
+      delete updatedFlight.is_new_flight;
+    }
   }
 
   return updatedFlight;
@@ -237,7 +270,10 @@ export function acknowledgeAllChanges(flights = []) {
 export function countUnreadChanges(flights = []) {
   if (!Array.isArray(flights)) return 0;
   return flights.reduce((sum, f) => {
-    if (!f.unread_changes) return sum;
-    return sum + Object.keys(f.unread_changes).length;
+    const unread = getSafeUnreadChanges(f);
+    const visibleCount = Object.keys(unread).filter(
+      k => (TRACKED_AVIABIT_FIELDS.includes(k) && k !== 'release_time') || k === '_is_new'
+    ).length;
+    return sum + visibleCount;
   }, 0);
 }

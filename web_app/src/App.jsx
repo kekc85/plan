@@ -37,7 +37,8 @@ import {
   acknowledgeFieldChange,
   acknowledgeFlightChanges,
   acknowledgeAllChanges,
-  countUnreadChanges
+  countUnreadChanges,
+  getSafeUnreadChanges
 } from './utils/deltaSync';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Bell, CheckCircle2, X, Volume2, MessageSquare } from 'lucide-react';
@@ -70,13 +71,16 @@ function normalizeFlight(f) {
   // Интеллектуальное определение типа ВС (332, 333, 321, 772, 739, 738, 190)
   const ac_type = f.ac_type ? normalizePlaneType(f.ac_type) : detectPlaneType(f);
 
+  const unread_changes = getSafeUnreadChanges(f);
+  const hasUnread = Object.keys(unread_changes).length > 0;
+
   return { 
     ...f, 
     status, 
     astra_times_sent, 
     ac_type,
-    unread_changes: f.unread_changes || undefined,
-    is_new_flight: !!f.is_new_flight
+    unread_changes: hasUnread ? unread_changes : undefined,
+    is_new_flight: hasUnread ? !!f.is_new_flight : false
   };
 }
 
