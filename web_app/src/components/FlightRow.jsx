@@ -745,7 +745,7 @@ export default function FlightRow({
       </td>
 
       {/* 14. Багаж */}
-      <td className={`py-1 px-0.5 min-w-[80px] max-w-[105px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 min-w-[75px] max-w-[95px] ${overdueBorderTopBottom}`}>
         <textarea
           rows={2}
           value={flight.baggage || ''}
@@ -839,13 +839,13 @@ export default function FlightRow({
       </td>
 
       {/* 18. СТАТУС РЕЙСА */}
-      <td className={`py-1 px-0.5 text-center whitespace-nowrap w-[108px] min-w-[105px] max-w-[112px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 text-center whitespace-nowrap w-[124px] min-w-[120px] max-w-[128px] ${overdueBorderTopBottom}`}>
         <select
           value={currentStatus}
           onChange={handleStatusSelectChange}
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
-          className={`text-[11px] font-black rounded px-1 py-1 border focus:outline-none cursor-pointer shadow-sm w-full leading-tight tracking-tight ${statusBadgeStyle[currentStatus] || statusBadgeStyle.pending}`}
+          className={`text-[11px] font-bold rounded px-1 py-1 pr-3 border focus:outline-none cursor-pointer shadow-sm w-full leading-tight tracking-tight ${statusBadgeStyle[currentStatus] || statusBadgeStyle.pending}`}
         >
           <option value="pending" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-300">⚪ Ожидание</option>
           <option value="prepared" className="bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300">🔵 Подготовлен</option>
@@ -856,7 +856,7 @@ export default function FlightRow({
       </td>
 
       {/* 19. Примечания */}
-      <td className={`py-1 px-0.5 min-w-[80px] max-w-[110px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 min-w-[75px] max-w-[95px] ${overdueBorderTopBottom}`}>
         <textarea
           rows={2}
           value={flight.notes || ''}
@@ -866,7 +866,7 @@ export default function FlightRow({
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="Заметка..."
           title={flight.notes || ''}
-          className="w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1.5 py-0.5 text-xs font-medium text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none cursor-text transition-all shadow-sm"
+          className="w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1 py-0.5 text-xs font-medium text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none cursor-text transition-all shadow-sm"
         />
       </td>
 
