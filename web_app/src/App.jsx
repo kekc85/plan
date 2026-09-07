@@ -171,6 +171,11 @@ export default function App() {
     initAudioUnlock();
   }, []);
 
+  const isInitialServerSyncCompletedRef = React.useRef(false);
+  const hasUserModifiedRef = React.useRef(false);
+  const isSavingToServerRef = React.useRef(false);
+  const lastServerDataHashRef = React.useRef('');
+
   // Shift metadata (интервал 24-часовой смены 09:00 - 09:00)
   const [shiftInfo, setShiftInfo] = useState(() => {
     const saved = getStoredWithMigration('info');
@@ -201,39 +206,35 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(normalizeFlight);
+        if (Array.isArray(parsed)) return parsed.map(normalizeFlight);
       } catch (e) {}
     }
-    return INITIAL_FLIGHTS.map(normalizeFlight);
+    return [];
   });
 
   // Подсчет общего количества неподтвержденных изменений
   const unreadChangesCount = React.useMemo(() => countUnreadChanges(flights), [flights]);
 
-  // Автозагрузка с сервера SQLite/MySQL при старте
+  // Автозагрузка с сервера SQLite/MySQL при старте (Сервер — главный источник правды)
   useEffect(() => {
     fetchCurrentShift()
       .then((data) => {
         if (data) {
-          if (data.flights && data.flights.length > 0) {
-            setFlights(data.flights.map(normalizeFlight));
-          } else {
-            // Если на сервере пусто, но локально у диспетчера уже есть расписание - сохраняем в БД
-            const localSaved = getStoredWithMigration('flights');
-            if (localSaved) {
-              try {
-                const parsed = JSON.parse(localSaved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                  saveShift(shiftInfo, parsed).catch(() => {});
-                }
-              } catch (e) {}
-            }
+          if (Array.isArray(data.flights)) {
+            const normalized = data.flights.map(normalizeFlight);
+            setFlights(normalized);
+            try {
+              localStorage.setItem(`${STORAGE_KEY}_flights`, JSON.stringify(normalized));
+            } catch (e) {}
           }
           if (data.shiftInfo) {
-            setShiftInfo(prev => ({
-              ...prev,
-              ...data.shiftInfo
-            }));
+            setShiftInfo(prev => {
+              const updated = { ...prev, ...data.shiftInfo };
+              try {
+                localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(updated));
+              } catch (e) {}
+              return updated;
+            });
 
             // Проверяем, было ли уже подтверждено ознакомление с этим замечанием
             if (data.shiftInfo.handover) {
@@ -246,10 +247,16 @@ export default function App() {
               }
             }
           }
+          lastServerDataHashRef.current = JSON.stringify({
+            s: data.shiftInfo || null,
+            f: (data.flights || []).map(f => ({ id: f.id, status: f.status, time: f.time, fuel: f.fuel_block, notes: f.notes, ac: f.ac_num, pax: f.pax, unread: f.unread_changes }))
+          });
         }
+        isInitialServerSyncCompletedRef.current = true;
       })
       .catch((err) => {
         console.warn('Initial server sync note:', err.message);
+        isInitialServerSyncCompletedRef.current = true;
       });
 
     // Загрузка актуального списка аэропортов вылета
@@ -308,12 +315,72 @@ export default function App() {
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
     setLastSaved(timeStr);
 
-    const timer = setTimeout(() => {
-      saveShift(shiftInfo, flights).catch(() => {});
+    // Защита от перезаписи: не сохраняем на сервер до первичной загрузки с сервера и пока не было явных правок
+    if (!isInitialServerSyncCompletedRef.current || !hasUserModifiedRef.current) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        isSavingToServerRef.current = true;
+        await saveShift(shiftInfo, flights);
+        hasUserModifiedRef.current = false;
+        lastServerDataHashRef.current = JSON.stringify({
+          s: shiftInfo || null,
+          f: flights.map(f => ({ id: f.id, status: f.status, time: f.time, fuel: f.fuel_block, notes: f.notes, ac: f.ac_num, pax: f.pax, unread: f.unread_changes }))
+        });
+      } catch (e) {
+        console.warn('Auto-save error:', e);
+      } finally {
+        isSavingToServerRef.current = false;
+      }
     }, 1200);
 
     return () => clearTimeout(timer);
   }, [flights, shiftInfo]);
+
+  // Фоновая синхронизация с сервером между вкладками / устройствами (Live Polling каждые 15 сек)
+  useEffect(() => {
+    const checkServerForRemoteUpdates = async () => {
+      if (!isInitialServerSyncCompletedRef.current || isSavingToServerRef.current || hasUserModifiedRef.current || isSyncing) {
+        return;
+      }
+
+      try {
+        const data = await fetchCurrentShift();
+        if (data && Array.isArray(data.flights)) {
+          const remoteHash = JSON.stringify({
+            s: data.shiftInfo || null,
+            f: data.flights.map(f => ({ id: f.id, status: f.status, time: f.time, fuel: f.fuel_block, notes: f.notes, ac: f.ac_num, pax: f.pax, unread: f.unread_changes }))
+          });
+
+          if (lastServerDataHashRef.current && remoteHash !== lastServerDataHashRef.current) {
+            lastServerDataHashRef.current = remoteHash;
+            setFlights(data.flights.map(normalizeFlight));
+            if (data.shiftInfo) {
+              setShiftInfo(prev => ({ ...prev, ...data.shiftInfo }));
+            }
+          }
+        }
+      } catch (err) {
+        // Фоновый тихий опрос
+      }
+    };
+
+    const interval = setInterval(checkServerForRemoteUpdates, 15000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkServerForRemoteUpdates();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isSyncing]);
+
 
   const initialSuppressionDoneRef = React.useRef(false);
 
@@ -376,6 +443,7 @@ export default function App() {
 
   // Быстрый выпуск рейса из всплывающего окна
   const handleQuickRelease = (flightId) => {
+    hasUserModifiedRef.current = true;
     setFlights(prev =>
       prev.map(f => {
         if (f.id === flightId) {
@@ -400,6 +468,7 @@ export default function App() {
 
   // Drag and Drop: перестановка строк
   const handleReorderFlights = (activeId, overId) => {
+    hasUserModifiedRef.current = true;
     setFlights((items) => {
       const oldIndex = items.findIndex((item) => item.id === activeId);
       const newIndex = items.findIndex((item) => item.id === overId);
@@ -413,17 +482,20 @@ export default function App() {
   // Перемещение вверх стрелочкой
   const handleMoveUp = (index) => {
     if (index <= 0) return;
+    hasUserModifiedRef.current = true;
     setFlights((items) => arrayMove(items, index, index - 1));
   };
 
   // Перемещение вниз стрелочкой
   const handleMoveDown = (index) => {
     if (index >= flights.length - 1) return;
+    hasUserModifiedRef.current = true;
     setFlights((items) => arrayMove(items, index, index + 1));
   };
 
   // Обновление отдельного поля рейса (с поддержкой авто-сортировки при смене времени/даты)
   const handleUpdateFlight = (id, updatedFields = {}, shouldSort = false) => {
+    hasUserModifiedRef.current = true;
     setFlights(prev => {
       const updatedList = prev.map(f => {
         if (f.id === id) {
@@ -441,11 +513,13 @@ export default function App() {
 
   // Удаление рейса
   const handleDeleteFlight = (id) => {
+    hasUserModifiedRef.current = true;
     setFlights(prev => prev.filter(f => f.id !== id));
   };
 
   // Добавление нового рейса
   const handleAddFlight = (newFlightData) => {
+    hasUserModifiedRef.current = true;
     const newFlight = normalizeFlight({
       id: `flight_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       ...newFlightData
@@ -455,16 +529,19 @@ export default function App() {
 
   // Подтверждение ознакомления с отдельным измененным параметром
   const handleAcknowledgeField = (flightId, fieldName) => {
+    hasUserModifiedRef.current = true;
     setFlights(prev => prev.map(f => f.id === flightId ? acknowledgeFieldChange(f, fieldName) : f));
   };
 
   // Подтверждение ознакомления со всеми изменениями конкретного рейса
   const handleAcknowledgeFlight = (flightId) => {
+    hasUserModifiedRef.current = true;
     setFlights(prev => prev.map(f => f.id === flightId ? acknowledgeFlightChanges(f) : f));
   };
 
   // Подтверждение ознакомления со всеми изменениями суточного плана
   const handleAcknowledgeAll = () => {
+    hasUserModifiedRef.current = true;
     setFlights(prev => acknowledgeAllChanges(prev));
   };
 
@@ -485,7 +562,7 @@ export default function App() {
 
   // Фоновая умная сверка с AviaBit (Smart Delta Polling)
   const triggerAutoSync = React.useCallback(async (isManual = false) => {
-    if (isSyncing) return;
+    if (isSyncing || !isInitialServerSyncCompletedRef.current) return;
     setIsSyncing(true);
 
     try {
@@ -524,6 +601,7 @@ export default function App() {
 
       const result = await fetchAviaBitSchedule(payload);
       if (result && result.success && Array.isArray(result.flights) && result.flights.length > 0) {
+        hasUserModifiedRef.current = true;
         setFlights(prevFlights => {
           const { mergedFlights, totalNewChanges, newFlightsCount } = smartMergeWithDelta(prevFlights, result.flights);
 
@@ -566,6 +644,7 @@ export default function App() {
 
   // Загрузка расписания из AviaBit
   const handleAviaBitScheduleLoaded = (loadedFlights, newShiftInfo) => {
+    hasUserModifiedRef.current = true;
     setFlights(prev => {
       if (prev && prev.length > 0) {
         const { mergedFlights, totalNewChanges } = smartMergeWithDelta(prev, loadedFlights);
@@ -590,6 +669,7 @@ export default function App() {
     try {
       const parsedData = await parseExcelToFlights(file);
       if (parsedData.flights && parsedData.flights.length > 0) {
+        hasUserModifiedRef.current = true;
         // Умное слияние с текущими данными
         let finalFlights = parsedData.flights;
         if (flights && flights.length > 0) {
@@ -626,13 +706,16 @@ export default function App() {
   // Сброс журнала смены
   const handleResetShift = () => {
     if (window.confirm('Сбросить весь суточный план к началу? Все несохраненные данные будут удалены.')) {
+      hasUserModifiedRef.current = true;
       setFlights([]);
       localStorage.removeItem(`${STORAGE_KEY}_flights`);
     }
   };
 
+
   // Подтверждение ознакомления с замечаниями сменщика
   const handleDismissHandoverNotes = () => {
+    hasUserModifiedRef.current = true;
     setIsHandoverNotesDismissed(true);
     const noteKey = `${shiftInfo?.handover?.handover_time || ''}_${shiftInfo?.handover?.notes || ''}`;
     localStorage.setItem(`${STORAGE_KEY}_dismissed_handover_note`, noteKey);
@@ -653,6 +736,7 @@ export default function App() {
 
   // Передача смены
   const handleHandoverSuccess = (newDispatcherName, archiveClosed, handoverData) => {
+    hasUserModifiedRef.current = true;
     setShiftInfo(prev => ({
       ...prev,
       dispatcher: newDispatcherName,
@@ -664,6 +748,7 @@ export default function App() {
       setFlights(prev => prev.filter(f => f.status !== 'closed'));
     }
   };
+
 
   // Вход пользователя
   const handleLoginSuccess = (user) => {

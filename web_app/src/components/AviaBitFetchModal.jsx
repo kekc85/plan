@@ -31,8 +31,6 @@ export default function AviaBitFetchModal({
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  if (!isOpen) return null;
-
   // Быстрые пресеты дат
   const setPresetYesterday = () => {
     const d1 = new Date();
@@ -70,6 +68,15 @@ export default function AviaBitFetchModal({
     setActivePreset('tomorrow');
     setErrorMsg('');
   };
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setPresetToday();
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
 
   const normalizeFullDate = (str) => {
     if (!str) return '';
