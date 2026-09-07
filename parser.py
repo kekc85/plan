@@ -715,6 +715,16 @@ def process_flights(
     if end_dt_msk and end_dt_msk.tzinfo is None:
         end_dt_msk = end_dt_msk.replace(tzinfo=MSK_TZ)
 
+    # Индексация всех рейсов по бортовым номерам для поиска входящих плеч
+    flights_by_tail = {}
+    for fl in candidate_flights:
+        raw_t = (fl.get("pln") or "").strip()
+        c_tail = raw_t.replace("RA-", "").replace("RA", "").replace("-", "").strip()
+        if c_tail:
+            if c_tail not in flights_by_tail:
+                flights_by_tail[c_tail] = []
+            flights_by_tail[c_tail].append(fl)
+
     # Дедупликация и фильтрация рейсов (исключаем резервы ~РЕЗ с красной буквой R)
     seen_keys = set()
     unique_candidates = []
@@ -895,6 +905,69 @@ def process_flights(
         else:
             route_str = f"{dep}-{arr}"
 
+        # Вычисление параметров движения борта (В пути -> Сел -> Вылетел)
+        def _parse_msk_hm(raw_iso):
+            if not raw_iso:
+                return ""
+            try:
+                d_utc = datetime.fromisoformat(str(raw_iso).replace("Z", "+00:00"))
+                d_msk = d_utc.astimezone(MSK_TZ)
+                return f"{d_msk.hour}:{d_msk.strftime('%M')}"
+            except Exception:
+                return ""
+
+        outbound_takeoff_time = _parse_msk_hm(fl.get("dateTakeoffReal"))
+
+        inbound_flight = ""
+        inbound_dep = ""
+        inbound_takeoff_time = ""
+        inbound_landing_calc = ""
+        inbound_landing_time = ""
+        plane_status = ""
+
+        tail_flights = flights_by_tail.get(tail_clean, [])
+        best_inbound = None
+        best_inbound_diff = 999999999
+
+        for c_in in tail_flights:
+            c_in_arr = (c_in.get("airPortLACode") or "").strip().upper()
+            if c_in_arr != dep:
+                continue
+            if c_in.get("pfRecordId") and fl.get("pfRecordId") and c_in.get("pfRecordId") == fl.get("pfRecordId"):
+                continue
+
+            in_arr_raw = c_in.get("dateLandingReal") or c_in.get("dateLandingCalculation") or c_in.get("dateLanding")
+            if not in_arr_raw:
+                in_arr_raw = c_in.get("dateTakeoffReal") or c_in.get("dateTakeoffCalculation") or c_in.get("dateTakeoff")
+
+            if in_arr_raw:
+                try:
+                    in_dt_utc = datetime.fromisoformat(str(in_arr_raw).replace("Z", "+00:00"))
+                    in_ts = int(in_dt_utc.timestamp())
+                    # Входящий рейс должен прилетать до или примерно во время нашего вылета
+                    diff = sort_timestamp - in_ts
+                    if diff >= -3600 and diff < best_inbound_diff:
+                        best_inbound_diff = diff
+                        best_inbound = c_in
+                except Exception:
+                    pass
+
+        if best_inbound:
+            inbound_flight = (best_inbound.get("flight") or "").strip()
+            inbound_dep = (best_inbound.get("airPortTOCode") or "").strip().upper()
+            inbound_takeoff_time = _parse_msk_hm(best_inbound.get("dateTakeoffReal"))
+            inbound_landing_time = _parse_msk_hm(best_inbound.get("dateLandingReal"))
+            inbound_landing_calc = _parse_msk_hm(best_inbound.get("dateLandingCalculation") or best_inbound.get("dateLanding"))
+
+        if outbound_takeoff_time:
+            plane_status = "departed"
+        elif inbound_landing_time:
+            plane_status = "landed"
+        elif inbound_takeoff_time or (inbound_landing_calc and best_inbound):
+            plane_status = "inbound_flying"
+        elif inbound_dep:
+            plane_status = "scheduled"
+
         processed.append({
             "sort_ts": sort_timestamp,
             "flight_no": flight_clean,
@@ -910,7 +983,14 @@ def process_flights(
             "cargo": cargo_val,
             "mail": mail_val,
             "dep": dep,
-            "arr": arr
+            "arr": arr,
+            "inbound_flight": inbound_flight,
+            "inbound_dep": inbound_dep,
+            "inbound_takeoff_time": inbound_takeoff_time,
+            "inbound_landing_calc": inbound_landing_calc,
+            "inbound_landing_time": inbound_landing_time,
+            "outbound_takeoff_time": outbound_takeoff_time,
+            "plane_status": plane_status
         })
 
     # Хронологическая сортировка по времени вылета STD

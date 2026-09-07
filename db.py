@@ -144,6 +144,13 @@ def init_db():
             astra_times_sent TINYINT(1) DEFAULT 0,
             status VARCHAR(32) DEFAULT 'pending',
             notes TEXT NULL,
+            inbound_flight VARCHAR(32) NULL,
+            inbound_dep VARCHAR(16) NULL,
+            inbound_takeoff_time VARCHAR(16) NULL,
+            inbound_landing_calc VARCHAR(16) NULL,
+            inbound_landing_time VARCHAR(16) NULL,
+            outbound_takeoff_time VARCHAR(16) NULL,
+            plane_status VARCHAR(32) NULL,
             sort_order INT DEFAULT 0,
             updated_at VARCHAR(64) NULL,
             updated_by VARCHAR(128) NULL,
@@ -287,6 +294,13 @@ def init_db():
             astra_times_sent INTEGER DEFAULT 0,
             status TEXT DEFAULT 'pending',
             notes TEXT,
+            inbound_flight TEXT,
+            inbound_dep TEXT,
+            inbound_takeoff_time TEXT,
+            inbound_landing_calc TEXT,
+            inbound_landing_time TEXT,
+            outbound_takeoff_time TEXT,
+            plane_status TEXT,
             unread_changes TEXT,
             sort_order INTEGER DEFAULT 0,
             updated_at TEXT,
@@ -359,19 +373,13 @@ def init_db():
             conn.commit()
             print("[SQLite] Созданы базовые учётные записи admin / dispatcher")
 
-        # Автомиграция: добавление колонки ac_type если ее еще нет
-        try:
-            cursor.execute("ALTER TABLE plan_flights ADD COLUMN ac_type TEXT;")
-            conn.commit()
-        except Exception:
-            pass
-
-        # Автомиграция: добавление колонки unread_changes если ее еще нет
-        try:
-            cursor.execute("ALTER TABLE plan_flights ADD COLUMN unread_changes TEXT;")
-            conn.commit()
-        except Exception:
-            pass
+        # Автомиграция: добавление колонок если их еще нет
+        for col in ["ac_type", "unread_changes", "inbound_flight", "inbound_dep", "inbound_takeoff_time", "inbound_landing_calc", "inbound_landing_time", "outbound_takeoff_time", "plane_status"]:
+            try:
+                cursor.execute(f"ALTER TABLE plan_flights ADD COLUMN {col} TEXT;")
+                conn.commit()
+            except Exception:
+                pass
 
     conn.close()
 

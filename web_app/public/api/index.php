@@ -118,9 +118,12 @@ function initAirportsTable($db) {
         $initialized = true;
     } catch (Exception $e) {}
 
-    try {
-        $db->exec("ALTER TABLE plan_flights ADD COLUMN ac_type VARCHAR(16) NULL AFTER ac_num");
-    } catch (Exception $e) {}
+    $colsToMigrate = ['ac_type', 'unread_changes', 'inbound_flight', 'inbound_dep', 'inbound_takeoff_time', 'inbound_landing_calc', 'inbound_landing_time', 'outbound_takeoff_time', 'plane_status'];
+    foreach ($colsToMigrate as $colName) {
+        try {
+            $db->exec("ALTER TABLE plan_flights ADD COLUMN $colName VARCHAR(64) NULL");
+        } catch (Exception $e) {}
+    }
 }
 
 function normalizePlaneType($rawType) {
@@ -614,7 +617,14 @@ if ($route === '/shift/current') {
             'ldm_sent' => (bool)$r['ldm_sent'],
             'astra_times_sent' => (bool)$r['astra_times_sent'],
             'status' => (string)($r['status'] ?? 'pending'),
-            'notes' => (string)($r['notes'] ?? '')
+            'notes' => (string)($r['notes'] ?? ''),
+            'inbound_flight' => (string)($r['inbound_flight'] ?? ''),
+            'inbound_dep' => (string)($r['inbound_dep'] ?? ''),
+            'inbound_takeoff_time' => (string)($r['inbound_takeoff_time'] ?? ''),
+            'inbound_landing_calc' => (string)($r['inbound_landing_calc'] ?? ''),
+            'inbound_landing_time' => (string)($r['inbound_landing_time'] ?? ''),
+            'outbound_takeoff_time' => (string)($r['outbound_takeoff_time'] ?? ''),
+            'plane_status' => (string)($r['plane_status'] ?? '')
         ];
         if (!empty($r['unread_changes'])) {
             $parsedUnread = json_decode($r['unread_changes'], true);
@@ -665,13 +675,17 @@ if ($route === '/shift/save') {
             departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
             fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow,
             lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
-            status, notes, unread_changes, sort_order, updated_at
+            status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
+            inbound_landing_calc, inbound_landing_time, outbound_takeoff_time,
+            plane_status, unread_changes, sort_order, updated_at
         ) VALUES (
             ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?,
+            ?, ?, ?,
+            ?, ?, ?, ?
         )
     ");
 
@@ -707,6 +721,13 @@ if ($route === '/shift/save') {
             !empty($f['astra_times_sent']) ? 1 : 0,
             (string)($f['status'] ?? 'pending'),
             (string)($f['notes'] ?? ''),
+            (string)($f['inbound_flight'] ?? ''),
+            (string)($f['inbound_dep'] ?? ''),
+            (string)($f['inbound_takeoff_time'] ?? ''),
+            (string)($f['inbound_landing_calc'] ?? ''),
+            (string)($f['inbound_landing_time'] ?? ''),
+            (string)($f['outbound_takeoff_time'] ?? ''),
+            (string)($f['plane_status'] ?? ''),
             $unreadChangesJson,
             $index,
             $nowStr
@@ -1097,6 +1118,19 @@ if ($route === '/fetch_schedule') {
         }
     }
 
+    // Индексация всех рейсов флота по бортовым номерам для вычисления входящих плеч
+    $flightsByTail = [];
+    foreach ($rawFlights as $rf) {
+        $rawT = trim($rf['pln'] ?? '');
+        $cTail = str_replace(['RA-', 'RA', '-'], '', $rawT);
+        if ($cTail) {
+            if (!isset($flightsByTail[$cTail])) {
+                $flightsByTail[$cTail] = [];
+            }
+            $flightsByTail[$cTail][] = $rf;
+        }
+    }
+
     // 1. Предварительная фильтрация кандидатов
     $candidates = [];
     $seenKeys = [];
@@ -1430,6 +1464,71 @@ if ($route === '/fetch_schedule') {
             }
         }
 
+        // Расчет времени движения борта (В пути -> Сел -> Вылетел)
+        $outboundTakeoffTime = '';
+        if (!empty($fl['dateTakeoffReal'])) {
+            $tTs = strtotime($fl['dateTakeoffReal']);
+            if ($tTs) $outboundTakeoffTime = date('G:i', $tTs);
+        }
+
+        $inboundFlight = '';
+        $inboundDep = '';
+        $inboundTakeoffTime = '';
+        $inboundLandingCalc = '';
+        $inboundLandingTime = '';
+        $planeStatus = '';
+
+        $tailFlights = $flightsByTail[$tail] ?? [];
+        $bestInbound = null;
+        $bestDiff = 999999999;
+        $flightTs = !empty($takeoffRaw) ? strtotime($takeoffRaw) : $shiftStartTs;
+
+        foreach ($tailFlights as $cIn) {
+            $cInArr = strtoupper(trim($cIn['airPortLACode'] ?? ''));
+            if ($cInArr !== $dep) continue;
+            if (!empty($cIn['pfRecordId']) && !empty($fl['pfRecordId']) && $cIn['pfRecordId'] == $fl['pfRecordId']) continue;
+
+            $inArrRaw = $cIn['dateLandingReal'] ?? $cIn['dateLandingCalculation'] ?? $cIn['dateLanding'] ?? $cIn['dateTakeoffReal'] ?? $cIn['dateTakeoff'] ?? '';
+            if ($inArrRaw) {
+                $inTs = strtotime($inArrRaw);
+                if ($inTs) {
+                    $diff = $flightTs - $inTs;
+                    if ($diff >= -3600 && $diff < $bestDiff) {
+                        $bestDiff = $diff;
+                        $bestInbound = $cIn;
+                    }
+                }
+            }
+        }
+
+        if ($bestInbound) {
+            $inboundFlight = trim($bestInbound['flight'] ?? '');
+            $inboundDep = strtoupper(trim($bestInbound['airPortTOCode'] ?? ''));
+            if (!empty($bestInbound['dateTakeoffReal'])) {
+                $t = strtotime($bestInbound['dateTakeoffReal']);
+                if ($t) $inboundTakeoffTime = date('G:i', $t);
+            }
+            if (!empty($bestInbound['dateLandingReal'])) {
+                $t = strtotime($bestInbound['dateLandingReal']);
+                if ($t) $inboundLandingTime = date('G:i', $t);
+            }
+            $calcRaw = $bestInbound['dateLandingCalculation'] ?? $bestInbound['dateLanding'] ?? '';
+            if ($calcRaw) {
+                $t = strtotime($calcRaw);
+                if ($t) $inboundLandingCalc = date('G:i', $t);
+            }
+        }
+
+        if ($outboundTakeoffTime !== '') {
+            $planeStatus = 'departed';
+        } elseif ($inboundLandingTime !== '') {
+            $planeStatus = 'landed';
+        } elseif ($inboundTakeoffTime !== '' || ($inboundLandingCalc !== '' && $bestInbound)) {
+            $planeStatus = 'inbound_flying';
+        } elseif ($inboundDep !== '') {
+            $planeStatus = 'scheduled';
+        }
+
         $processed[] = [
             'id' => 'fl_' . time() . '_' . $idx,
             'flight' => $flClean,
@@ -1458,7 +1557,14 @@ if ($route === '/fetch_schedule') {
             'ldm_sent' => false,
             'astra_times_sent' => false,
             'status' => 'pending',
-            'notes' => ''
+            'notes' => '',
+            'inbound_flight' => $inboundFlight,
+            'inbound_dep' => $inboundDep,
+            'inbound_takeoff_time' => $inboundTakeoffTime,
+            'inbound_landing_calc' => $inboundLandingCalc,
+            'inbound_landing_time' => $inboundLandingTime,
+            'outbound_takeoff_time' => $outboundTakeoffTime,
+            'plane_status' => $planeStatus
         ];
     }
 

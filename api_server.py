@@ -555,7 +555,14 @@ def get_current_shift():
             "ldm_sent": bool(r.get("ldm_sent")),
             "astra_times_sent": bool(r.get("astra_times_sent")),
             "status": str(r.get("status") or "pending"),
-            "notes": str(r.get("notes") or "")
+            "notes": str(r.get("notes") or ""),
+            "inbound_flight": str(r.get("inbound_flight") or ""),
+            "inbound_dep": str(r.get("inbound_dep") or ""),
+            "inbound_takeoff_time": str(r.get("inbound_takeoff_time") or ""),
+            "inbound_landing_calc": str(r.get("inbound_landing_calc") or ""),
+            "inbound_landing_time": str(r.get("inbound_landing_time") or ""),
+            "outbound_takeoff_time": str(r.get("outbound_takeoff_time") or ""),
+            "plane_status": str(r.get("plane_status") or "")
         }
         if unread_obj:
             fl_item["unread_changes"] = unread_obj
@@ -606,13 +613,17 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
                 departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
                 fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow,
                 lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
-                status, notes, unread_changes, sort_order, updated_at
+                status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
+                inbound_landing_calc, inbound_landing_time, outbound_takeoff_time,
+                plane_status, unread_changes, sort_order, updated_at
             ) VALUES (
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s, %s
             );
             """, engine),
             (
@@ -645,6 +656,13 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
                 1 if f.get("astra_times_sent") else 0,
                 f.get("status") or "pending",
                 f.get("notes") or "",
+                f.get("inbound_flight") or "",
+                f.get("inbound_dep") or "",
+                f.get("inbound_takeoff_time") or "",
+                f.get("inbound_landing_calc") or "",
+                f.get("inbound_landing_time") or "",
+                f.get("outbound_takeoff_time") or "",
+                f.get("plane_status") or "",
                 unread_json,
                 index,
                 now_str
@@ -933,7 +951,14 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
             "ldm_sent": False,
             "astra_times_sent": False,
             "status": "pending",
-            "notes": ""
+            "notes": "",
+            "inbound_flight": str(row.get("inbound_flight") or ""),
+            "inbound_dep": str(row.get("inbound_dep") or ""),
+            "inbound_takeoff_time": str(row.get("inbound_takeoff_time") or ""),
+            "inbound_landing_calc": str(row.get("inbound_landing_calc") or ""),
+            "inbound_landing_time": str(row.get("inbound_landing_time") or ""),
+            "outbound_takeoff_time": str(row.get("outbound_takeoff_time") or ""),
+            "plane_status": str(row.get("plane_status") or "")
         })
 
     return {

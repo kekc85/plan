@@ -1,4 +1,10 @@
 - 2026-09-07:
+  - Внедрен индикатор движения борта (Подлёт / Посадка / Вылет) в ветке `feat/aircraft-flight-status`:
+    1. Автоматический поиск входящего плеча по номеру борта в `parser.py` и `index.php`, извлечение `dateTakeoffReal`, `dateLandingReal`, `dateLandingCalculation`.
+    2. База данных: добавлены колонки `inbound_flight`, `inbound_dep`, `inbound_takeoff_time`, `inbound_landing_calc`, `inbound_landing_time`, `outbound_takeoff_time`, `plane_status` (MySQL/SQLite автомиграция).
+    3. `FlightRow.jsx`: в ячейку «Маршрут» под кодами аэропортов внедрен 3-этапный индикатор (🟡 «В пути к DEP (~ЧЧ:ММ)», 🟢 «СЕЛ В DEP ЧЧ:ММ» для запроса трип-инфо, 🔵 «ВЫЛЕТ DEP ЧЧ:ММ»).
+    4. Проект успешно собран (`npm run build`), все бэкенд-модули и автомиграции протестированы.
+
   - Устранена гонка автосохранения и рассинхронизация смены между ПК и телефоном:
     1. `api.js` & `index.php`: внедрена тотальная защита от HTTP-кэширования браузерами смартфонов (Safari/Chrome iOS/Android) — добавлены заголовки `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`, `Pragma: no-cache`, `Expires: 0` и динамический timestamp `_t=Date.now()` к GET-запросам.
     2. `App.jsx`: в `handleAviaBitScheduleLoaded` убрано ошибочное повторное слияние старой смены с новой, добавлено немедленное сохранение на сервер `saveShift`.

@@ -384,6 +384,70 @@ export default function FlightRow({
             className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400 outline-none w-full min-w-[75px] uppercase cursor-text tracking-wider text-center ${getChangedStyle('route_airports')}`}
           />
           <ChangeBadge change={unread.route_airports} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'route_airports')} />
+
+          {/* Индикатор фактического движения борта (В пути -> Сел -> Вылетел) */}
+          {(() => {
+            const dep = (flight.route_airports || '').split('-')[0].trim().toUpperCase() || 'А/П';
+            const status = flight.plane_status || (
+              flight.outbound_takeoff_time ? 'departed' :
+              flight.inbound_landing_time ? 'landed' :
+              (flight.inbound_takeoff_time || flight.inbound_landing_calc) ? 'inbound_flying' : ''
+            );
+
+            if (status === 'departed' || flight.outbound_takeoff_time) {
+              const t = flight.outbound_takeoff_time || '';
+              return (
+                <div
+                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-blue-500/15 dark:bg-blue-950/60 border border-blue-400/50 text-blue-700 dark:text-blue-300 text-[9px] font-extrabold tracking-tight leading-none w-full max-w-[105px] truncate cursor-default shadow-xs"
+                  title={`Борт вылетел из ${dep}${t ? ' в ' + t : ''}. Рейс отправлен.`}
+                >
+                  <span className="text-[10px]">🛫</span>
+                  <span className="truncate">ВЫЛЕТ {dep}{t ? ' ' + t : ''}</span>
+                </div>
+              );
+            }
+
+            if (status === 'landed' || flight.inbound_landing_time) {
+              const t = flight.inbound_landing_time || '';
+              return (
+                <div
+                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-emerald-500/20 dark:bg-emerald-950/70 border-2 border-emerald-500 text-emerald-900 dark:text-emerald-100 text-[9px] font-black tracking-tight leading-none shadow-sm w-full max-w-[105px] truncate cursor-default ring-1 ring-emerald-500/40"
+                  title={`БОРТ СЕЛ В ${dep}${t ? ' в ' + t : ''}! Запросите трип-инфо у экипажа.`}
+                >
+                  <span className="text-[10px]">🛬</span>
+                  <span className="truncate">СЕЛ В {dep}{t ? ' ' + t : ''}</span>
+                </div>
+              );
+            }
+
+            if (status === 'inbound_flying' || flight.inbound_takeoff_time || flight.inbound_landing_calc) {
+              const calcT = flight.inbound_landing_calc ? ` (~${flight.inbound_landing_calc})` : '';
+              const fromStr = flight.inbound_dep ? `из ${flight.inbound_dep}` : '';
+              return (
+                <div
+                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-amber-500/15 dark:bg-amber-950/60 border border-amber-500/40 text-amber-800 dark:text-amber-200 text-[9px] font-bold tracking-tight leading-none w-full max-w-[105px] truncate cursor-default animate-pulse"
+                  title={`Борт в воздухе: летит ${fromStr} в ${dep}${calcT ? ', расчетная посадка' + calcT : ''}`}
+                >
+                  <span className="text-[10px]">✈️</span>
+                  <span className="truncate">В пути к {dep}{calcT}</span>
+                </div>
+              );
+            }
+
+            if (flight.inbound_dep) {
+              return (
+                <div
+                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[9px] font-semibold tracking-tight leading-none w-full max-w-[105px] truncate cursor-default"
+                  title={`Ожидает вылета из ${flight.inbound_dep} в ${dep}`}
+                >
+                  <span className="text-[10px]">⏳</span>
+                  <span className="truncate">Из {flight.inbound_dep}</span>
+                </div>
+              );
+            }
+
+            return null;
+          })()}
         </div>
       </td>
 
