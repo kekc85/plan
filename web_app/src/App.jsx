@@ -84,8 +84,6 @@ function normalizeFlight(f) {
     status = 'released';
   } else if (f.lir_sent) {
     status = 'lir_sent';
-  } else if (status === 'prepared' && !hasManualWork) {
-    status = 'pending';
   }
 
   // Для рейсов, вылетающих НЕ из Оренбурга, чекбокс Времена (Astra) не применяется

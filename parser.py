@@ -290,9 +290,9 @@ class AviaBitClient:
         
         return 1055
 
-    def fetch_schedule(self, start_dt: datetime, end_dt: datetime, template_id: int = 1055) -> list:
+    def fetch_schedule(self, start_dt: datetime, end_dt: datetime, template_id: int = None) -> list:
         """
-        Запрос расписания полетов за указанный диапазон дат.
+        Запрос расписания полетов за указанный диапазон дат (полный флот для отслеживания входящих плеч).
         """
         start_bound = datetime(start_dt.year, start_dt.month, start_dt.day, 0, 0, 0)
         end_bound = datetime(end_dt.year, end_dt.month, end_dt.day, 23, 59, 59, 999000)
@@ -300,9 +300,10 @@ class AviaBitClient:
         ts_start = int(start_bound.timestamp() * 1000)
         ts_end = int(end_bound.timestamp() * 1000)
 
+        template_param = f"&template={template_id}" if template_id else ""
         url = (
             f"{self.base_url}/api/plan-flight?"
-            f"dateBegin={ts_start}&dateEnd={ts_end}&eng=false&apCode=3&apId=0&template={template_id}&showCancel=false"
+            f"dateBegin={ts_start}&dateEnd={ts_end}&eng=false&apCode=3&apId=0{template_param}&showCancel=false"
         )
 
         print(f"[*] [{self.name}] Запрос расписания с {start_bound.strftime('%d.%m.%Y')} по {end_bound.strftime('%d.%m.%Y')}...")

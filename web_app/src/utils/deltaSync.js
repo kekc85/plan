@@ -168,12 +168,10 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = []) {
     if (old.astra_times_sent !== undefined) merged.astra_times_sent = old.astra_times_sent;
 
     // 4. Сохраняем статус рейса
-    if (['closed', 'released', 'lir_sent'].includes(old.status)) {
+    if (old.status) {
       merged.status = old.status;
-    } else if (old.status === 'prepared' && (hasManualWork || (old.notes && old.notes.trim()))) {
-      merged.status = 'prepared';
     } else {
-      merged.status = old.status || 'pending';
+      merged.status = inc.status || 'pending';
     }
 
     // 5. Прикрепляем неподтвержденные изменения

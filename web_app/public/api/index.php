@@ -965,10 +965,8 @@ function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTs
         "Cookie: connect.sid=$cookieVal"
     ];
 
-    $templateId = 1055;
-
-    // 1. Прямой запрос суточного плана полетов с сохраненной сессией
-    $url = "$origin/api/plan-flight?dateBegin={$startTsMs}&dateEnd={$endTsMs}&eng=false&apCode=3&apId=0&template={$templateId}&showCancel=false";
+    // 1. Прямой запрос суточного плана полетов со всеми бортами флота (полный охват входящих плеч)
+    $url = "$origin/api/plan-flight?dateBegin={$startTsMs}&dateEnd={$endTsMs}&eng=false&apCode=3&apId=0&showCancel=false";
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
