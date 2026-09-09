@@ -686,11 +686,14 @@ def smart_merge_schedules(req: SmartMergeRequest, current_user: Optional[dict] =
     - Рейсы за пределами выбранного интервала очищаются.
     """
     existing_map = {}
+    existing_by_flight = {}
     for f in req.current_flights:
         flight_clean = f.get("flight", "").replace("-", "").replace(" ", "").strip().upper()
         flight_date = str(f.get("flight_date", "")).strip()
         key = f"{flight_clean}_{flight_date}"
         existing_map[key] = f
+        if flight_clean and flight_clean not in existing_by_flight:
+            existing_by_flight[flight_clean] = f
 
     merged_flights = []
 
@@ -698,9 +701,9 @@ def smart_merge_schedules(req: SmartMergeRequest, current_user: Optional[dict] =
         flight_clean = inc.get("flight", "").replace("-", "").replace(" ", "").strip().upper()
         flight_date = str(inc.get("flight_date", "")).strip()
         key = f"{flight_clean}_{flight_date}"
-        
-        if key in existing_map:
-            old = existing_map[key]
+        old = existing_map.get(key) or existing_by_flight.get(flight_clean)
+
+        if old is not None:
             merged = inc.copy()
             merged["id"] = old.get("id") or inc.get("id")
             

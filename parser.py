@@ -803,9 +803,10 @@ def process_flights(
         # Номер рейса без дефисов (например N4-1442 -> N41442, EO-487 -> EO487)
         flight_clean = flight_no.replace("-", "").replace(" ", "")
 
-        # Исходное плановое время вылета по расписанию
-        # Приоритет: 1. Плановое (dateTakeoff) -> 2. Расчетное (dateTakeoffCalculation) -> 3. Фактическое (dateTakeoffReal)
-        takeoff_raw = fl.get("dateTakeoff") or fl.get("dateTakeoffCalculation") or fl.get("dateTakeoffReal")
+        # Ожидаемое / расчетное время вылета (при переносе/задержке) или плановое по расписанию
+        # Приоритет: 1. Расчетное/перенесенное (dateTakeoffCalculation) -> 2. Плановое (dateTakeoff) -> 3. Фактическое (dateTakeoffReal)
+        # Обратите внимание: dateTakeoffReal не заменяет ожидаемое время вылета, а выводится отдельно в колонке "Маршрут" как реальный взлет!
+        takeoff_raw = fl.get("dateTakeoffCalculation") or fl.get("dateTakeoff") or fl.get("dateTakeoffReal")
         time_str = ""
         sort_timestamp = 0
         dt_msk = None

@@ -52,7 +52,7 @@ function normalizeVal(val) {
  */
 export function getFlightKey(flight) {
   if (!flight) return '';
-  const flNum = (flight.flight || '').replace(/[-\s]/g, '').toUpperCase();
+  const flNum = (flight.flight || flight.flight_no || '').replace(/[-\s]/g, '').toUpperCase();
   const flDate = (flight.flight_date || '').trim();
   return `${flNum}_${flDate}`;
 }
@@ -100,9 +100,14 @@ export function detectFlightChanges(oldFlight, incomingFlight) {
  */
 export function smartMergeWithDelta(currentFlights = [], incomingFlights = []) {
   const existingMap = new Map();
+  const existingByFlight = new Map();
   currentFlights.forEach(f => {
     const key = getFlightKey(f);
     if (key) existingMap.set(key, f);
+    const flNum = (f.flight || f.flight_no || '').replace(/[-\s]/g, '').toUpperCase();
+    if (flNum && !existingByFlight.has(flNum)) {
+      existingByFlight.set(flNum, f);
+    }
   });
 
   let totalNewChanges = 0;
@@ -110,7 +115,8 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = []) {
 
   const mergedFlights = incomingFlights.map(inc => {
     const key = getFlightKey(inc);
-    const old = existingMap.get(key);
+    const flNum = (inc.flight || inc.flight_no || '').replace(/[-\s]/g, '').toUpperCase();
+    const old = existingMap.get(key) || existingByFlight.get(flNum);
 
     if (!old) {
       // Совершенно новый рейс, добавленный в расписание AviaBit

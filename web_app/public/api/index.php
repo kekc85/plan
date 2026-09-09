@@ -781,11 +781,15 @@ if ($route === '/shift/smart_merge') {
     $incoming = $input['incoming_flights'] ?? [];
 
     $existingMap = [];
+    $existingByFlight = [];
     foreach ($current as $f) {
         $flightClean = strtoupper(str_replace(['-', ' '], '', trim($f['flight'] ?? '')));
         $flightDate = trim($f['flight_date'] ?? '');
         $key = "{$flightClean}_{$flightDate}";
         $existingMap[$key] = $f;
+        if (!empty($flightClean) && !isset($existingByFlight[$flightClean])) {
+            $existingByFlight[$flightClean] = $f;
+        }
     }
 
     $merged = [];
@@ -794,9 +798,9 @@ if ($route === '/shift/smart_merge') {
         $flightClean = strtoupper(str_replace(['-', ' '], '', trim($inc['flight'] ?? '')));
         $flightDate = trim($inc['flight_date'] ?? '');
         $key = "{$flightClean}_{$flightDate}";
+        $old = $existingMap[$key] ?? $existingByFlight[$flightClean] ?? null;
 
-        if (isset($existingMap[$key])) {
-            $old = $existingMap[$key];
+        if ($old !== null) {
             $item = $inc;
             $item['id'] = $old['id'] ?? $inc['id'];
             $item['status'] = $old['status'] ?? $inc['status'] ?? 'pending';
@@ -1180,9 +1184,10 @@ if ($route === '/fetch_schedule') {
         if (stripos($flightNo, 'РЕЗ') !== false || stripos($flightNo, 'REZ') !== false) continue;
         if (!empty($fl['isSpecialFlight'])) continue;
 
-        $flClean = str_replace(['-', ' '], '', $flightNo);
-        // Исходное плановое время вылета по расписанию
-        $takeoffRaw = $fl['dateTakeoff'] ?? $fl['dateTakeoffCalculation'] ?? $fl['dateTakeoffReal'] ?? '';
+        // Ожидаемое / расчетное время вылета (при переносе/задержке) или плановое по расписанию
+        // Приоритет: 1. Расчетное/перенесенное (dateTakeoffCalculation) -> 2. Плановое (dateTakeoff) -> 3. Фактическое (dateTakeoffReal)
+        // Обратите внимание: dateTakeoffReal не заменяет ожидаемое время вылета, а выводится отдельно в колонке "Маршрут" как реальный взлет!
+        $takeoffRaw = $fl['dateTakeoffCalculation'] ?? $fl['dateTakeoff'] ?? $fl['dateTakeoffReal'] ?? '';
 
         $timeStr = '';
         $flightDate = date('d.m', $shiftStartTs);
