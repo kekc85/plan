@@ -929,7 +929,7 @@ def process_flights(
 
         tail_flights = flights_by_tail.get(tail_clean, [])
         best_inbound = None
-        best_inbound_diff = 999999999
+        best_inbound_dep_ts = -1
 
         for c_in in tail_flights:
             c_in_arr = (c_in.get("airPortLACode") or "").strip().upper()
@@ -938,19 +938,20 @@ def process_flights(
             if c_in.get("pfRecordId") and fl.get("pfRecordId") and c_in.get("pfRecordId") == fl.get("pfRecordId"):
                 continue
 
-            in_arr_raw = c_in.get("dateLandingReal") or c_in.get("dateLandingCalculation") or c_in.get("dateLanding")
-            if not in_arr_raw:
-                in_arr_raw = c_in.get("dateTakeoffReal") or c_in.get("dateTakeoffCalculation") or c_in.get("dateTakeoff")
-
-            if in_arr_raw:
+            # Время вылета входящего рейса (расчетное/фактическое/плановое)
+            in_dep_raw = c_in.get("dateTakeoffCalculation") or c_in.get("dateTakeoffReal") or c_in.get("dateTakeoff")
+            if in_dep_raw:
                 try:
-                    in_dt_utc = datetime.fromisoformat(str(in_arr_raw).replace("Z", "+00:00"))
-                    in_ts = int(in_dt_utc.timestamp())
-                    # Входящий рейс должен прилетать до или примерно во время нашего вылета
-                    diff = sort_timestamp - in_ts
-                    if diff >= -3600 and diff < best_inbound_diff:
-                        best_inbound_diff = diff
-                        best_inbound = c_in
+                    in_dep_utc = datetime.fromisoformat(str(in_dep_raw).replace("Z", "+00:00"))
+                    in_dep_ts = int(in_dep_utc.timestamp())
+                    # Входящий рейс должен вылетать строго ДО нашего текущего вылета
+                    if in_dep_ts > 0 and sort_timestamp > 0:
+                        if in_dep_ts >= sort_timestamp:
+                            continue
+                        # Ищем самый последний/ближайший входящий рейс перед нашим вылетом
+                        if in_dep_ts > best_inbound_dep_ts:
+                            best_inbound_dep_ts = in_dep_ts
+                            best_inbound = c_in
                 except Exception:
                     pass
 

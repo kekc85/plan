@@ -1516,21 +1516,24 @@ if ($route === '/fetch_schedule') {
 
         $tailFlights = $flightsByTail[$tail] ?? [];
         $bestInbound = null;
-        $bestDiff = 999999999;
-        $flightTs = !empty($takeoffRaw) ? strtotime($takeoffRaw) : $shiftStartTs;
+        $bestInboundDepTs = -1;
+        $flightTakeoffRaw = $fl['dateTakeoffCalculation'] ?? $fl['dateTakeoff'] ?? $fl['dateTakeoffReal'] ?? '';
+        $flightTs = !empty($flightTakeoffRaw) ? strtotime($flightTakeoffRaw) : $shiftStartTs;
 
         foreach ($tailFlights as $cIn) {
             $cInArr = strtoupper(trim($cIn['airPortLACode'] ?? ''));
             if ($cInArr !== $dep) continue;
             if (!empty($cIn['pfRecordId']) && !empty($fl['pfRecordId']) && $cIn['pfRecordId'] == $fl['pfRecordId']) continue;
 
-            $inArrRaw = $cIn['dateLandingReal'] ?? $cIn['dateLandingCalculation'] ?? $cIn['dateLanding'] ?? $cIn['dateTakeoffReal'] ?? $cIn['dateTakeoff'] ?? '';
-            if ($inArrRaw) {
-                $inTs = strtotime($inArrRaw);
-                if ($inTs) {
-                    $diff = $flightTs - $inTs;
-                    if ($diff >= -3600 && $diff < $bestDiff) {
-                        $bestDiff = $diff;
+            $inDepRaw = $cIn['dateTakeoffCalculation'] ?? $cIn['dateTakeoffReal'] ?? $cIn['dateTakeoff'] ?? '';
+            if ($inDepRaw) {
+                $inDepTs = strtotime($inDepRaw);
+                if ($inDepTs) {
+                    if ($flightTs > 0 && $inDepTs >= $flightTs) {
+                        continue;
+                    }
+                    if ($inDepTs > $bestInboundDepTs) {
+                        $bestInboundDepTs = $inDepTs;
                         $bestInbound = $cIn;
                     }
                 }
