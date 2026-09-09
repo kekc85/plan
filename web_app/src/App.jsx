@@ -97,8 +97,11 @@ function normalizeFlight(f) {
   const unread_changes = getSafeUnreadChanges(f);
   const hasUnread = Object.keys(unread_changes).length > 0;
 
+  const flight = f.flight || f.flight_no || '';
+
   return { 
     ...f, 
+    flight,
     status, 
     astra_times_sent, 
     ac_type,

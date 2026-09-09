@@ -354,7 +354,7 @@ export default function FlightRow({
         <div className="flex flex-col items-center justify-center gap-0.5">
           <input
             type="text"
-            value={flight.flight || ''}
+            value={flight.flight || flight.flight_no || ''}
             onChange={(e) => handleCellChange('flight', formatValidFlight(e.target.value))}
             onFocus={(e) => e.target.select()}
             onPointerDown={(e) => e.stopPropagation()}

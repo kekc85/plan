@@ -1180,9 +1180,9 @@ if ($route === '/fetch_schedule') {
 
         // Исключаем резервные рейсы (~РЕ307д, ~РЕЗ, РЕЗ, REZ, ~ и т.д.) и спецрейсы
         if (strpos($flightNo, '~') !== false) continue;
-        if (preg_match('/^[~]?(?:РЕЗ|REZ|РЕ|RE)/ui', $flightNo)) continue;
         if (stripos($flightNo, 'РЕЗ') !== false || stripos($flightNo, 'REZ') !== false) continue;
         if (!empty($fl['isSpecialFlight'])) continue;
+        $flClean = str_replace(['-', ' '], '', $flightNo);
 
         // Ожидаемое / расчетное время вылета (при переносе/задержке) или плановое по расписанию
         // Приоритет: 1. Расчетное/перенесенное (dateTakeoffCalculation) -> 2. Плановое (dateTakeoff) -> 3. Фактическое (dateTakeoffReal)
