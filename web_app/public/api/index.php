@@ -1517,10 +1517,16 @@ if ($route === '/fetch_schedule') {
         $tailFlights = $flightsByTail[$tail] ?? [];
         $bestInbound = null;
         $bestInboundDepTs = -1;
+        $airborneLeg = null;
         $flightTakeoffRaw = $fl['dateTakeoffCalculation'] ?? $fl['dateTakeoff'] ?? $fl['dateTakeoffReal'] ?? '';
         $flightTs = !empty($flightTakeoffRaw) ? strtotime($flightTakeoffRaw) : $shiftStartTs;
 
         foreach ($tailFlights as $cIn) {
+            // Проверяем, находится ли борт в воздухе на каком-либо рейсе прямо сейчас
+            if (!empty($cIn['dateTakeoffReal']) && empty($cIn['dateLandingReal'])) {
+                $airborneLeg = $cIn;
+            }
+
             $cInArr = strtoupper(trim($cIn['airPortLACode'] ?? ''));
             if ($cInArr !== $dep) continue;
             if (!empty($cIn['pfRecordId']) && !empty($fl['pfRecordId']) && $cIn['pfRecordId'] == $fl['pfRecordId']) continue;
@@ -1562,8 +1568,17 @@ if ($route === '/fetch_schedule') {
             $planeStatus = 'departed';
         } elseif ($inboundLandingTime !== '') {
             $planeStatus = 'landed';
-        } elseif ($inboundTakeoffTime !== '' || ($inboundLandingCalc !== '' && $bestInbound)) {
+        } elseif ($inboundTakeoffTime !== '') {
             $planeStatus = 'inbound_flying';
+        } elseif ($airborneLeg) {
+            $planeStatus = 'other_flying';
+            $inboundFlight = trim($airborneLeg['flight'] ?? '');
+            $inboundDep = strtoupper(trim($airborneLeg['airPortLACode'] ?? ''));
+            $calcRaw = $airborneLeg['dateLandingCalculation'] ?? $airborneLeg['dateLanding'] ?? '';
+            if ($calcRaw) {
+                $t = strtotime($calcRaw);
+                if ($t) $inboundLandingCalc = date('G:i', $t);
+            }
         } elseif ($inboundDep !== '') {
             $planeStatus = 'scheduled';
         }

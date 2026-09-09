@@ -413,7 +413,7 @@ export default function FlightRow({
             const status = flight.plane_status || (
               flight.outbound_takeoff_time ? 'departed' :
               flight.inbound_landing_time ? 'landed' :
-              (flight.inbound_takeoff_time || flight.inbound_landing_calc) ? 'inbound_flying' : ''
+              flight.inbound_takeoff_time ? 'inbound_flying' : ''
             );
 
             if (status === 'departed' || flight.outbound_takeoff_time) {
@@ -442,7 +442,7 @@ export default function FlightRow({
               );
             }
 
-            if (status === 'inbound_flying' || flight.inbound_takeoff_time || flight.inbound_landing_calc) {
+            if (status === 'inbound_flying' || flight.inbound_takeoff_time) {
               const calcT = flight.inbound_landing_calc ? ` (~${flight.inbound_landing_calc})` : '';
               const fromStr = flight.inbound_dep ? `из ${flight.inbound_dep}` : '';
               return (
@@ -452,6 +452,21 @@ export default function FlightRow({
                 >
                   <span className="text-[10px]">✈️</span>
                   <span className="truncate">В пути к {dep}{calcT}</span>
+                </div>
+              );
+            }
+
+            if (status === 'other_flying') {
+              const calcT = flight.inbound_landing_calc ? ` (~${flight.inbound_landing_calc})` : '';
+              const otherFl = flight.inbound_flight || '';
+              const targetCity = flight.inbound_dep || '';
+              return (
+                <div
+                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-purple-500/15 dark:bg-purple-950/60 border border-purple-400/50 text-purple-800 dark:text-purple-200 text-[9px] font-bold tracking-tight leading-none w-full max-w-[105px] truncate cursor-default"
+                  title={`Борт в воздухе: выполняет другой рейс ${otherFl} (прилёт в ${targetCity}${calcT}). До нашего вылета из ${dep} запланированы промежуточные плечи.`}
+                >
+                  <span className="text-[10px]">✈️</span>
+                  <span className="truncate">В рейсе ➔ {targetCity}{calcT}</span>
                 </div>
               );
             }

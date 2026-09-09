@@ -930,8 +930,13 @@ def process_flights(
         tail_flights = flights_by_tail.get(tail_clean, [])
         best_inbound = None
         best_inbound_dep_ts = -1
+        airborne_leg = None
 
         for c_in in tail_flights:
+            # Проверяем, находится ли борт в воздухе на каком-либо рейсе прямо сейчас
+            if c_in.get("dateTakeoffReal") and not c_in.get("dateLandingReal"):
+                airborne_leg = c_in
+
             c_in_arr = (c_in.get("airPortLACode") or "").strip().upper()
             if c_in_arr != dep:
                 continue
@@ -966,8 +971,14 @@ def process_flights(
             plane_status = "departed"
         elif inbound_landing_time:
             plane_status = "landed"
-        elif inbound_takeoff_time or (inbound_landing_calc and best_inbound):
+        elif inbound_takeoff_time:
             plane_status = "inbound_flying"
+        elif airborne_leg:
+            # Борт в воздухе, но выполняет другой рейс цепочки
+            plane_status = "other_flying"
+            inbound_flight = (airborne_leg.get("flight") or "").strip()
+            inbound_dep = (airborne_leg.get("airPortLACode") or "").strip().upper()
+            inbound_landing_calc = _parse_msk_hm(airborne_leg.get("dateLandingCalculation") or airborne_leg.get("dateLanding"))
         elif inbound_dep:
             plane_status = "scheduled"
 
