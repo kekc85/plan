@@ -958,7 +958,7 @@ export default function FlightRow({
       </td>
 
       {/* 19. Примечания */}
-      <td className={`py-1 px-0.5 min-w-[75px] max-w-[95px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-1 w-[85px] min-w-[80px] max-w-[95px] overflow-hidden ${overdueBorderTopBottom}`}>
         <textarea
           rows={2}
           value={flight.notes || ''}
@@ -968,20 +968,20 @@ export default function FlightRow({
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="Заметка..."
           title={flight.notes || ''}
-          className="w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1 py-0.5 text-xs font-medium text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none cursor-text transition-all shadow-sm"
+          className="w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1 py-0.5 text-xs font-medium text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none cursor-text transition-all shadow-sm block"
         />
       </td>
 
       {/* 20. Действия */}
-      <td className={`py-1 px-0.5 text-center whitespace-nowrap no-print rounded-r-2xl w-16 min-w-[64px] max-w-[68px] ${
+      <td className={`py-1 px-1 text-center whitespace-nowrap no-print rounded-r-2xl w-[84px] min-w-[82px] max-w-[88px] ${
         isOverdue ? 'border-r-2 border-r-rose-500 border-t-2 border-b-2 border-rose-500' : 'border-r border-t border-b border-slate-200/80 dark:border-slate-800/80'
       }`}>
-        <div className="flex items-center justify-center gap-0.5">
+        <div className="flex items-center justify-center gap-0.5 w-full">
           {hasUnreadChanges && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
-              className="flex items-center justify-center gap-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-extrabold px-1 py-0.5 rounded shadow-sm transition-all active:scale-95 animate-pulse shrink-0 cursor-pointer"
+              className="flex items-center justify-center gap-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-extrabold px-1 py-0.5 rounded shadow-sm transition-all active:scale-95 animate-pulse shrink-0 cursor-pointer"
               title="Подтвердить ознакомление со всеми изменениями в этом рейсе"
             >
               <Check className="w-2.5 h-2.5 stroke-[3]" />
@@ -989,41 +989,45 @@ export default function FlightRow({
             </button>
           )}
 
-          <div className="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0">
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); onOpenHistory?.(flight); }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              className="p-0.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 rounded hover:bg-sky-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 rounded hover:bg-sky-100 dark:hover:bg-slate-800 transition-colors shrink-0"
               title="История изменений рейса (Flight Audit Trail)"
             >
               <History className="w-3.5 h-3.5" />
             </button>
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); onMoveUp(index); }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               disabled={isFirst}
-              className="p-0.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800"
+              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0"
               title="Переместить вверх"
             >
               <ArrowUp className="w-3.5 h-3.5" />
             </button>
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); onMoveDown(index); }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               disabled={isLast}
-              className="p-0.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800"
+              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0"
               title="Переместить вниз"
             >
               <ArrowDown className="w-3.5 h-3.5" />
             </button>
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); onDeleteFlight(flight.id); }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              className="p-0.5 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-colors"
+              className="p-1 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-colors shrink-0"
               title="Удалить рейс"
             >
               <Trash2 className="w-3.5 h-3.5" />
