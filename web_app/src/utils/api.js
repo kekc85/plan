@@ -336,3 +336,15 @@ export async function adminDeleteArchive(archiveId) {
   });
 }
 
+// --- ИСТОРИЯ ПРАВОК ПО РЕЙСАМ (FLIGHT AUDIT TRAIL) ---
+
+export async function fetchFlightHistory(params = {}) {
+  const query = new URLSearchParams();
+  if (params.flightId) query.append('flight_id', params.flightId);
+  if (params.flightNumber) query.append('flight_number', params.flightNumber);
+  if (params.flightDate) query.append('flight_date', params.flightDate);
+  if (params.limit) query.append('limit', params.limit);
+  const qStr = query.toString();
+  return request(`/flight/history${qStr ? `?${qStr}` : ''}`);
+}
+

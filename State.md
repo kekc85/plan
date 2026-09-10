@@ -1,4 +1,9 @@
 - 2026-09-10:
+  - Реализована история правок по каждому рейсу (Flight Audit Trail, Шаг 3):
+    1. БД (`db.py`, `schema.sql`, `web_app/public/schema.sql`): таблица `plan_flight_audit_logs` с индексами `(flight_number, flight_date)`, `flight_id`, `created_at` (SQLite и MySQL Beget).
+    2. Бэкенды (`api_server.py`, `web_app/public/api/index.php`): сравнительный аудит всех изменяемых полей (топливо, DOW/DOI, кухня, MTOW, PAX, багаж, груз, почта, борт, компоновка, статусы, чекбоксы LIR/СЗВ/LDM/Времена, заметки) при каждом сохранении смены (`/shift/save`) с фиксацией автора, старого/нового значения и точного времени МСК. Добавлен эндпоинт `GET /api/flight/history`.
+    3. Фронтенд (`FlightHistoryModal.jsx`, `FlightRow.jsx`, `ShiftTable.jsx`, `App.jsx`, `api.js`): кнопка вызова истории (🕒) в строке каждого рейса, модальное окно таймлайна с фильтрами («Все», «Топливо и Веса», «Статусы и Чекбоксы», «Расписание и Борт», «Примечания»), поиском по автору/значениям и экспортом в .txt.
+    4. Проект успешно протестирован и пересобран (`npm run build`).
   - Реализованы Telegram-оповещения об авариях/смене и система посменных архивов (Шаг 2):
     1. БД (`db.py`, `schema.sql`, `web_app/public/schema.sql`): создана таблица `plan_shift_archives` с автомиграцией SQLite и MySQL Beget.
     2. Telegram API (`db.py`, `api_server.py`, `index.php`): отправка уведомлений по категориям («Критические ошибки», «Сдача смен», «Сбои AviaBit»), хранение Bot Token и Chat ID в `plan_settings` без открытой выкладки в git.

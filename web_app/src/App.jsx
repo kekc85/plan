@@ -10,6 +10,7 @@ import AdminModal from './components/AdminModal';
 import HandoverModal from './components/HandoverModal';
 import DownloadManualModal from './components/DownloadManualModal';
 import DepartureAirportsModal from './components/DepartureAirportsModal';
+import FlightHistoryModal from './components/FlightHistoryModal';
 import { INITIAL_FLIGHTS } from './utils/mockData';
 import { exportShiftToExcel } from './utils/excelExport';
 import { parseExcelToFlights } from './utils/excelImport';
@@ -126,6 +127,8 @@ export default function App() {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [selectedHistoryFlight, setSelectedHistoryFlight] = useState(null);
   const [isHandoverNotesDismissed, setIsHandoverNotesDismissed] = useState(() => {
     const saved = getStoredWithMigration('dismissed_handover_note');
     return !!saved;
@@ -903,6 +906,12 @@ export default function App() {
     );
   }
 
+  // Открытие истории изменений рейса (Flight Audit Trail)
+  const handleOpenFlightHistory = (flight) => {
+    setSelectedHistoryFlight(flight);
+    setIsHistoryModalOpen(true);
+  };
+
   return (
     <div className="min-h-screen flex flex-col transition-colors duration-200">
       {/* Header Bar */}
@@ -1031,6 +1040,7 @@ export default function App() {
           onMoveDown={handleMoveDown}
           onAcknowledgeField={handleAcknowledgeField}
           onAcknowledgeFlight={handleAcknowledgeFlight}
+          onOpenHistory={handleOpenFlightHistory}
           onAddFlight={() => setIsAddModalOpen(true)}
         />
       </main>
@@ -1148,6 +1158,16 @@ export default function App() {
       <DownloadManualModal
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
+      />
+
+      {/* Модальное окно истории правок рейса (Flight Audit Trail) */}
+      <FlightHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => {
+          setIsHistoryModalOpen(false);
+          setSelectedHistoryFlight(null);
+        }}
+        flight={selectedHistoryFlight}
       />
     </div>
   );

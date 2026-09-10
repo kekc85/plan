@@ -40,7 +40,9 @@ from db import (
     create_shift_snapshot,
     get_shift_archives,
     get_shift_archive_by_id,
-    delete_shift_archive
+    delete_shift_archive,
+    record_flight_batch_changes,
+    get_flight_audit_history
 )
 from auth import (
     create_jwt_token,
@@ -1013,6 +1015,96 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
         )
         shift_id = cursor.lastrowid
 
+    # 1. Извлекаем текущее состояние рейсов для аудита изменений (Flight Audit Trail)
+    cursor.execute("SELECT * FROM plan_flights;")
+    old_rows = cursor.fetchall()
+    old_map = {}
+    for r in old_rows:
+        rd = dict(r)
+        f_id = str(rd.get("id", ""))
+        f_num = str(rd.get("flight_number", "")).replace("-", "").replace(" ", "").upper()
+        f_date = str(rd.get("flight_date", "")).strip()
+        if f_id:
+            old_map[f_id] = rd
+        if f_num:
+            old_map[f"{f_num}_{f_date}"] = rd
+
+    # Собираем журнал изменений
+    user_display = (current_user.get("full_name") or current_user.get("username")) if current_user else dispatcher
+    u_id = current_user.get("id") if current_user else None
+    audit_changes = []
+
+    compare_fields = [
+        ("flight", "flight_number"),
+        ("flight_date", "flight_date"),
+        ("time", "departure_time"),
+        ("release_time", "release_time"),
+        ("route_city", "route_city"),
+        ("route_airports", "route_airports"),
+        ("ac_num", "ac_num"),
+        ("ac_type", "ac_type"),
+        ("ac_config", "ac_config"),
+        ("pax", "pax"),
+        ("crew", "crew"),
+        ("fuel_block", "fuel_block"),
+        ("fuel_trip", "fuel_trip"),
+        ("fuel_taxi", "fuel_taxi"),
+        ("dow", "dow"),
+        ("doi", "doi"),
+        ("galley", "galley"),
+        ("mtow", "mtow"),
+        ("cargo", "cargo"),
+        ("mail", "mail"),
+        ("baggage", "baggage"),
+        ("notes", "notes"),
+        ("status", "status"),
+        ("lir_sent", "lir_sent"),
+        ("szv_sent", "szv_sent"),
+        ("ldm_sent", "ldm_sent"),
+        ("astra_times_sent", "astra_times_sent")
+    ]
+
+    for f in req.flights:
+        f_id = str(f.get("id", ""))
+        f_num = str(f.get("flight") or f.get("flight_number") or "").replace("-", "").replace(" ", "").upper()
+        f_date = str(f.get("flight_date") or "").strip()
+        old_f = old_map.get(f_id) or old_map.get(f"{f_num}_{f_date}")
+
+        if old_f:
+            for req_key, db_key in compare_fields:
+                new_v = f.get(req_key)
+                old_v = old_f.get(db_key)
+
+                # Булевы чекбоксы
+                if req_key in ("lir_sent", "szv_sent", "ldm_sent", "astra_times_sent"):
+                    b_new = bool(new_v)
+                    b_old = bool(old_v)
+                    if b_new != b_old:
+                        audit_changes.append({
+                            "flight_id": f_id,
+                            "flight_number": f.get("flight") or f.get("flight_number") or "",
+                            "flight_date": f_date,
+                            "field_name": req_key,
+                            "old_val": "ВКЛ" if b_old else "ВЫКЛ",
+                            "new_val": "ВКЛ" if b_new else "ВЫКЛ",
+                            "changed_by": user_display,
+                            "user_id": u_id
+                        })
+                else:
+                    s_new = str(new_v).strip() if new_v is not None else ""
+                    s_old = str(old_v).strip() if old_v is not None else ""
+                    if s_new != s_old and (s_old or s_new):
+                        audit_changes.append({
+                            "flight_id": f_id,
+                            "flight_number": f.get("flight") or f.get("flight_number") or "",
+                            "flight_date": f_date,
+                            "field_name": req_key,
+                            "old_val": s_old,
+                            "new_val": s_new,
+                            "changed_by": user_display,
+                            "user_id": u_id
+                        })
+
     # Синхронизируем рейсы
     cursor.execute("DELETE FROM plan_flights;")
     for index, f in enumerate(req.flights):
@@ -1083,7 +1175,32 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
     if engine == "sqlite":
         conn.commit()
     conn.close()
+
+    # Фиксируем аудит-логи в БД
+    if audit_changes:
+        record_flight_batch_changes(audit_changes)
+
     return {"success": True, "saved_count": len(req.flights)}
+
+
+# --- 3.1. ИСТОРИЯ ПРАВОК РЕЙСА (FLIGHT AUDIT TRAIL) ---
+
+@app.get("/api/flight/history")
+def get_flight_history(
+    flight_id: Optional[str] = None,
+    flight_number: Optional[str] = None,
+    flight_date: Optional[str] = None,
+    limit: int = 100
+):
+    """Возвращает историю всех правок по рейсу (таймлайн изменений)"""
+    limit = max(1, min(500, limit))
+    history = get_flight_audit_history(
+        flight_id=flight_id,
+        flight_number=flight_number,
+        flight_date=flight_date,
+        limit=limit
+    )
+    return {"history": history}
 
 
 # --- 4. УМНОЕ СЛИЯНИЕ РАСПИСАНИЙ (SMART MERGE) ---

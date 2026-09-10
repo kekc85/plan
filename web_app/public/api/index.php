@@ -667,6 +667,138 @@ function deleteShiftArchive($id) {
     }
 }
 
+function initAuditLogsTable($db) {
+    static $initialized = false;
+    if ($initialized) return;
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS plan_flight_audit_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            flight_id VARCHAR(64) NOT NULL,
+            flight_number VARCHAR(32) NOT NULL,
+            flight_date VARCHAR(16) NULL,
+            field_name VARCHAR(64) NOT NULL,
+            field_label VARCHAR(64) NULL,
+            old_val TEXT NULL,
+            new_val TEXT NULL,
+            changed_by VARCHAR(128) NOT NULL,
+            user_id INT NULL,
+            created_at VARCHAR(64) NOT NULL,
+            INDEX idx_flight_history (flight_number, flight_date),
+            INDEX idx_flight_id (flight_id),
+            INDEX idx_audit_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $initialized = true;
+    } catch (Exception $e) {}
+}
+
+function getFlightFieldLabel($field) {
+    $labels = [
+        'flight' => '№ Рейса',
+        'flight_number' => '№ Рейса',
+        'flight_date' => 'Дата рейса',
+        'time' => 'Время вылета',
+        'departure_time' => 'Время вылета',
+        'release_time' => 'Время выпуска (-40м)',
+        'route_city' => 'Город маршрута',
+        'route_airports' => 'Аэропорты маршрута',
+        'ac_num' => 'Бортовой номер',
+        'ac_type' => 'Тип ВС',
+        'ac_config' => 'Компоновка',
+        'pax' => 'Пассажиры (PAX)',
+        'crew' => 'Экипаж',
+        'fuel_block' => 'Топливо Block',
+        'fuel_trip' => 'Топливо Trip',
+        'fuel_taxi' => 'Топливо Taxi',
+        'dow' => 'DOW (Сухой вес)',
+        'doi' => 'DOI (Индекс)',
+        'galley' => 'Кухня (Galley)',
+        'mtow' => 'MTOW',
+        'cargo' => 'Груз (Cargo)',
+        'mail' => 'Почта (Mail)',
+        'baggage' => 'Багаж',
+        'lir_sent' => 'Чекбокс LIR',
+        'szv_sent' => 'Чекбокс СЗВ',
+        'ldm_sent' => 'Чекбокс LDM',
+        'astra_times_sent' => 'Чекбокс Времена',
+        'status' => 'Статус рейса',
+        'notes' => 'Примечания / Заметки',
+        'inbound_flight' => 'Прибывающий рейс',
+        'inbound_takeoff_time' => 'Взлет входящего',
+        'inbound_landing_time' => 'Посадка входящего',
+        'outbound_takeoff_time' => 'Фактический вылет',
+        'plane_status' => 'Движение борта'
+    ];
+    return $labels[$field] ?? $field;
+}
+
+function recordFlightBatchChanges($db, $changes) {
+    if (empty($changes)) return;
+    initAuditLogsTable($db);
+    $now = date('Y-m-d H:i:s');
+    $stmt = $db->prepare("
+        INSERT INTO plan_flight_audit_logs (
+            flight_id, flight_number, flight_date, field_name, field_label,
+            old_val, new_val, changed_by, user_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+    foreach ($changes as $c) {
+        $oldVal = isset($c['old_val']) ? trim((string)$c['old_val']) : '';
+        $newVal = isset($c['new_val']) ? trim((string)$c['new_val']) : '';
+        if ($oldVal === $newVal) continue;
+        $fieldName = $c['field_name'] ?? '';
+        $fieldLabel = getFlightFieldLabel($fieldName);
+        $stmt->execute([
+            (string)($c['flight_id'] ?? ''),
+            (string)($c['flight_number'] ?? ''),
+            (string)($c['flight_date'] ?? ''),
+            $fieldName,
+            $fieldLabel,
+            $oldVal,
+            $newVal,
+            (string)($c['changed_by'] ?? 'Диспетчер по центровке'),
+            $c['user_id'] ?? null,
+            $now
+        ]);
+    }
+}
+
+function getFlightAuditHistory($flightId = null, $flightNumber = null, $flightDate = null, $limit = 100) {
+    try {
+        $db = getDb();
+        initAuditLogsTable($db);
+        $conditions = [];
+        $params = [];
+
+        if (!empty($flightId)) {
+            $conditions[] = "flight_id = ?";
+            $params[] = (string)$flightId;
+        } elseif (!empty($flightNumber)) {
+            $cleanNum = strtoupper(str_replace(['-', ' '], '', trim($flightNumber)));
+            $conditions[] = "REPLACE(REPLACE(UPPER(flight_number), '-', ''), ' ', '') = ?";
+            $params[] = $cleanNum;
+            if (!empty($flightDate)) {
+                $conditions[] = "flight_date = ?";
+                $params[] = trim((string)$flightDate);
+            }
+        }
+
+        $whereClause = !empty($conditions) ? ('WHERE ' . implode(' AND ', $conditions)) : '';
+        $limit = max(1, min(500, (int)$limit));
+
+        $sql = "SELECT id, flight_id, flight_number, flight_date, field_name, field_label,
+                       old_val, new_val, changed_by, user_id, created_at
+                FROM plan_flight_audit_logs
+                $whereClause
+                ORDER BY id DESC
+                LIMIT $limit";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
 // ----------------------------------------------------
 // 2. МАРШРУТИЗАЦИЯ
 // ----------------------------------------------------
@@ -935,6 +1067,100 @@ if ($route === '/shift/save') {
             $shiftId = $db->lastInsertId();
         }
 
+        // 1. Извлекаем текущее состояние рейсов для аудита изменений (Flight Audit Trail)
+        $stmtOld = $db->query("SELECT * FROM plan_flights");
+        $oldRows = $stmtOld->fetchAll();
+        $oldMap = [];
+        foreach ($oldRows as $r) {
+            $fId = (string)($r['id'] ?? '');
+            $fNum = strtoupper(str_replace(['-', ' '], '', trim($r['flight_number'] ?? '')));
+            $fDate = trim((string)($r['flight_date'] ?? ''));
+            if ($fId !== '') $oldMap[$fId] = $r;
+            if ($fNum !== '') $oldMap["{$fNum}_{$fDate}"] = $r;
+        }
+
+        $userDisplayName = $authUser ? ($authUser['full_name'] ?: $authUser['username']) : $dispatcher;
+        $userId = $authUser ? $authUser['id'] : null;
+        $auditChanges = [];
+
+        $compareFields = [
+            ['flight', 'flight_number'],
+            ['flight_date', 'flight_date'],
+            ['time', 'departure_time'],
+            ['release_time', 'release_time'],
+            ['route_city', 'route_city'],
+            ['route_airports', 'route_airports'],
+            ['ac_num', 'ac_num'],
+            ['ac_type', 'ac_type'],
+            ['ac_config', 'ac_config'],
+            ['pax', 'pax'],
+            ['crew', 'crew'],
+            ['fuel_block', 'fuel_block'],
+            ['fuel_trip', 'fuel_trip'],
+            ['fuel_taxi', 'fuel_taxi'],
+            ['dow', 'dow'],
+            ['doi', 'doi'],
+            ['galley', 'galley'],
+            ['mtow', 'mtow'],
+            ['cargo', 'cargo'],
+            ['mail', 'mail'],
+            ['baggage', 'baggage'],
+            ['notes', 'notes'],
+            ['status', 'status'],
+            ['lir_sent', 'lir_sent'],
+            ['szv_sent', 'szv_sent'],
+            ['ldm_sent', 'ldm_sent'],
+            ['astra_times_sent', 'astra_times_sent']
+        ];
+
+        foreach ($flights as $f) {
+            $fId = (string)($f['id'] ?? '');
+            $fNum = strtoupper(str_replace(['-', ' '], '', trim($f['flight'] ?? ($f['flight_number'] ?? ''))));
+            $fDate = trim((string)($f['flight_date'] ?? ''));
+            $oldF = $oldMap[$fId] ?? ($oldMap["{$fNum}_{$fDate}"] ?? null);
+
+            if ($oldF) {
+                foreach ($compareFields as $cf) {
+                    $reqK = $cf[0];
+                    $dbK = $cf[1];
+                    $newV = $f[$reqK] ?? null;
+                    $oldV = $oldF[$dbK] ?? null;
+
+                    if (in_array($reqK, ['lir_sent', 'szv_sent', 'ldm_sent', 'astra_times_sent'])) {
+                        $bNew = !empty($newV);
+                        $bOld = !empty($oldV);
+                        if ($bNew !== $bOld) {
+                            $auditChanges[] = [
+                                'flight_id' => $fId,
+                                'flight_number' => $f['flight'] ?? ($f['flight_number'] ?? ''),
+                                'flight_date' => $fDate,
+                                'field_name' => $reqK,
+                                'old_val' => $bOld ? 'ВКЛ' : 'ВЫКЛ',
+                                'new_val' => $bNew ? 'ВКЛ' : 'ВЫКЛ',
+                                'changed_by' => $userDisplayName,
+                                'user_id' => $userId
+                            ];
+                        }
+                    } else {
+                        $sNew = trim((string)($newV ?? ''));
+                        $sOld = trim((string)($oldV ?? ''));
+                        if ($sNew !== $sOld && ($sOld !== '' || $sNew !== '')) {
+                            $auditChanges[] = [
+                                'flight_id' => $fId,
+                                'flight_number' => $f['flight'] ?? ($f['flight_number'] ?? ''),
+                                'flight_date' => $fDate,
+                                'field_name' => $reqK,
+                                'old_val' => $sOld,
+                                'new_val' => $sNew,
+                                'changed_by' => $userDisplayName,
+                                'user_id' => $userId
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
         $db->exec("DELETE FROM plan_flights");
         $insertFlight = $db->prepare("
             INSERT INTO plan_flights (
@@ -1003,6 +1229,11 @@ if ($route === '/shift/save') {
         }
 
         $db->commit();
+
+        if (!empty($auditChanges)) {
+            recordFlightBatchChanges($db, $auditChanges);
+        }
+
         echo json_encode(['success' => true, 'saved_count' => count($flights)]);
         exit;
     } catch (Exception $e) {
@@ -1013,6 +1244,21 @@ if ($route === '/shift/save') {
         echo json_encode(['detail' => 'Ошибка сохранения смены в MySQL: ' . $e->getMessage()]);
         exit;
     }
+}
+
+
+// ----------------------------------------------------
+// ЭНДПОИНТ: /flight/history (История правок рейса)
+// ----------------------------------------------------
+if ($route === '/flight/history') {
+    $flightId = $_GET['flight_id'] ?? null;
+    $flightNumber = $_GET['flight_number'] ?? null;
+    $flightDate = $_GET['flight_date'] ?? null;
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 100;
+
+    $history = getFlightAuditHistory($flightId, $flightNumber, $flightDate, $limit);
+    echo json_encode(['history' => $history]);
+    exit;
 }
 
 

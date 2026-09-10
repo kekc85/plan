@@ -23,6 +23,7 @@ export default function ShiftTable({
   onMoveDown,
   onAcknowledgeField,
   onAcknowledgeFlight,
+  onOpenHistory,
   onAddFlight
 }) {
   const sensors = useSensors(
@@ -78,7 +79,7 @@ export default function ShiftTable({
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[62px] max-w-[70px] text-teal-700 dark:text-teal-300 shadow-sm">Астра (REN)<br/><span className="text-[9px] font-medium text-slate-500">Времена</span></th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[124px] min-w-[120px] max-w-[128px] shadow-sm">Статус</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 font-extrabold tracking-wider uppercase min-w-[75px] max-w-[95px] shadow-sm">Примечания</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 min-w-[56px] max-w-[60px] no-print shadow-sm">Действия</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-16 min-w-[64px] max-w-[68px] no-print shadow-sm">Действия</th>
             </tr>
           </thead>
 
@@ -105,6 +106,7 @@ export default function ShiftTable({
                       onMoveDown={onMoveDown}
                       onAcknowledgeField={onAcknowledgeField}
                       onAcknowledgeFlight={onAcknowledgeFlight}
+                      onOpenHistory={onOpenHistory}
                       isFirst={index === 0}
                       isLast={index === flights.length - 1}
                     />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, ArrowUp, ArrowDown, Check, Bell } from 'lucide-react';
+import { GripVertical, Trash2, ArrowUp, ArrowDown, Check, Bell, History } from 'lucide-react';
 import { 
   formatValidTime, 
   calcReleaseTime, 
@@ -46,6 +46,7 @@ export default function FlightRow({
   onMoveDown,
   onAcknowledgeField,
   onAcknowledgeFlight,
+  onOpenHistory,
   isFirst,
   isLast
 }) {
@@ -972,7 +973,7 @@ export default function FlightRow({
       </td>
 
       {/* 20. Действия */}
-      <td className={`py-1 px-0.5 text-center whitespace-nowrap no-print rounded-r-2xl w-14 min-w-[56px] max-w-[60px] ${
+      <td className={`py-1 px-0.5 text-center whitespace-nowrap no-print rounded-r-2xl w-16 min-w-[64px] max-w-[68px] ${
         isOverdue ? 'border-r-2 border-r-rose-500 border-t-2 border-b-2 border-rose-500' : 'border-r border-t border-b border-slate-200/80 dark:border-slate-800/80'
       }`}>
         <div className="flex items-center justify-center gap-0.5">
@@ -989,6 +990,15 @@ export default function FlightRow({
           )}
 
           <div className="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={(e) => { e.stopPropagation(); onOpenHistory?.(flight); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="p-0.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 rounded hover:bg-sky-100 dark:hover:bg-slate-800 transition-colors"
+              title="История изменений рейса (Flight Audit Trail)"
+            >
+              <History className="w-3.5 h-3.5" />
+            </button>
             <button
               onClick={(e) => { e.stopPropagation(); onMoveUp(index); }}
               onPointerDown={(e) => e.stopPropagation()}
