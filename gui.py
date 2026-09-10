@@ -359,11 +359,11 @@ class AviabitParserGUI(tk.Tk):
         end_str = end_date.strftime("%d.%m.%Y")
 
         if s_h == 0 and s_m == 0 and e_h == 23 and e_m == 59:
-            default_filename = f"Суточный_план_Диспетчера_{start_str}_{end_str}.xlsx"
+            default_filename = f"План_{start_str}_{end_str}.xlsx"
         else:
             s_t = f"{s_h:02d}-{s_m:02d}"
             e_t = f"{e_h:02d}-{e_m:02d}"
-            default_filename = f"Суточный_план_Диспетчера_{start_str}_{s_t}_{end_str}_{e_t}.xlsx"
+            default_filename = f"План_{start_str}_{s_t}_{end_str}_{e_t}.xlsx"
 
         # Диалог выбора папки и имени файла для сохранения
         chosen_path = filedialog.asksaveasfilename(

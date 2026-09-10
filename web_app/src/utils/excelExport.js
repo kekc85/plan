@@ -187,7 +187,7 @@ export async function exportShiftToExcel(flights, shiftInfo) {
     });
 
     const cleanDate = (shiftInfo?.date_interval || shiftInfo?.date || 'export').replace(/[^a-zA-Z0-9а-яА-Я._-]/g, '_');
-    const fileName = `Суточный_план_Диспетчера_${cleanDate}.xlsx`;
+    const fileName = `План_${cleanDate}.xlsx`;
 
     // 1. Попытка нативного модального окна проводника «Сохранить как»
     if (typeof window.showSaveFilePicker === 'function') {

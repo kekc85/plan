@@ -1113,7 +1113,7 @@ def export_excel_endpoint(req: ExportExcelRequest, current_user: dict = Depends(
     output_stream.seek(0)
 
     clean_date = "".join(c for c in date_str if c.isalnum() or c in "._-")
-    filename = f"Суточный_план_Диспетчера_{clean_date}.xlsx"
+    filename = f"План_{clean_date}.xlsx"
     encoded_filename = urllib.parse.quote(filename)
 
     return StreamingResponse(
