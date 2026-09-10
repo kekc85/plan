@@ -91,7 +91,50 @@ CREATE TABLE IF NOT EXISTS `plan_handover_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------
--- 5. Начальные учётные записи (пароли: admin123 / dispatch123)
+-- 5. Таблица аэропортов вылета
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `plan_departure_airports` (
+    `code` VARCHAR(10) PRIMARY KEY,
+    `city_name` VARCHAR(100) NOT NULL,
+    `is_enabled` TINYINT(1) DEFAULT 1,
+    `is_custom` TINYINT(1) DEFAULT 0,
+    `sort_order` INT DEFAULT 0,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------
+-- 6. Таблица системных логов и аудита ошибок
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `plan_system_logs` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `level` VARCHAR(16) NOT NULL DEFAULT 'INFO',
+    `module` VARCHAR(32) NOT NULL DEFAULT 'system',
+    `message` TEXT NOT NULL,
+    `details` MEDIUMTEXT NULL,
+    `user_id` INT NULL,
+    `username` VARCHAR(64) NULL,
+    `ip_address` VARCHAR(64) NULL,
+    `created_at` VARCHAR(64) NOT NULL,
+    INDEX `idx_logs_created_at` (`created_at`),
+    INDEX `idx_logs_level` (`level`),
+    INDEX `idx_logs_module` (`module`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------
+-- 7. Таблица системных настроек
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `plan_settings` (
+    `setting_key` VARCHAR(64) PRIMARY KEY,
+    `setting_value` TEXT NOT NULL,
+    `updated_at` VARCHAR(64) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `plan_settings` (`setting_key`, `setting_value`, `updated_at`)
+VALUES ('log_retention_days', '7', NOW())
+ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;
+
+-- ----------------------------------------------------------
+-- 8. Начальные учётные записи (пароли: admin123 / dispatch123)
 -- ----------------------------------------------------------
 INSERT INTO `plan_users` (`username`, `password_hash`, `salt`, `full_name`, `role`, `is_active`, `created_at`)
 VALUES 

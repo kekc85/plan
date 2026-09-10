@@ -440,6 +440,106 @@ function getJsonInput() {
     return json_decode($raw, true) ?: [];
 }
 
+function initLogsTable($db) {
+    static $initialized = false;
+    if ($initialized) return;
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS plan_system_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            level VARCHAR(16) NOT NULL DEFAULT 'INFO',
+            module VARCHAR(32) NOT NULL DEFAULT 'system',
+            message TEXT NOT NULL,
+            details MEDIUMTEXT NULL,
+            user_id INT NULL,
+            username VARCHAR(64) NULL,
+            ip_address VARCHAR(64) NULL,
+            created_at VARCHAR(64) NOT NULL,
+            INDEX idx_logs_created_at (created_at),
+            INDEX idx_logs_level (level),
+            INDEX idx_logs_module (module)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS plan_settings (
+            setting_key VARCHAR(64) PRIMARY KEY,
+            setting_value TEXT NOT NULL,
+            updated_at VARCHAR(64) NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("INSERT IGNORE INTO plan_settings (setting_key, setting_value, updated_at) VALUES ('log_retention_days', '7', NOW())");
+        $initialized = true;
+    } catch (Exception $e) {}
+}
+
+function getClientIp() {
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $parts = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+        return trim($parts[0]);
+    }
+    return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+}
+
+function getSystemSetting($key, $default = '') {
+    try {
+        $db = getDb();
+        initLogsTable($db);
+        $stmt = $db->prepare("SELECT setting_value FROM plan_settings WHERE setting_key = ? LIMIT 1");
+        $stmt->execute([$key]);
+        $row = $stmt->fetch();
+        return $row ? $row['setting_value'] : $default;
+    } catch (Exception $e) {
+        return $default;
+    }
+}
+
+function setSystemSetting($key, $value) {
+    try {
+        $db = getDb();
+        initLogsTable($db);
+        $now = date('Y-m-d H:i:s');
+        $stmt = $db->prepare("INSERT INTO plan_settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = VALUES(updated_at)");
+        $stmt->execute([$key, (string)$value, $now]);
+    } catch (Exception $e) {}
+}
+
+function getLogRetentionDays() {
+    $days = (int)getSystemSetting('log_retention_days', '7');
+    return ($days >= 1 && $days <= 365) ? $days : 7;
+}
+
+function cleanupOldLogs($days = null) {
+    try {
+        $db = getDb();
+        initLogsTable($db);
+        if ($days === null) {
+            $days = getLogRetentionDays();
+        }
+        $cutoff = date('Y-m-d H:i:s', strtotime("-$days days"));
+        $cutoffIso = date('c', strtotime("-$days days"));
+        $stmt = $db->prepare("DELETE FROM plan_system_logs WHERE created_at < ? OR created_at < ?");
+        $stmt->execute([$cutoff, $cutoffIso]);
+        return $stmt->rowCount();
+    } catch (Exception $e) {
+        return 0;
+    }
+}
+
+function logSystemEvent($level, $module, $message, $details = null, $userId = null, $username = null, $ipAddress = null) {
+    try {
+        $db = getDb();
+        initLogsTable($db);
+        $level = strtoupper($level ?: 'INFO');
+        $module = strtolower($module ?: 'system');
+        $now = date('Y-m-d H:i:s');
+        if ($details !== null && !is_string($details)) {
+            $details = json_encode($details, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        }
+        $stmt = $db->prepare("INSERT INTO plan_system_logs (level, module, message, details, user_id, username, ip_address, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$level, $module, $message, $details, $userId, $username, $ipAddress, $now]);
+    } catch (Exception $e) {}
+}
+
 // ----------------------------------------------------
 // 2. МАРШРУТИЗАЦИЯ
 // ----------------------------------------------------
@@ -525,17 +625,23 @@ if ($route === '/auth/login') {
         }
     }
 
+    $clientIp = getClientIp();
+
     if (!$user || !$isValid) {
+        logSystemEvent('WARN', 'auth', "Неудачная попытка входа с логином '$username'", null, null, $username, $clientIp);
         http_response_code(401);
         echo json_encode(['detail' => 'Неверный логин или пароль']);
         exit;
     }
 
     if (!$user['is_active']) {
+        logSystemEvent('WARN', 'auth', "Попытка входа в заблокированную учетную запись '{$user['username']}'", null, $user['id'], $user['username'], $clientIp);
         http_response_code(403);
         echo json_encode(['detail' => 'Учетная запись отключена']);
         exit;
     }
+
+    logSystemEvent('INFO', 'auth', "Пользователь '{$user['username']}' ({$user['full_name']}) успешно вошел в систему", null, $user['id'], $user['username'], $clientIp);
 
     $token = createJwtToken([
         'user_id' => $user['id'],
@@ -1690,9 +1796,10 @@ if (strpos($route, '/admin/users') === 0) {
             exit;
         }
 
-        list($hash, $salt) = hashPassword($password);
         $ins = $db->prepare("INSERT INTO plan_users (username, password_hash, salt, full_name, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)");
         $ins->execute([$username, $hash, $salt, $fullName, $role, date('Y-m-d H:i:s')]);
+
+        logSystemEvent('INFO', 'auth', "Администратор '{$admin['username']}' создал пользователя '$username' (роль: $role, ФИО: $fullName)", null, $admin['id'], $admin['username'], getClientIp());
 
         echo json_encode(['success' => true, 'message' => "Пользователь $username успешно создан"]);
         exit;
@@ -1736,6 +1843,8 @@ if (strpos($route, '/admin/users') === 0) {
         $upd = $db->prepare("UPDATE plan_users SET full_name = ?, username = ?, role = ?, is_active = ?, password_hash = ?, salt = ? WHERE id = ?");
         $upd->execute([$fullName, $username, $role, $isActive, $passwordHash, $salt, $targetId]);
 
+        logSystemEvent('INFO', 'auth', "Администратор '{$admin['username']}' обновил пользователя '{$targetUser['username']}' (ID: $targetId)", null, $admin['id'], $admin['username'], getClientIp());
+
         echo json_encode([
             'success' => true,
             'message' => "Данные пользователя $username успешно обновлены"
@@ -1750,13 +1859,173 @@ if (strpos($route, '/admin/users') === 0) {
             exit;
         }
 
+        $stmt = $db->prepare("SELECT username FROM plan_users WHERE id = ?");
+        $stmt->execute([$targetId]);
+        $targetUser = $stmt->fetch();
+        $deletedName = $targetUser ? $targetUser['username'] : "ID $targetId";
+
         $del = $db->prepare("DELETE FROM plan_users WHERE id = ?");
         $del->execute([$targetId]);
+
+        logSystemEvent('WARN', 'auth', "Администратор '{$admin['username']}' удалил пользователя '$deletedName' (ID: $targetId)", null, $admin['id'], $admin['username'], getClientIp());
 
         echo json_encode(['success' => true, 'message' => 'Пользователь удален']);
         exit;
     }
 }
+
+// ----------------------------------------------------
+// ЭНДПОИНТЫ АДМИНИСТРАТОРА: /admin/logs (Журнал системных логов)
+// ----------------------------------------------------
+if (strpos($route, '/admin/logs') === 0) {
+    $admin = getAuthUser();
+    if ($admin['role'] !== 'admin') {
+        http_response_code(403);
+        echo json_encode(['detail' => 'Доступ разрешен только Администратору']);
+        exit;
+    }
+
+    $db = getDb();
+    initLogsTable($db);
+    $method = $_SERVER['REQUEST_METHOD'];
+
+    // 1. Настройки срока хранения логов
+    if ($route === '/admin/logs/settings') {
+        if ($method === 'GET') {
+            echo json_encode(['retention_days' => getLogRetentionDays()]);
+            exit;
+        }
+        if ($method === 'POST') {
+            $input = getJsonInput();
+            $days = max(1, min(365, (int)($input['retention_days'] ?? 7)));
+            setSystemSetting('log_retention_days', (string)$days);
+            $deleted = cleanupOldLogs($days);
+            logSystemEvent('INFO', 'system', "Администратор '{$admin['username']}' изменил срок хранения логов на $days дней (удалено $deleted устаревших записей)", null, $admin['id'], $admin['username'], getClientIp());
+            echo json_encode([
+                'success' => true,
+                'retention_days' => $days,
+                'deleted_count' => $deleted,
+                'message' => "Срок хранения установлен: $days дн. Удалено устаревших записей: $deleted"
+            ]);
+            exit;
+        }
+    }
+
+    // 2. Очистка логов
+    if ($route === '/admin/logs/clear' && $method === 'POST') {
+        $input = getJsonInput();
+        if (!empty($input['clear_all'])) {
+            $stmt = $db->query("DELETE FROM plan_system_logs");
+            $deleted = $stmt->rowCount();
+            logSystemEvent('WARN', 'system', "Администратор '{$admin['username']}' полностью очистил журнал логов", null, $admin['id'], $admin['username'], getClientIp());
+            echo json_encode(['success' => true, 'deleted_count' => $deleted, 'message' => 'Все логи успешно удалены']);
+            exit;
+        } else {
+            $days = isset($input['days']) ? (int)$input['days'] : getLogRetentionDays();
+            $deleted = cleanupOldLogs($days);
+            logSystemEvent('INFO', 'system', "Администратор '{$admin['username']}' выполнил ручную очистку логов старше $days дней (удалено $deleted)", null, $admin['id'], $admin['username'], getClientIp());
+            echo json_encode(['success' => true, 'deleted_count' => $deleted, 'message' => "Удалено $deleted записей старше $days дней"]);
+            exit;
+        }
+    }
+
+    // 3. Получение списка логов
+    if ($method === 'GET') {
+        cleanupOldLogs();
+
+        $level = $_GET['level'] ?? null;
+        $module = $_GET['module'] ?? null;
+        $search = trim($_GET['search'] ?? '');
+        $limit = max(1, min(1000, (int)($_GET['limit'] ?? 200)));
+        $offset = max(0, (int)($_GET['offset'] ?? 0));
+
+        $conditions = [];
+        $params = [];
+
+        if ($level && strtoupper($level) !== 'ALL') {
+            $conditions[] = "level = ?";
+            $params[] = strtoupper($level);
+        }
+        if ($module && strtolower($module) !== 'all') {
+            $conditions[] = "module = ?";
+            $params[] = strtolower($module);
+        }
+        if ($search !== '') {
+            $term = "%$search%";
+            $conditions[] = "(message LIKE ? OR details LIKE ? OR username LIKE ? OR ip_address LIKE ?)";
+            $params[] = $term;
+            $params[] = $term;
+            $params[] = $term;
+            $params[] = $term;
+        }
+
+        $whereClause = !empty($conditions) ? "WHERE " . implode(" AND ", $conditions) : "";
+
+        // Общий подсчет
+        $countStmt = $db->prepare("SELECT COUNT(*) as cnt FROM plan_system_logs $whereClause");
+        $countStmt->execute($params);
+        $totalCount = (int)$countStmt->fetchColumn();
+
+        // Сводная статистика
+        $statStmt = $db->query("SELECT level, COUNT(*) as cnt FROM plan_system_logs GROUP BY level");
+        $statRows = $statStmt->fetchAll();
+        $stats = ['total' => 0, 'error' => 0, 'warn' => 0, 'info' => 0];
+        foreach ($statRows as $sr) {
+            $lvl = strtoupper($sr['level']);
+            $cnt = (int)$sr['cnt'];
+            $stats['total'] += $cnt;
+            if (strpos($lvl, 'ERROR') !== false || strpos($lvl, 'CRIT') !== false) {
+                $stats['error'] += $cnt;
+            } elseif (strpos($lvl, 'WARN') !== false) {
+                $stats['warn'] += $cnt;
+            } elseif (strpos($lvl, 'INFO') !== false) {
+                $stats['info'] += $cnt;
+            }
+        }
+
+        // Выборка записей
+        $selectSql = "SELECT id, level, module, message, details, user_id, username, ip_address, created_at
+            FROM plan_system_logs
+            $whereClause
+            ORDER BY id DESC
+            LIMIT $limit OFFSET $offset";
+        $selStmt = $db->prepare($selectSql);
+        $selStmt->execute($params);
+        $logs = $selStmt->fetchAll();
+
+        echo json_encode([
+            'logs' => $logs,
+            'total' => $totalCount,
+            'stats' => $stats,
+            'retention_days' => getLogRetentionDays()
+        ]);
+        exit;
+    }
+}
+
+// ----------------------------------------------------
+// ЭНДПОИНТ: /logs/client_error (Прием JS-ошибок с фронтенда)
+// ----------------------------------------------------
+if ($route === '/logs/client_error' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = getOptionalAuthUser();
+    $input = getJsonInput();
+    $message = trim($input['message'] ?? 'Неизвестная ошибка фронтенда');
+    $clientIp = getClientIp();
+
+    logSystemEvent(
+        'ERROR',
+        'client',
+        "Клиентская ошибка: $message",
+        $input,
+        $user ? $user['id'] : null,
+        $user ? $user['username'] : 'anonymous',
+        $clientIp
+    );
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
 
 // ----------------------------------------------------
 // ЭНДПОИНТ: /airports (Управление фильтром аэропортов вылета)

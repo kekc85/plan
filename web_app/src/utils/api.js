@@ -204,3 +204,88 @@ export async function deleteDepartureAirport(code) {
     body: JSON.stringify({ code })
   });
 }
+
+// --- АДМИНИСТРИРОВАНИЕ ЖУРНАЛА СИСТЕМНЫХ ЛОГОВ И ОШИБОК ---
+
+export async function adminGetLogs(params = {}) {
+  const query = new URLSearchParams();
+  if (params.level) query.append('level', params.level);
+  if (params.module) query.append('module', params.module);
+  if (params.search) query.append('search', params.search);
+  if (params.limit) query.append('limit', params.limit);
+  if (params.offset) query.append('offset', params.offset);
+  const qStr = query.toString();
+  return request(`/admin/logs${qStr ? `?${qStr}` : ''}`);
+}
+
+export async function adminGetLogSettings() {
+  return request('/admin/logs/settings');
+}
+
+export async function adminUpdateLogSettings(retentionDays) {
+  return request('/admin/logs/settings', {
+    method: 'POST',
+    body: JSON.stringify({ retention_days: retentionDays })
+  });
+}
+
+export async function adminClearLogs(options = {}) {
+  return request('/admin/logs/clear', {
+    method: 'POST',
+    body: JSON.stringify({
+      clear_all: Boolean(options.clearAll),
+      days: options.days
+    })
+  });
+}
+
+export async function sendClientErrorLog(errorData) {
+  try {
+    return await request('/logs/client_error', {
+      method: 'POST',
+      body: JSON.stringify(errorData)
+    });
+  } catch (e) {
+    // Игнорируем сбои отправки отчета об ошибке
+    return null;
+  }
+}
+
+// Защита от спама повторными ошибками на клиенте
+const reportedErrorSet = new Set();
+
+export function initGlobalErrorLogging() {
+  if (typeof window === 'undefined') return;
+
+  window.onerror = (message, source, lineno, colno, error) => {
+    const key = `${message}:${source}:${lineno}`;
+    if (reportedErrorSet.has(key)) return;
+    reportedErrorSet.add(key);
+    setTimeout(() => reportedErrorSet.delete(key), 30000);
+
+    sendClientErrorLog({
+      message: String(message),
+      source: String(source || ''),
+      lineno: lineno || null,
+      colno: colno || null,
+      stack: error && error.stack ? String(error.stack) : '',
+      url: window.location.href
+    });
+  };
+
+  window.onunhandledrejection = (event) => {
+    const reason = event.reason || 'Unhandled Promise Rejection';
+    const message = reason.message || String(reason);
+    const key = `rejection:${message}`;
+    if (reportedErrorSet.has(key)) return;
+    reportedErrorSet.add(key);
+    setTimeout(() => reportedErrorSet.delete(key), 30000);
+
+    sendClientErrorLog({
+      message: `Unhandled Rejection: ${message}`,
+      stack: reason.stack ? String(reason.stack) : '',
+      url: window.location.href
+    });
+  };
+}
+

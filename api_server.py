@@ -30,7 +30,12 @@ from db import (
     hash_password,
     verify_password,
     execute_query,
-    MSK_TZ
+    MSK_TZ,
+    log_system_event,
+    cleanup_old_logs,
+    get_setting,
+    set_setting,
+    get_log_retention_days
 )
 from auth import (
     create_jwt_token,
@@ -185,6 +190,25 @@ class HandoverRequest(BaseModel):
     archive_closed_flights: bool = False
 
 
+class ClientErrorLogRequest(BaseModel):
+    message: str
+    source: Optional[str] = None
+    lineno: Optional[int] = None
+    colno: Optional[int] = None
+    stack: Optional[str] = None
+    url: Optional[str] = None
+
+
+class LogSettingsRequest(BaseModel):
+    retention_days: int
+
+
+class ClearLogsRequest(BaseModel):
+    clear_all: Optional[bool] = False
+    days: Optional[int] = None
+
+
+
 # --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
 def calc_release_time_py(flight_time: str, offset_mins: int = 40) -> str:
@@ -292,12 +316,15 @@ def login(req: LoginRequest, request: Request):
 
     if not user_dict or not is_valid:
         record_failed_login(client_ip)
+        log_system_event("WARN", "auth", f"Неудачная попытка входа с логином '{username_clean}'", ip_address=client_ip)
         raise HTTPException(status_code=401, detail="Неверное имя пользователя или пароль")
 
     if not user_dict["is_active"]:
+        log_system_event("WARN", "auth", f"Попытка входа в заблокированную учетную запись '{user_dict['username']}'", user_id=user_dict["id"], username=user_dict["username"], ip_address=client_ip)
         raise HTTPException(status_code=403, detail="Учетная запись заблокирована администратором")
 
     clear_failed_logins(client_ip)
+    log_system_event("INFO", "auth", f"Пользователь '{user_dict['username']}' ({user_dict['full_name']}) успешно вошел в систему", user_id=user_dict["id"], username=user_dict["username"], ip_address=client_ip)
 
     token = create_jwt_token({
         "user_id": user_dict["id"],
@@ -406,6 +433,12 @@ def create_user(req: CreateUserRequest, admin: dict = Depends(require_admin)):
         conn.commit()
     conn.close()
 
+    log_system_event(
+        "INFO", "auth",
+        f"Администратор '{admin['username']}' создал пользователя '{username}' (роль: {req.role}, ФИО: {req.full_name})",
+        user_id=admin["id"], username=admin["username"]
+    )
+
     return {"success": True, "user_id": new_id, "message": f"Пользователь {username} успешно создан"}
 
 
@@ -420,6 +453,7 @@ def update_user(user_id: int, req: UpdateUserRequest, admin: dict = Depends(requ
         conn.close()
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
+    target_dict = dict(target_user)
     updates = []
     params = []
 
@@ -454,6 +488,14 @@ def update_user(user_id: int, req: UpdateUserRequest, admin: dict = Depends(requ
             conn.commit()
 
     conn.close()
+
+    log_system_event(
+        "INFO", "auth",
+        f"Администратор '{admin['username']}' обновил пользователя '{target_dict.get('username')}' (ID: {user_id})",
+        details={"updated_fields": [u.split(' =')[0] for u in updates]},
+        user_id=admin["id"], username=admin["username"]
+    )
+
     return {"success": True, "message": "Данные пользователя обновлены"}
 
 
@@ -465,11 +507,202 @@ def delete_user(user_id: int, admin: dict = Depends(require_admin)):
 
     conn, engine = DatabaseConnection.get_connection()
     cursor = conn.cursor()
+    cursor.execute(q("SELECT username FROM plan_users WHERE id = %s;", engine), (user_id,))
+    target = cursor.fetchone()
+    deleted_username = dict(target).get("username") if target else f"ID {user_id}"
+
     cursor.execute(q("DELETE FROM plan_users WHERE id = %s;", engine), (user_id,))
     if engine == "sqlite":
         conn.commit()
     conn.close()
+
+    log_system_event(
+        "WARN", "auth",
+        f"Администратор '{admin['username']}' удалил пользователя '{deleted_username}' (ID: {user_id})",
+        user_id=admin["id"], username=admin["username"]
+    )
+
     return {"success": True, "message": "Пользователь удален"}
+
+
+# --- 2.1. ЖУРНАЛ СИСТЕМНЫХ ЛОГОВ И АУДИТА ОШИБОК (ТОЛЬКО АДМИНИСТРАТОР) ---
+
+@app.get("/api/admin/logs")
+def get_system_logs(
+    level: Optional[str] = None,
+    module: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 200,
+    offset: int = 0,
+    admin: dict = Depends(require_admin)
+):
+    """
+    Получение системных логов и аудита ошибок с автоочисткой устаревших (только для Администратора).
+    """
+    # Выполняем автоочистку записей старше установленного срока
+    cleanup_old_logs()
+
+    limit = max(1, min(1000, limit))
+    offset = max(0, offset)
+
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+
+    conditions = []
+    params = []
+
+    if level and level.upper() != "ALL":
+        conditions.append("level = %s")
+        params.append(level.upper())
+
+    if module and module.lower() != "all":
+        conditions.append("module = %s")
+        params.append(module.lower())
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        conditions.append("(message LIKE %s OR details LIKE %s OR username LIKE %s OR ip_address LIKE %s)")
+        params.extend([term, term, term, term])
+
+    where_clause = ""
+    if conditions:
+        where_clause = "WHERE " + " AND ".join(conditions)
+
+    # 1. Получаем общее количество записей с учетом фильтров
+    count_sql = f"SELECT COUNT(*) as cnt FROM plan_system_logs {where_clause};"
+    cursor.execute(q(count_sql, engine), tuple(params))
+    count_row = cursor.fetchone()
+    total_count = count_row["cnt"] if isinstance(count_row, dict) else count_row[0]
+
+    # 2. Получаем сводную статистику по уровням
+    cursor.execute("SELECT level, COUNT(*) as cnt FROM plan_system_logs GROUP BY level;")
+    stat_rows = cursor.fetchall()
+    stats = {"total": 0, "error": 0, "warn": 0, "info": 0}
+    for row in stat_rows:
+        r_dict = dict(row)
+        lvl = str(r_dict.get("level", "")).upper()
+        cnt = int(r_dict.get("cnt", 0))
+        stats["total"] += cnt
+        if "ERROR" in lvl or "CRIT" in lvl:
+            stats["error"] += cnt
+        elif "WARN" in lvl:
+            stats["warn"] += cnt
+        elif "INFO" in lvl:
+            stats["info"] += cnt
+
+    # 3. Выборка строк с пагинацией
+    select_sql = f"""
+    SELECT id, level, module, message, details, user_id, username, ip_address, created_at
+    FROM plan_system_logs
+    {where_clause}
+    ORDER BY id DESC
+    LIMIT %s OFFSET %s;
+    """
+    select_params = list(params) + [limit, offset]
+    cursor.execute(q(select_sql, engine), tuple(select_params))
+    rows = cursor.fetchall()
+    logs = [dict(r) for r in rows]
+    conn.close()
+
+    return {
+        "logs": logs,
+        "total": total_count,
+        "stats": stats,
+        "retention_days": get_log_retention_days()
+    }
+
+
+@app.get("/api/admin/logs/settings")
+def get_log_settings(admin: dict = Depends(require_admin)):
+    """Получение текущих настроек журнала логов"""
+    return {
+        "retention_days": get_log_retention_days()
+    }
+
+
+@app.post("/api/admin/logs/settings")
+def update_log_settings(req: LogSettingsRequest, admin: dict = Depends(require_admin)):
+    """Обновление срока хранения логов (3, 7, 14, 30 дней)"""
+    days = max(1, min(365, req.retention_days))
+    set_setting("log_retention_days", str(days))
+    deleted = cleanup_old_logs(days)
+
+    log_system_event(
+        "INFO", "system",
+        f"Администратор '{admin['username']}' изменил срок хранения логов на {days} дней (удалено {deleted} устаревших записей)",
+        user_id=admin["id"], username=admin["username"]
+    )
+
+    return {
+        "success": True,
+        "retention_days": days,
+        "deleted_count": deleted,
+        "message": f"Срок хранения установлен: {days} дн. Удалено устаревших записей: {deleted}"
+    }
+
+
+@app.post("/api/admin/logs/clear")
+def clear_system_logs(req: ClearLogsRequest, admin: dict = Depends(require_admin)):
+    """Очистка журнала логов администратором"""
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+
+    if req.clear_all:
+        cursor.execute("DELETE FROM plan_system_logs;")
+        deleted = cursor.rowcount
+        if engine == "sqlite": conn.commit()
+        conn.close()
+        log_system_event(
+            "WARN", "system",
+            f"Администратор '{admin['username']}' полностью очистил журнал логов",
+            user_id=admin["id"], username=admin["username"]
+        )
+        return {"success": True, "deleted_count": deleted, "message": "Все логи успешно удалены"}
+    else:
+        conn.close()
+        days = req.days if req.days is not None else get_log_retention_days()
+        deleted = cleanup_old_logs(days)
+        log_system_event(
+            "INFO", "system",
+            f"Администратор '{admin['username']}' выполнил ручную очистку логов старше {days} дней (удалено {deleted})",
+            user_id=admin["id"], username=admin["username"]
+        )
+        return {"success": True, "deleted_count": deleted, "message": f"Удалено {deleted} записей старше {days} дней"}
+
+
+@app.post("/api/logs/client_error")
+def receive_client_error(
+    req: ClientErrorLogRequest,
+    request: Request,
+    auth_user: Optional[dict] = Depends(get_optional_user)
+):
+    """
+    Прием и логирование клиентских JavaScript-ошибок с фронтенда диспетчеров.
+    """
+    client_ip = get_client_ip(request)
+    u_id = auth_user["id"] if auth_user else None
+    u_name = auth_user["username"] if auth_user else "anonymous"
+
+    details = {
+        "source": req.source,
+        "lineno": req.lineno,
+        "colno": req.colno,
+        "url": req.url,
+        "stack": req.stack
+    }
+
+    log_system_event(
+        level="ERROR",
+        module="client",
+        message=f"Клиентская ошибка: {req.message}",
+        details=details,
+        user_id=u_id,
+        username=u_name,
+        ip_address=client_ip
+    )
+
+    return {"success": True}
+
 
 
 # --- 3. СИНХРОНИЗАЦИЯ СМЕНЫ И РЕЙСОВ В БАЗЕ ДАННЫХ ---
@@ -826,6 +1059,14 @@ def shift_handover(req: HandoverRequest, current_user: dict = Depends(get_curren
         conn.commit()
     conn.close()
 
+    log_system_event(
+        "INFO", "shift",
+        f"Смена успешно передана: {req.handed_over_by} ➔ {req.accepted_by} (передано рейсов: {len(active_flights)})",
+        details={"notes": req.notes, "active_flights": summary_text},
+        user_id=current_user.get("id"),
+        username=current_user.get("username")
+    )
+
     return {
         "success": True,
         "message": f"Смена успешно передана диспетчеру {req.accepted_by}",
@@ -974,6 +1215,21 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
             "outbound_takeoff_time": str(row.get("outbound_takeoff_time") or ""),
             "plane_status": str(row.get("plane_status") or "")
         })
+
+    if errors:
+        log_system_event(
+            "WARN", "aviabit",
+            f"Предупреждения при загрузке AviaBit: {'; '.join(errors)} (получено {len(result_flights)} рейсов)",
+            user_id=current_user.get("id"),
+            username=current_user.get("username")
+        )
+    else:
+        log_system_event(
+            "INFO", "aviabit",
+            f"Загрузка AviaBit: успешно получено {len(result_flights)} рейсов ({start_dt.strftime('%d.%m %H:%M')} — {end_dt.strftime('%d.%m %H:%M')})",
+            user_id=current_user.get("id"),
+            username=current_user.get("username")
+        )
 
     return {
         "success": True,

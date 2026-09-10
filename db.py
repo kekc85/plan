@@ -223,6 +223,39 @@ def init_db():
             """, ("dispatcher", disp_hash, disp_salt, "Диспетчер по центровке", "dispatcher", now_str))
             print("[MySQL] Созданы начальные учётные записи в MySQL на Beget")
 
+        # Таблица системных логов и аудита ошибок
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS plan_system_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            level VARCHAR(16) NOT NULL DEFAULT 'INFO',
+            module VARCHAR(32) NOT NULL DEFAULT 'system',
+            message TEXT NOT NULL,
+            details MEDIUMTEXT NULL,
+            user_id INT NULL,
+            username VARCHAR(64) NULL,
+            ip_address VARCHAR(64) NULL,
+            created_at VARCHAR(64) NOT NULL,
+            INDEX idx_logs_created_at (created_at),
+            INDEX idx_logs_level (level),
+            INDEX idx_logs_module (module)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """)
+
+        # Таблица системных настроек (например, срок хранения логов)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS plan_settings (
+            setting_key VARCHAR(64) PRIMARY KEY,
+            setting_value TEXT NOT NULL,
+            updated_at VARCHAR(64) NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """)
+
+        # Значение по умолчанию для срока хранения логов (7 дней)
+        cursor.execute("""
+        INSERT IGNORE INTO plan_settings (setting_key, setting_value, updated_at)
+        VALUES ('log_retention_days', '7', NOW());
+        """)
+
         # Автомиграция: добавление колонки ac_type если ее еще нет
         try:
             cursor.execute("ALTER TABLE plan_flights ADD COLUMN ac_type VARCHAR(16) NULL AFTER ac_num;")
@@ -382,6 +415,39 @@ def init_db():
             conn.commit()
             print("[SQLite] Созданы базовые учётные записи admin / dispatcher")
 
+        # Таблица системных логов и аудита ошибок
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS plan_system_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            level TEXT NOT NULL DEFAULT 'INFO',
+            module TEXT NOT NULL DEFAULT 'system',
+            message TEXT NOT NULL,
+            details TEXT,
+            user_id INTEGER,
+            username TEXT,
+            ip_address TEXT,
+            created_at TEXT NOT NULL
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_created_at ON plan_system_logs(created_at);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_level ON plan_system_logs(level);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_module ON plan_system_logs(module);")
+
+        # Таблица системных настроек
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS plan_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """)
+        now_str = datetime.now(MSK_TZ).strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute("""
+        INSERT OR IGNORE INTO plan_settings (setting_key, setting_value, updated_at)
+        VALUES ('log_retention_days', '7', ?);
+        """, (now_str,))
+        conn.commit()
+
         # Автомиграция: добавление колонок если их еще нет
         for col in ["ac_type", "unread_changes", "inbound_flight", "inbound_dep", "inbound_takeoff_time", "inbound_landing_calc", "inbound_landing_time", "outbound_takeoff_time", "plane_status"]:
             try:
@@ -397,6 +463,137 @@ def init_db():
             pass
 
     conn.close()
+
+
+def get_setting(key: str, default: str = "") -> str:
+    """Получает значение системной настройки из БД"""
+    try:
+        conn, engine = DatabaseConnection.get_connection()
+        cursor = conn.cursor()
+        if engine == "mysql":
+            cursor.execute("SELECT setting_value FROM plan_settings WHERE setting_key = %s LIMIT 1;", (key,))
+        else:
+            cursor.execute("SELECT setting_value FROM plan_settings WHERE setting_key = ? LIMIT 1;", (key,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return row["setting_value"] if isinstance(row, dict) else row[0]
+        return default
+    except Exception:
+        return default
+
+
+def set_setting(key: str, value: str):
+    """Сохраняет значение системной настройки в БД"""
+    now_str = datetime.now(MSK_TZ).strftime('%Y-%m-%d %H:%M:%S')
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+    try:
+        if engine == "mysql":
+            cursor.execute("""
+            INSERT INTO plan_settings (setting_key, setting_value, updated_at)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = VALUES(updated_at);
+            """, (key, str(value), now_str))
+            conn.commit()
+        else:
+            cursor.execute("""
+            INSERT INTO plan_settings (setting_key, setting_value, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = excluded.updated_at;
+            """, (key, str(value), now_str))
+            conn.commit()
+    finally:
+        conn.close()
+
+
+def get_log_retention_days() -> int:
+    """Возвращает количество дней хранения логов (по умолчанию 7)"""
+    val = get_setting("log_retention_days", "7")
+    try:
+        days = int(val)
+        return max(1, min(365, days))
+    except Exception:
+        return 7
+
+
+def cleanup_old_logs(days: Optional[int] = None) -> int:
+    """
+    Удаляет записи системных логов старше указанного количества дней (по умолчанию из настроек).
+    Возвращает количество удаленных записей.
+    """
+    if days is None:
+        days = get_log_retention_days()
+    cutoff_dt = datetime.now(MSK_TZ) - timedelta(days=days)
+    cutoff_str = cutoff_dt.strftime('%Y-%m-%d %H:%M:%S')
+    cutoff_iso = cutoff_dt.isoformat()
+
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+    deleted_count = 0
+    try:
+        if engine == "mysql":
+            cursor.execute("""
+            DELETE FROM plan_system_logs 
+            WHERE created_at < %s OR created_at < %s;
+            """, (cutoff_str, cutoff_iso))
+            deleted_count = cursor.rowcount
+            conn.commit()
+        else:
+            cursor.execute("""
+            DELETE FROM plan_system_logs 
+            WHERE created_at < ? OR created_at < ?;
+            """, (cutoff_str, cutoff_iso))
+            deleted_count = cursor.rowcount
+            conn.commit()
+    except Exception as e:
+        print(f"[Log Cleanup Error] {e}")
+    finally:
+        conn.close()
+    return deleted_count
+
+
+def log_system_event(
+    level: str,
+    module: str,
+    message: str,
+    details: Optional[str] = None,
+    user_id: Optional[int] = None,
+    username: Optional[str] = None,
+    ip_address: Optional[str] = None
+):
+    """
+    Универсальная запись события/ошибки в таблицу plan_system_logs с автоматической ротацией.
+    """
+    level_clean = (level or "INFO").upper()
+    module_clean = (module or "system").lower()
+    now_str = datetime.now(MSK_TZ).strftime('%Y-%m-%d %H:%M:%S')
+
+    # Конвертируем details в строку если передан словарь/список
+    if details is not None and not isinstance(details, str):
+        try:
+            details = json.dumps(details, ensure_ascii=False, indent=2)
+        except Exception:
+            details = str(details)
+
+    try:
+        conn, engine = DatabaseConnection.get_connection()
+        cursor = conn.cursor()
+        if engine == "mysql":
+            cursor.execute("""
+            INSERT INTO plan_system_logs (level, module, message, details, user_id, username, ip_address, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
+            """, (level_clean, module_clean, message, details, user_id, username, ip_address, now_str))
+            conn.commit()
+        else:
+            cursor.execute("""
+            INSERT INTO plan_system_logs (level, module, message, details, user_id, username, ip_address, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """, (level_clean, module_clean, message, details, user_id, username, ip_address, now_str))
+            conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[Logging Failure] {e} | Message: {message}")
 
 
 def execute_query(sql_mysql: str, sql_sqlite: str, params: tuple = ()):
@@ -418,3 +615,4 @@ def execute_query(sql_mysql: str, sql_sqlite: str, params: tuple = ()):
 if __name__ == "__main__":
     init_db()
     print("Инициализация базы данных завершена.")
+
