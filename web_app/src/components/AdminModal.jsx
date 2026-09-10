@@ -497,16 +497,16 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-2 sm:p-4">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden max-h-[94vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
         
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850/80">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 flex items-center justify-center shadow-sm">
-              <Shield className="w-5 h-5" />
+        {/* Header Row: Title + Role Badge + Close Button */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-850/90 gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 flex items-center justify-center shadow-sm shrink-0">
+              <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 leading-none flex items-center gap-2">
-                {isModerator ? 'Панель управления (Модератор)' : 'Панель администратора'}
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+            <div className="min-w-0">
+              <h3 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-slate-100 leading-tight flex items-center gap-2 flex-wrap">
+                <span>{isModerator ? 'Панель управления' : 'Панель администратора'}</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
                   isModerator
                     ? 'bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800'
                     : 'bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
@@ -514,7 +514,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                   {isModerator ? 'Модератор' : 'Администратор'}
                 </span>
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-medium">
+              <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium truncate">
                 {isModerator
                   ? 'Управление диспетчерами, просмотр логов и посменных архивов'
                   : 'Управление пользователями, аудит системных событий и настройки'}
@@ -522,94 +522,95 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
             </div>
           </div>
 
-          {/* Вкладки переключения */}
-          <div className="flex items-center bg-slate-200/70 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-300 dark:border-slate-700 gap-1 overflow-x-auto max-w-[65%]">
-            <button
-              onClick={() => {
-                setActiveTab('users');
-                setErrorMsg('');
-                setSuccessMsg('');
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                activeTab === 'users'
-                  ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>Пользователи</span>
-              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                {users.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab('logs');
-                setErrorMsg('');
-                setSuccessMsg('');
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                activeTab === 'logs'
-                  ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Activity className="w-3.5 h-3.5" />
-              <span>Журнал событий</span>
-              {logStats.error > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
-                  {logStats.error}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab('archives');
-                setErrorMsg('');
-                setSuccessMsg('');
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                activeTab === 'archives'
-                  ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Archive className="w-3.5 h-3.5" />
-              <span>Архив смен</span>
-              {archives.length > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                  {archives.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab('telegram');
-                setErrorMsg('');
-                setSuccessMsg('');
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                activeTab === 'telegram'
-                  ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Send className="w-3.5 h-3.5 text-sky-500" />
-              <span>Telegram-бот</span>
-              {tgChatId && (
-                <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" title="Настроен" />
-              )}
-            </button>
-          </div>
-
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0"
+            title="Закрыть окно"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Dedicated Responsive Tab Bar */}
+        <div className="px-3 sm:px-6 py-2 bg-slate-100/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar shrink-0 shadow-inner">
+          <button
+            onClick={() => {
+              setActiveTab('users');
+              setErrorMsg('');
+              setSuccessMsg('');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              activeTab === 'users'
+                ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Пользователи</span>
+            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+              {users.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('logs');
+              setErrorMsg('');
+              setSuccessMsg('');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              activeTab === 'logs'
+                ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Журнал событий</span>
+            {logStats.error > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+                {logStats.error}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('archives');
+              setErrorMsg('');
+              setSuccessMsg('');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              activeTab === 'archives'
+                ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
+            }`}
+          >
+            <Archive className="w-3.5 h-3.5" />
+            <span>Архив смен</span>
+            {archives.length > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                {archives.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('telegram');
+              setErrorMsg('');
+              setSuccessMsg('');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              activeTab === 'telegram'
+                ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
+            }`}
+          >
+            <Send className="w-3.5 h-3.5 text-sky-500" />
+            <span>Telegram-бот</span>
+            {tgChatId && (
+              <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" title="Настроен" />
+            )}
           </button>
         </div>
 
