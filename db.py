@@ -109,6 +109,7 @@ def init_db():
             started_at VARCHAR(64) NOT NULL,
             closed_at VARCHAR(64) NULL,
             status VARCHAR(32) NOT NULL DEFAULT 'active',
+            deleted_flights TEXT NULL,
             created_at VARCHAR(64) NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """)
@@ -236,6 +237,13 @@ def init_db():
         except Exception:
             pass
 
+        # Автомиграция: добавление колонки deleted_flights в plan_shifts
+        try:
+            cursor.execute("ALTER TABLE plan_shifts ADD COLUMN deleted_flights TEXT NULL;")
+            conn.commit()
+        except Exception:
+            pass
+
     else:
         # SQLite таблицы
         cursor.execute("""
@@ -259,6 +267,7 @@ def init_db():
             started_at TEXT NOT NULL,
             closed_at TEXT,
             status TEXT NOT NULL DEFAULT 'active',
+            deleted_flights TEXT,
             created_at TEXT NOT NULL
         );
         """)
@@ -380,6 +389,12 @@ def init_db():
                 conn.commit()
             except Exception:
                 pass
+
+        try:
+            cursor.execute("ALTER TABLE plan_shifts ADD COLUMN deleted_flights TEXT;")
+            conn.commit()
+        except Exception:
+            pass
 
     conn.close()
 

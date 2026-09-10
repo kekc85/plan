@@ -34,6 +34,8 @@ import {
 } from './utils/api';
 import {
   smartMergeWithDelta,
+  getFlightKey,
+  getFlightKeyVariants,
   acknowledgeFieldChange,
   acknowledgeFlightChanges,
   acknowledgeAllChanges,
@@ -154,6 +156,9 @@ export default function App() {
   });
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState('');
+  const lastSyncTimestampRef = React.useRef(Date.now());
+  const triggerAutoSyncRef = React.useRef();
+  const isSyncingRef = React.useRef(false);
   const [changeToast, setChangeToast] = useState(null);
 
   const [activeAlert, setActiveAlert] = useState(null);
@@ -213,6 +218,20 @@ export default function App() {
     return [];
   });
 
+  // Изоляция удаленных рейсов: список рейсов, удаленных диспетчером в текущей смене
+  const [deletedFlightKeys, setDeletedFlightKeys] = useState(() => {
+    const saved = getStoredWithMigration('deleted_flights');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  });
+  const deletedFlightKeysRef = React.useRef(deletedFlightKeys);
+  deletedFlightKeysRef.current = deletedFlightKeys;
+
   // Подсчет общего количества неподтвержденных изменений
   const unreadChangesCount = React.useMemo(() => countUnreadChanges(flights), [flights]);
 
@@ -236,6 +255,12 @@ export default function App() {
               } catch (e) {}
               return updated;
             });
+            if (Array.isArray(data.shiftInfo.deleted_flights)) {
+              setDeletedFlightKeys(data.shiftInfo.deleted_flights);
+              try {
+                localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify(data.shiftInfo.deleted_flights));
+              } catch (e) {}
+            }
 
             // Проверяем, было ли уже подтверждено ознакомление с этим замечанием
             if (data.shiftInfo.handover) {
@@ -360,6 +385,12 @@ export default function App() {
             setFlights(data.flights.map(normalizeFlight));
             if (data.shiftInfo) {
               setShiftInfo(prev => ({ ...prev, ...data.shiftInfo }));
+              if (Array.isArray(data.shiftInfo.deleted_flights)) {
+                setDeletedFlightKeys(data.shiftInfo.deleted_flights);
+                try {
+                  localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify(data.shiftInfo.deleted_flights));
+                } catch (e) {}
+              }
             }
           }
         }
@@ -515,6 +546,33 @@ export default function App() {
   // Удаление рейса
   const handleDeleteFlight = (id) => {
     hasUserModifiedRef.current = true;
+    const targetFlight = flights.find(f => f.id === id);
+    if (targetFlight) {
+      const newKeys = getFlightKeyVariants(targetFlight);
+
+      setDeletedFlightKeys(prev => {
+        const currentList = Array.isArray(prev) ? prev : [];
+        const updated = Array.from(new Set([...currentList, ...newKeys]));
+        deletedFlightKeysRef.current = updated;
+        try {
+          localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+
+      setShiftInfo(prev => {
+        const currentDeleted = Array.isArray(prev?.deleted_flights) ? prev.deleted_flights : [];
+        const nextDeleted = Array.from(new Set([...currentDeleted, ...newKeys]));
+        const updatedShift = {
+          ...prev,
+          deleted_flights: nextDeleted
+        };
+        try {
+          localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(updatedShift));
+        } catch (e) {}
+        return updatedShift;
+      });
+    }
     setFlights(prev => prev.filter(f => f.id !== id));
   };
 
@@ -604,7 +662,15 @@ export default function App() {
       if (result && result.success && Array.isArray(result.flights) && result.flights.length > 0) {
         hasUserModifiedRef.current = true;
         setFlights(prevFlights => {
-          const { mergedFlights, totalNewChanges, newFlightsCount } = smartMergeWithDelta(prevFlights, result.flights);
+          const activeDeleted = (deletedFlightKeysRef.current && deletedFlightKeysRef.current.length > 0)
+            ? deletedFlightKeysRef.current
+            : deletedFlightKeys;
+
+          const { mergedFlights, totalNewChanges, newFlightsCount } = smartMergeWithDelta(
+            prevFlights,
+            result.flights,
+            { deletedFlightKeys: activeDeleted }
+          );
 
           if (totalNewChanges > 0 || newFlightsCount > 0) {
             const msgParts = [];
@@ -621,6 +687,10 @@ export default function App() {
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       setLastSyncTime(timeStr);
+      lastSyncTimestampRef.current = Date.now();
+      try {
+        localStorage.setItem(`${STORAGE_KEY}_last_sync_time`, timeStr);
+      } catch (e) {}
     } catch (err) {
       console.warn('Auto-sync note:', err.message);
       if (isManual) {
@@ -628,32 +698,67 @@ export default function App() {
       }
     } finally {
       setIsSyncing(false);
+      isSyncingRef.current = false;
     }
-  }, [isSyncing, shiftInfo, departureAirports]);
+  }, [isSyncing, shiftInfo, departureAirports, deletedFlightKeys]);
 
-  // Фоновый таймер авто-подкачки AviaBit
+  triggerAutoSyncRef.current = triggerAutoSync;
+  isSyncingRef.current = isSyncing;
+
+  // Надежный фоновый таймер авто-подкачки AviaBit (сверка по астрономическому времени)
   useEffect(() => {
     if (!autoSyncEnabled) return;
-    const intervalMs = (autoSyncInterval || 10) * 60 * 1000;
-    const intervalId = setInterval(() => {
-      triggerAutoSync(false);
-    }, intervalMs);
 
-    return () => clearInterval(intervalId);
-  }, [autoSyncEnabled, autoSyncInterval, triggerAutoSync]);
+    const checkAndTrigger = () => {
+      if (!autoSyncEnabled || isSyncingRef.current || !isInitialServerSyncCompletedRef.current) return;
+      const intervalMs = (autoSyncInterval || 10) * 60 * 1000;
+      const elapsed = Date.now() - (lastSyncTimestampRef.current || 0);
+
+      if (elapsed >= intervalMs) {
+        if (triggerAutoSyncRef.current) {
+          triggerAutoSyncRef.current(false);
+        }
+      }
+    };
+
+    // Периодическая проверка каждые 10 секунд (не сбрасывается при наборе текста или кликах)
+    const intervalId = setInterval(checkAndTrigger, 10000);
+
+    // Мгновенная проверка при возвращении пользователя на вкладку браузера
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndTrigger();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [autoSyncEnabled, autoSyncInterval]);
 
   // Загрузка расписания из AviaBit
   const handleAviaBitScheduleLoaded = (loadedFlights, newShiftInfo) => {
     hasUserModifiedRef.current = true;
     const normalized = sortFlightsChronologically(loadedFlights.map(normalizeFlight));
     setFlights(normalized);
-    const updatedShift = newShiftInfo ? { ...shiftInfo, ...newShiftInfo } : shiftInfo;
-    if (newShiftInfo) {
-      setShiftInfo(updatedShift);
-    }
+    setDeletedFlightKeys([]);
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    setLastSyncTime(timeStr);
+    lastSyncTimestampRef.current = Date.now();
+
+    const updatedShift = {
+      ...(newShiftInfo ? { ...shiftInfo, ...newShiftInfo } : shiftInfo),
+      deleted_flights: []
+    };
+    setShiftInfo(updatedShift);
     try {
       localStorage.setItem(`${STORAGE_KEY}_flights`, JSON.stringify(normalized));
       localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(updatedShift));
+      localStorage.setItem(`${STORAGE_KEY}_last_sync_time`, timeStr);
+      localStorage.removeItem(`${STORAGE_KEY}_deleted_flights`);
     } catch (e) {}
 
     // Мгновенное сохранение в базу данных
@@ -705,7 +810,10 @@ export default function App() {
     if (window.confirm('Сбросить весь суточный план к началу? Все несохраненные данные будут удалены.')) {
       hasUserModifiedRef.current = true;
       setFlights([]);
+      setDeletedFlightKeys([]);
+      setShiftInfo(prev => ({ ...prev, deleted_flights: [] }));
       localStorage.removeItem(`${STORAGE_KEY}_flights`);
+      localStorage.removeItem(`${STORAGE_KEY}_deleted_flights`);
     }
   };
 
@@ -734,10 +842,13 @@ export default function App() {
   // Передача смены
   const handleHandoverSuccess = (newDispatcherName, archiveClosed, handoverData) => {
     hasUserModifiedRef.current = true;
+    setDeletedFlightKeys([]);
+    localStorage.removeItem(`${STORAGE_KEY}_deleted_flights`);
     setShiftInfo(prev => ({
       ...prev,
       dispatcher: newDispatcherName,
-      handover: handoverData || prev.handover
+      handover: handoverData || prev.handover,
+      deleted_flights: []
     }));
     localStorage.removeItem(`${STORAGE_KEY}_dismissed_handover_note`);
     setIsHandoverNotesDismissed(false);

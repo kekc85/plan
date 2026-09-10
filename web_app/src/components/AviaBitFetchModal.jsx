@@ -145,7 +145,7 @@ export default function AviaBitFetchModal({
 
       // Умное слияние с сохранением данных предыдущего диспетчера и детекцией изменений
       if (useSmartMerge && currentFlights && currentFlights.length > 0) {
-        const mergeResult = smartMergeWithDelta(currentFlights, finalFlights);
+        const mergeResult = smartMergeWithDelta(currentFlights, finalFlights, { deletedFlightKeys: [] });
         finalFlights = mergeResult.mergedFlights;
         totalChanges = mergeResult.totalNewChanges;
         newCount = mergeResult.newFlightsCount;

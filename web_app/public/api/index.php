@@ -82,7 +82,8 @@ function getDb() {
                 "ALTER TABLE plan_flights ADD COLUMN inbound_landing_time VARCHAR(16) NULL",
                 "ALTER TABLE plan_flights ADD COLUMN outbound_takeoff_time VARCHAR(16) NULL",
                 "ALTER TABLE plan_flights ADD COLUMN plane_status VARCHAR(32) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN updated_by VARCHAR(128) NULL"
+                "ALTER TABLE plan_flights ADD COLUMN updated_by VARCHAR(128) NULL",
+                "ALTER TABLE plan_shifts ADD COLUMN deleted_flights TEXT NULL"
             ];
             foreach ($migrations as $mSql) {
                 try {
@@ -596,11 +597,20 @@ if ($route === '/shift/current') {
             ];
         }
 
+        $deletedFlights = [];
+        if (!empty($shift['deleted_flights'])) {
+            $parsedDeleted = json_decode($shift['deleted_flights'], true);
+            if (is_array($parsedDeleted)) {
+                $deletedFlights = $parsedDeleted;
+            }
+        }
+
         $shiftInfo = [
             'id' => (int)$shift['id'],
             'date_interval' => $shift['date_interval'],
             'dispatcher' => $shift['dispatcher_name'],
             'status' => $shift['status'],
+            'deleted_flights' => $deletedFlights,
             'handover' => $handoverData
         ];
     }
@@ -671,6 +681,8 @@ if ($route === '/shift/save') {
 
     $dateInterval = $shiftInfo['date_interval'] ?? $shiftInfo['date'] ?? date('d.m.Y');
     $dispatcher = $shiftInfo['dispatcher'] ?? ($authUser['full_name'] ?? 'Диспетчер по центровке');
+    $deletedFlightsVal = $shiftInfo['deleted_flights'] ?? null;
+    $deletedFlightsJson = $deletedFlightsVal !== null ? json_encode($deletedFlightsVal, JSON_UNESCAPED_UNICODE) : null;
     $nowStr = date('Y-m-d H:i:s');
 
     $db = getDb();
@@ -682,11 +694,11 @@ if ($route === '/shift/save') {
 
         if ($activeShift) {
             $shiftId = $activeShift['id'];
-            $upd = $db->prepare("UPDATE plan_shifts SET date_interval = ?, dispatcher_name = ? WHERE id = ?");
-            $upd->execute([$dateInterval, $dispatcher, $shiftId]);
+            $upd = $db->prepare("UPDATE plan_shifts SET date_interval = ?, dispatcher_name = ?, deleted_flights = ? WHERE id = ?");
+            $upd->execute([$dateInterval, $dispatcher, $deletedFlightsJson, $shiftId]);
         } else {
-            $ins = $db->prepare("INSERT INTO plan_shifts (date_interval, dispatcher_name, started_at, status, created_at) VALUES (?, ?, ?, 'active', ?)");
-            $ins->execute([$dateInterval, $dispatcher, $nowStr, $nowStr]);
+            $ins = $db->prepare("INSERT INTO plan_shifts (date_interval, dispatcher_name, started_at, status, deleted_flights, created_at) VALUES (?, ?, ?, 'active', ?, ?)");
+            $ins->execute([$dateInterval, $dispatcher, $nowStr, $deletedFlightsJson, $nowStr]);
             $shiftId = $db->lastInsertId();
         }
 

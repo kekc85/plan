@@ -48,13 +48,68 @@ function normalizeVal(val) {
 }
 
 /**
- * Очистка номера рейса для сопоставления (убираем пробелы, дефисы, приводим к верхнему регистру)
+ * Нормализация номера рейса (убираем пробелы, дефисы, русские буквы -> латиница, E0 -> EO)
+ */
+export function normalizeFlightNumber(fl) {
+  if (!fl) return '';
+  let s = String(fl).toUpperCase().replace(/[-\s]/g, '');
+  // Замена похожих русских букв на латинские
+  const cyrToLat = {
+    'А': 'A', 'В': 'B', 'Е': 'E', 'К': 'K', 'М': 'M',
+    'Н': 'N', 'О': 'O', 'Р': 'R', 'С': 'C', 'Т': 'T',
+    'У': 'Y', 'Х': 'X'
+  };
+  s = s.replace(/[АВЕКМНОРСТУХ]/g, m => cyrToLat[m] || m);
+  // Замена E0 -> EO (частая путаница нуля и буквы O в коде Икар EO)
+  s = s.replace(/^E0/, 'EO');
+  return s;
+}
+
+/**
+ * Нормализация даты рейса (приведение ДД.ММ или ДД.ММ.ГГГГ к ДД.ММ)
+ */
+export function normalizeFlightDate(d) {
+  if (!d) return '';
+  const s = String(d).trim();
+  const parts = s.split('.');
+  if (parts.length >= 2) {
+    return `${parts[0].padStart(2, '0')}.${parts[1].padStart(2, '0')}`;
+  }
+  return s;
+}
+
+/**
+ * Очистка номера рейса для сопоставления
  */
 export function getFlightKey(flight) {
   if (!flight) return '';
-  const flNum = (flight.flight || flight.flight_no || '').replace(/[-\s]/g, '').toUpperCase();
-  const flDate = (flight.flight_date || '').trim();
-  return `${flNum}_${flDate}`;
+  const flNum = normalizeFlightNumber(flight.flight || flight.flight_no || flight.flight_number || '');
+  const flDate = normalizeFlightDate(flight.flight_date);
+  return flDate ? `${flNum}_${flDate}` : flNum;
+}
+
+/**
+ * Генерация всех возможных вариантов ключей рейса для гарантированного сопоставления
+ */
+export function getFlightKeyVariants(flight) {
+  if (!flight) return [];
+  const rawFlight = flight.flight || flight.flight_no || flight.flight_number || '';
+  const normFlight = normalizeFlightNumber(rawFlight);
+  const normDate = normalizeFlightDate(flight.flight_date);
+  const digitsOnly = normFlight.replace(/\D/g, '');
+
+  const variants = new Set();
+  if (normFlight && normDate) variants.add(`${normFlight}_${normDate}`);
+  if (normFlight) variants.add(normFlight);
+  if (digitsOnly && normDate) variants.add(`NUM_${digitsOnly}_${normDate}`);
+  if (digitsOnly) variants.add(`NUM_${digitsOnly}`);
+  if (rawFlight) {
+    const rawClean = String(rawFlight).replace(/[-\s]/g, '').toUpperCase();
+    variants.add(rawClean);
+    if (normDate) variants.add(`${rawClean}_${normDate}`);
+  }
+
+  return Array.from(variants);
 }
 
 /**
@@ -96,38 +151,74 @@ export function detectFlightChanges(oldFlight, incomingFlight) {
  * Умное слияние входящего расписания с текущим суточным планом
  * @param {Array} currentFlights - текущие рейсы в журнале диспетчера
  * @param {Array} incomingFlights - свежие рейсы из AviaBit
+ * @param {Object} options - дополнительные опции слияния { deletedFlightKeys: [] }
  * @returns {{ mergedFlights: Array, totalNewChanges: number, newFlightsCount: number }}
  */
-export function smartMergeWithDelta(currentFlights = [], incomingFlights = []) {
+export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], options = {}) {
+  const { deletedFlightKeys = [] } = options;
+  const deletedSet = new Set();
+  (Array.isArray(deletedFlightKeys) ? deletedFlightKeys : []).forEach(k => {
+    if (!k) return;
+    const strK = String(k).trim().toUpperCase();
+    deletedSet.add(strK);
+    deletedSet.add(strK.replace(/[-\s]/g, ''));
+    deletedSet.add(normalizeFlightNumber(strK));
+    const digits = strK.replace(/\D/g, '');
+    if (digits) {
+      deletedSet.add(`NUM_${digits}`);
+      deletedSet.add(digits);
+    }
+  });
+
   const existingMap = new Map();
   const existingByFlight = new Map();
+  const existingByDigits = new Map();
+
   currentFlights.forEach(f => {
     const key = getFlightKey(f);
     if (key) existingMap.set(key, f);
-    const flNum = (f.flight || f.flight_no || '').replace(/[-\s]/g, '').toUpperCase();
+    const flNum = normalizeFlightNumber(f.flight || f.flight_no || f.flight_number || '');
     if (flNum && !existingByFlight.has(flNum)) {
       existingByFlight.set(flNum, f);
+    }
+    const digits = flNum.replace(/\D/g, '');
+    const flDate = normalizeFlightDate(f.flight_date);
+    if (digits && flDate && !existingByDigits.has(`${digits}_${flDate}`)) {
+      existingByDigits.set(`${digits}_${flDate}`, f);
     }
   });
 
   let totalNewChanges = 0;
   let newFlightsCount = 0;
 
-  const mergedFlights = incomingFlights.map(inc => {
+  const mergedFlights = [];
+
+  for (const inc of incomingFlights) {
     const key = getFlightKey(inc);
-    const flNum = (inc.flight || inc.flight_no || '').replace(/[-\s]/g, '').toUpperCase();
-    const old = existingMap.get(key) || existingByFlight.get(flNum);
+    const flNum = normalizeFlightNumber(inc.flight || inc.flight_no || inc.flight_number || '');
+    const digits = flNum.replace(/\D/g, '');
+    const flDate = normalizeFlightDate(inc.flight_date);
+    const old = existingMap.get(key) || existingByFlight.get(flNum) || existingByDigits.get(`${digits}_${flDate}`);
 
     if (!old) {
+      // Проверяем: был ли этот рейс удален диспетчером ранее в текущей смене?
+      const incVariants = getFlightKeyVariants(inc);
+      const isDeleted = incVariants.some(v => deletedSet.has(v));
+      if (isDeleted) {
+        // Пропускаем удаленный рейс — не добавляем его обратно при авто-подкачке
+        continue;
+      }
+
       // Совершенно новый рейс, добавленный в расписание AviaBit
       newFlightsCount++;
-      return {
+      mergedFlights.push({
         ...inc,
         is_new_flight: true,
         unread_changes: {
           _is_new: { old: null, new: true, ts: Date.now() }
         }
-      };
+      });
+      continue;
     }
 
     // Выявляем изменившиеся оперативные параметры
@@ -187,8 +278,8 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = []) {
       merged.is_new_flight = true;
     }
 
-    return merged;
-  });
+    mergedFlights.push(merged);
+  }
 
   return {
     mergedFlights,

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS `plan_shifts` (
     `started_at` VARCHAR(64) NOT NULL,
     `closed_at` VARCHAR(64) NULL,
     `status` VARCHAR(32) NOT NULL DEFAULT 'active',
+    `deleted_flights` TEXT NULL,
     `created_at` VARCHAR(64) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

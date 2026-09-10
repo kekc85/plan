@@ -503,11 +503,20 @@ def get_current_shift():
                 "notes": lh.get("notes") or ""
             }
 
+        deleted_raw = shift_dict.get("deleted_flights")
+        deleted_list = []
+        if deleted_raw:
+            try:
+                deleted_list = json.loads(deleted_raw) if isinstance(deleted_raw, str) else deleted_raw
+            except Exception:
+                deleted_list = []
+
         shift_info = {
             "id": shift_dict["id"],
             "date_interval": shift_dict["date_interval"],
             "dispatcher": shift_dict["dispatcher_name"],
             "status": shift_dict["status"],
+            "deleted_flights": deleted_list if isinstance(deleted_list, list) else [],
             "handover": handover_data
         }
 
@@ -582,6 +591,8 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
     shift_info = req.shiftInfo or {}
     date_interval = shift_info.get("date_interval") or shift_info.get("date") or datetime.now(MSK_TZ).strftime("%d.%m.%Y")
     dispatcher = shift_info.get("dispatcher") or (current_user.get("full_name") if current_user else "Диспетчер по центровке")
+    deleted_flights_val = shift_info.get("deleted_flights")
+    deleted_flights_json = json.dumps(deleted_flights_val) if deleted_flights_val is not None else None
 
     # Проверяем или создаем активную смену
     cursor.execute("SELECT id FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1;")
@@ -589,16 +600,16 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
     if current_shift:
         shift_id = dict(current_shift)["id"]
         cursor.execute(
-            q("UPDATE plan_shifts SET date_interval = %s, dispatcher_name = %s WHERE id = %s;", engine),
-            (date_interval, dispatcher, shift_id)
+            q("UPDATE plan_shifts SET date_interval = %s, dispatcher_name = %s, deleted_flights = %s WHERE id = %s;", engine),
+            (date_interval, dispatcher, deleted_flights_json, shift_id)
         )
     else:
         cursor.execute(
             q("""
-            INSERT INTO plan_shifts (date_interval, dispatcher_name, started_at, status, created_at)
-            VALUES (%s, %s, %s, 'active', %s);
+            INSERT INTO plan_shifts (date_interval, dispatcher_name, started_at, status, deleted_flights, created_at)
+            VALUES (%s, %s, %s, 'active', %s, %s);
             """, engine),
-            (date_interval, dispatcher, now_str, now_str)
+            (date_interval, dispatcher, now_str, deleted_flights_json, now_str)
         )
         shift_id = cursor.lastrowid
 
