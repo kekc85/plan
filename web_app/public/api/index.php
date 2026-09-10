@@ -2166,16 +2166,17 @@ if ($route === '/fetch_schedule') {
 }
 
 // ----------------------------------------------------
-// ЭНДПОИНТЫ АДМИНИСТРАТОРА: /admin/users
+// ЭНДПОИНТЫ АДМИНИСТРАТОРА И МОДЕРАТОРА: /admin/users
 // ----------------------------------------------------
 if (strpos($route, '/admin/users') === 0) {
-    $admin = getAuthUser();
-    if ($admin['role'] !== 'admin') {
+    $authUser = getAuthUser();
+    if ($authUser['role'] !== 'admin' && $authUser['role'] !== 'moderator') {
         http_response_code(403);
-        echo json_encode(['detail' => 'Доступ разрешен только Администратору']);
+        echo json_encode(['detail' => 'Доступ разрешен только Администратору или Модератору']);
         exit;
     }
 
+    $isModerator = ($authUser['role'] === 'moderator');
     $db = getDb();
     $method = $_SERVER['REQUEST_METHOD'];
 
@@ -2197,6 +2198,12 @@ if (strpos($route, '/admin/users') === 0) {
         $fullName = trim($input['full_name'] ?? '');
         $role = $input['role'] ?? 'dispatcher';
 
+        if ($isModerator && $role !== 'dispatcher') {
+            http_response_code(403);
+            echo json_encode(['detail' => "Модератор может создавать пользователей только с ролью 'Диспетчер'"]);
+            exit;
+        }
+
         if (!$username || !$password || !$fullName) {
             http_response_code(400);
             echo json_encode(['detail' => 'Заполните обязательные поля']);
@@ -2211,10 +2218,12 @@ if (strpos($route, '/admin/users') === 0) {
             exit;
         }
 
+        list($hash, $salt) = hashPassword($password);
         $ins = $db->prepare("INSERT INTO plan_users (username, password_hash, salt, full_name, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)");
         $ins->execute([$username, $hash, $salt, $fullName, $role, date('Y-m-d H:i:s')]);
 
-        logSystemEvent('INFO', 'auth', "Администратор '{$admin['username']}' создал пользователя '$username' (роль: $role, ФИО: $fullName)", null, $admin['id'], $admin['username'], getClientIp());
+        $actorTitle = $isModerator ? 'Модератор' : 'Администратор';
+        logSystemEvent('INFO', 'auth', "$actorTitle '{$authUser['username']}' создал пользователя '$username' (роль: $role, ФИО: $fullName)", null, $authUser['id'], $authUser['username'], getClientIp());
 
         echo json_encode(['success' => true, 'message' => "Пользователь $username успешно создан"]);
         exit;
@@ -2230,6 +2239,19 @@ if (strpos($route, '/admin/users') === 0) {
             http_response_code(404);
             echo json_encode(['detail' => 'Пользователь не найден']);
             exit;
+        }
+
+        if ($isModerator) {
+            if (in_array($targetUser['role'], ['admin', 'moderator']) && $targetId !== (int)$authUser['id']) {
+                http_response_code(403);
+                echo json_encode(['detail' => 'Модератор не может редактировать учетные записи Администраторов и Модераторов']);
+                exit;
+            }
+            if (isset($input['role']) && $input['role'] !== 'dispatcher') {
+                http_response_code(403);
+                echo json_encode(['detail' => "Модератор не может назначать роли кроме 'Диспетчер'"]);
+                exit;
+            }
         }
 
         $fullName = isset($input['full_name']) ? trim($input['full_name']) : $targetUser['full_name'];
@@ -2258,7 +2280,8 @@ if (strpos($route, '/admin/users') === 0) {
         $upd = $db->prepare("UPDATE plan_users SET full_name = ?, username = ?, role = ?, is_active = ?, password_hash = ?, salt = ? WHERE id = ?");
         $upd->execute([$fullName, $username, $role, $isActive, $passwordHash, $salt, $targetId]);
 
-        logSystemEvent('INFO', 'auth', "Администратор '{$admin['username']}' обновил пользователя '{$targetUser['username']}' (ID: $targetId)", null, $admin['id'], $admin['username'], getClientIp());
+        $actorTitle = $isModerator ? 'Модератор' : 'Администратор';
+        logSystemEvent('INFO', 'auth', "$actorTitle '{$authUser['username']}' обновил пользователя '{$targetUser['username']}' (ID: $targetId)", null, $authUser['id'], $authUser['username'], getClientIp());
 
         echo json_encode([
             'success' => true,
@@ -2268,7 +2291,13 @@ if (strpos($route, '/admin/users') === 0) {
     }
 
     if ($method === 'DELETE' && $targetId) {
-        if ($targetId === (int)$admin['id']) {
+        if ($authUser['role'] !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['detail' => 'Удаление пользователей разрешено только Администратору']);
+            exit;
+        }
+
+        if ($targetId === (int)$authUser['id']) {
             http_response_code(400);
             echo json_encode(['detail' => 'Нельзя удалить собственную учетную запись']);
             exit;
@@ -2282,7 +2311,7 @@ if (strpos($route, '/admin/users') === 0) {
         $del = $db->prepare("DELETE FROM plan_users WHERE id = ?");
         $del->execute([$targetId]);
 
-        logSystemEvent('WARN', 'auth', "Администратор '{$admin['username']}' удалил пользователя '$deletedName' (ID: $targetId)", null, $admin['id'], $admin['username'], getClientIp());
+        logSystemEvent('WARN', 'auth', "Администратор '{$authUser['username']}' удалил пользователя '$deletedName' (ID: $targetId)", null, $authUser['id'], $authUser['username'], getClientIp());
 
         echo json_encode(['success' => true, 'message' => 'Пользователь удален']);
         exit;
@@ -2290,13 +2319,13 @@ if (strpos($route, '/admin/users') === 0) {
 }
 
 // ----------------------------------------------------
-// ЭНДПОИНТЫ АДМИНИСТРАТОРА: /admin/logs (Журнал системных логов)
+// ЭНДПОИНТЫ: /admin/logs (Журнал системных логов)
 // ----------------------------------------------------
 if (strpos($route, '/admin/logs') === 0) {
-    $admin = getAuthUser();
-    if ($admin['role'] !== 'admin') {
+    $authUser = getAuthUser();
+    if ($authUser['role'] !== 'admin' && $authUser['role'] !== 'moderator') {
         http_response_code(403);
-        echo json_encode(['detail' => 'Доступ разрешен только Администратору']);
+        echo json_encode(['detail' => 'Доступ разрешен только Администратору или Модератору']);
         exit;
     }
 
@@ -2311,11 +2340,16 @@ if (strpos($route, '/admin/logs') === 0) {
             exit;
         }
         if ($method === 'POST') {
+            if ($authUser['role'] !== 'admin') {
+                http_response_code(403);
+                echo json_encode(['detail' => 'Изменение срока хранения логов разрешено только Администратору']);
+                exit;
+            }
             $input = getJsonInput();
             $days = max(1, min(365, (int)($input['retention_days'] ?? 7)));
             setSystemSetting('log_retention_days', (string)$days);
             $deleted = cleanupOldLogs($days);
-            logSystemEvent('INFO', 'system', "Администратор '{$admin['username']}' изменил срок хранения логов на $days дней (удалено $deleted устаревших записей)", null, $admin['id'], $admin['username'], getClientIp());
+            logSystemEvent('INFO', 'system', "Администратор '{$authUser['username']}' изменил срок хранения логов на $days дней (удалено $deleted устаревших записей)", null, $authUser['id'], $authUser['username'], getClientIp());
             echo json_encode([
                 'success' => true,
                 'retention_days' => $days,
@@ -2328,17 +2362,22 @@ if (strpos($route, '/admin/logs') === 0) {
 
     // 2. Очистка логов
     if ($route === '/admin/logs/clear' && $method === 'POST') {
+        if ($authUser['role'] !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['detail' => 'Очистка журнала логов разрешена только Администратору']);
+            exit;
+        }
         $input = getJsonInput();
         if (!empty($input['clear_all'])) {
             $stmt = $db->query("DELETE FROM plan_system_logs");
             $deleted = $stmt->rowCount();
-            logSystemEvent('WARN', 'system', "Администратор '{$admin['username']}' полностью очистил журнал логов", null, $admin['id'], $admin['username'], getClientIp());
+            logSystemEvent('WARN', 'system', "Администратор '{$authUser['username']}' полностью очистил журнал логов", null, $authUser['id'], $authUser['username'], getClientIp());
             echo json_encode(['success' => true, 'deleted_count' => $deleted, 'message' => 'Все логи успешно удалены']);
             exit;
         } else {
             $days = isset($input['days']) ? (int)$input['days'] : getLogRetentionDays();
             $deleted = cleanupOldLogs($days);
-            logSystemEvent('INFO', 'system', "Администратор '{$admin['username']}' выполнил ручную очистку логов старше $days дней (удалено $deleted)", null, $admin['id'], $admin['username'], getClientIp());
+            logSystemEvent('INFO', 'system', "Администратор '{$authUser['username']}' выполнил ручную очистку логов старше $days дней (удалено $deleted)", null, $authUser['id'], $authUser['username'], getClientIp());
             echo json_encode(['success' => true, 'deleted_count' => $deleted, 'message' => "Удалено $deleted записей старше $days дней"]);
             exit;
         }
@@ -2350,67 +2389,62 @@ if (strpos($route, '/admin/logs') === 0) {
 
         $level = $_GET['level'] ?? null;
         $module = $_GET['module'] ?? null;
-        $search = trim($_GET['search'] ?? '');
+        $search = $_GET['search'] ?? null;
         $limit = max(1, min(1000, (int)($_GET['limit'] ?? 200)));
         $offset = max(0, (int)($_GET['offset'] ?? 0));
 
-        $conditions = [];
+        $where = [];
         $params = [];
 
         if ($level && strtoupper($level) !== 'ALL') {
-            $conditions[] = "level = ?";
+            $where[] = "level = ?";
             $params[] = strtoupper($level);
         }
         if ($module && strtolower($module) !== 'all') {
-            $conditions[] = "module = ?";
+            $where[] = "module = ?";
             $params[] = strtolower($module);
         }
-        if ($search !== '') {
-            $term = "%$search%";
-            $conditions[] = "(message LIKE ? OR details LIKE ? OR username LIKE ? OR ip_address LIKE ?)";
+        if ($search && trim($search)) {
+            $term = '%' . trim($search) . '%';
+            $where[] = "(message LIKE ? OR details LIKE ? OR username LIKE ? OR ip_address LIKE ?)";
             $params[] = $term;
             $params[] = $term;
             $params[] = $term;
             $params[] = $term;
         }
 
-        $whereClause = !empty($conditions) ? "WHERE " . implode(" AND ", $conditions) : "";
+        $whereSql = !empty($where) ? ("WHERE " . implode(" AND ", $where)) : "";
 
-        // Общий подсчет
-        $countStmt = $db->prepare("SELECT COUNT(*) as cnt FROM plan_system_logs $whereClause");
-        $countStmt->execute($params);
-        $totalCount = (int)$countStmt->fetchColumn();
+        // Total count
+        $cntStmt = $db->prepare("SELECT COUNT(*) as cnt FROM plan_system_logs $whereSql");
+        $cntStmt->execute($params);
+        $total = (int)$cntStmt->fetch()['cnt'];
 
-        // Сводная статистика
+        // Stats
         $statStmt = $db->query("SELECT level, COUNT(*) as cnt FROM plan_system_logs GROUP BY level");
-        $statRows = $statStmt->fetchAll();
         $stats = ['total' => 0, 'error' => 0, 'warn' => 0, 'info' => 0];
-        foreach ($statRows as $sr) {
-            $lvl = strtoupper($sr['level']);
-            $cnt = (int)$sr['cnt'];
-            $stats['total'] += $cnt;
+        while ($row = $statStmt->fetch()) {
+            $lvl = strtoupper($row['level']);
+            $c = (int)$row['cnt'];
+            $stats['total'] += $c;
             if (strpos($lvl, 'ERROR') !== false || strpos($lvl, 'CRIT') !== false) {
-                $stats['error'] += $cnt;
+                $stats['error'] += $c;
             } elseif (strpos($lvl, 'WARN') !== false) {
-                $stats['warn'] += $cnt;
+                $stats['warn'] += $c;
             } elseif (strpos($lvl, 'INFO') !== false) {
-                $stats['info'] += $cnt;
+                $stats['info'] += $c;
             }
         }
 
-        // Выборка записей
-        $selectSql = "SELECT id, level, module, message, details, user_id, username, ip_address, created_at
-            FROM plan_system_logs
-            $whereClause
-            ORDER BY id DESC
-            LIMIT $limit OFFSET $offset";
-        $selStmt = $db->prepare($selectSql);
+        // Rows
+        $selSql = "SELECT id, level, module, message, details, user_id, username, ip_address, created_at FROM plan_system_logs $whereSql ORDER BY id DESC LIMIT $limit OFFSET $offset";
+        $selStmt = $db->prepare($selSql);
         $selStmt->execute($params);
         $logs = $selStmt->fetchAll();
 
         echo json_encode([
             'logs' => $logs,
-            'total' => $totalCount,
+            'total' => $total,
             'stats' => $stats,
             'retention_days' => getLogRetentionDays()
         ]);
@@ -2419,24 +2453,29 @@ if (strpos($route, '/admin/logs') === 0) {
 }
 
 // ----------------------------------------------------
-// ЭНДПОИНТ: /logs/client_error (Прием JS-ошибок с фронтенда)
+// ЭНДПОИНТ: /logs/client_error (Логирование клиентских ошибок интерфейса)
 // ----------------------------------------------------
 if ($route === '/logs/client_error' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $user = getOptionalAuthUser();
-    $input = getJsonInput();
-    $message = trim($input['message'] ?? 'Неизвестная ошибка фронтенда');
-    $clientIp = getClientIp();
-    $uName = $user ? $user['username'] : 'anonymous';
+    $db = getDb();
+    initLogsTable($db);
 
-    logSystemEvent(
-        'ERROR',
-        'client',
-        "Клиентская ошибка: $message",
-        $input,
-        $user ? $user['id'] : null,
-        $uName,
-        $clientIp
-    );
+    $input = getJsonInput();
+    $message = trim($input['message'] ?? 'Неизвестная ошибка интерфейса');
+    $clientIp = getClientIp();
+
+    $authUser = getOptionalAuthUser();
+    $uId = $authUser ? $authUser['id'] : null;
+    $uName = $authUser ? $authUser['username'] : 'anonymous';
+
+    $details = [
+        'source' => $input['source'] ?? '',
+        'lineno' => $input['lineno'] ?? '',
+        'colno' => $input['colno'] ?? '',
+        'url' => $input['url'] ?? '',
+        'stack' => $input['stack'] ?? ''
+    ];
+
+    logSystemEvent('ERROR', 'client', "Клиентская ошибка: $message", $details, $uId, $uName, $clientIp);
 
     // Оповещение в Telegram об ошибке
     $tgText = "🚨 <b>Клиентская ошибка интерфейса</b>\n\n"
@@ -2454,21 +2493,23 @@ if ($route === '/logs/client_error' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 // ЭНДПОИНТЫ: /admin/telegram/* (Настройки Telegram-оповещений)
 // ----------------------------------------------------
 if (strpos($route, '/admin/telegram') === 0) {
-    $admin = getAuthUser();
-    if ($admin['role'] !== 'admin') {
+    $authUser = getAuthUser();
+    if ($authUser['role'] !== 'admin' && $authUser['role'] !== 'moderator') {
         http_response_code(403);
-        echo json_encode(['detail' => 'Доступ разрешен только Администратору']);
+        echo json_encode(['detail' => 'Доступ разрешен только Администратору или Модератору']);
         exit;
     }
 
+    $isModerator = ($authUser['role'] === 'moderator');
     $method = $_SERVER['REQUEST_METHOD'];
 
     if ($route === '/admin/telegram/settings') {
         if ($method === 'GET') {
             $token = getSystemSetting('tg_bot_token', '');
             $maskedToken = (strlen($token) > 12) ? (substr($token, 0, 6) . '...' . substr($token, -4)) : (str_repeat('*', strlen($token)));
+            $safeToken = $isModerator ? '' : $token;
             echo json_encode([
-                'bot_token' => $token,
+                'bot_token' => $safeToken,
                 'masked_token' => $maskedToken,
                 'has_token' => !empty($token),
                 'chat_id' => getSystemSetting('tg_chat_id', ''),
@@ -2480,6 +2521,11 @@ if (strpos($route, '/admin/telegram') === 0) {
         }
 
         if ($method === 'POST') {
+            if ($authUser['role'] !== 'admin') {
+                http_response_code(403);
+                echo json_encode(['detail' => 'Сохранение настроек Telegram разрешено только Администратору']);
+                exit;
+            }
             $input = getJsonInput();
             setSystemSetting('tg_bot_token', trim($input['bot_token'] ?? ''));
             setSystemSetting('tg_chat_id', trim($input['chat_id'] ?? ''));
@@ -2487,7 +2533,7 @@ if (strpos($route, '/admin/telegram') === 0) {
             setSystemSetting('tg_notify_handover', !empty($input['notify_handover']) ? '1' : '0');
             setSystemSetting('tg_notify_aviabit', !empty($input['notify_aviabit']) ? '1' : '0');
 
-            logSystemEvent('INFO', 'system', "Администратор '{$admin['username']}' обновил настройки Telegram-оповещений", null, $admin['id'], $admin['username'], getClientIp());
+            logSystemEvent('INFO', 'system', "Администратор '{$authUser['username']}' обновил настройки Telegram-оповещений", null, $authUser['id'], $authUser['username'], getClientIp());
 
             echo json_encode(['success' => true, 'message' => 'Настройки Telegram успешно сохранены']);
             exit;
@@ -2526,15 +2572,17 @@ if (strpos($route, '/admin/telegram') === 0) {
         $ctx = stream_context_create($opts);
         $res = @file_get_contents($url, false, $ctx);
 
+        $actorTitle = $isModerator ? 'Модератор' : 'Администратор';
+
         if ($res) {
             $jsonRes = json_decode($res, true);
             if (!empty($jsonRes['ok'])) {
-                logSystemEvent('INFO', 'system', "Успешный тест связи с Telegram-ботом (Chat ID: $chatId)", null, $admin['id'], $admin['username'], getClientIp());
+                logSystemEvent('INFO', 'system', "Успешный тест связи с Telegram-ботом от $actorTitle '{$authUser['username']}' (Chat ID: $chatId)", null, $authUser['id'], $authUser['username'], getClientIp());
                 echo json_encode(['success' => true, 'message' => 'Тестовое сообщение успешно доставлено в Telegram!']);
                 exit;
             } else {
                 $errDesc = $jsonRes['description'] ?? 'Ошибка Telegram API';
-                logSystemEvent('ERROR', 'system', "Ошибка Telegram теста: $errDesc", null, $admin['id'], $admin['username'], getClientIp());
+                logSystemEvent('ERROR', 'system', "Ошибка Telegram теста: $errDesc", null, $authUser['id'], $authUser['username'], getClientIp());
                 http_response_code(502);
                 echo json_encode(['detail' => "Telegram API вернул ошибку: $errDesc"]);
                 exit;
@@ -2551,10 +2599,10 @@ if (strpos($route, '/admin/telegram') === 0) {
 // ЭНДПОИНТЫ: /admin/archives/* (Посменные архивы и снимки)
 // ----------------------------------------------------
 if (strpos($route, '/admin/archives') === 0) {
-    $admin = getAuthUser();
-    if ($admin['role'] !== 'admin') {
+    $authUser = getAuthUser();
+    if ($authUser['role'] !== 'admin' && $authUser['role'] !== 'moderator') {
         http_response_code(403);
-        echo json_encode(['detail' => 'Доступ разрешен только Администратору']);
+        echo json_encode(['detail' => 'Доступ разрешен только Администратору или Модератору']);
         exit;
     }
 
@@ -2579,10 +2627,15 @@ if (strpos($route, '/admin/archives') === 0) {
         exit;
     }
 
-    // Удаление снимка
+    // Удаление снимка (только Администратор)
     if ($targetArchiveId && $method === 'DELETE') {
+        if ($authUser['role'] !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['detail' => 'Удаление архивных снимков разрешено только Администратору']);
+            exit;
+        }
         deleteShiftArchive($targetArchiveId);
-        logSystemEvent('WARN', 'shift', "Администратор '{$admin['username']}' удалил архивный снимок #$targetArchiveId", null, $admin['id'], $admin['username'], getClientIp());
+        logSystemEvent('WARN', 'shift', "Администратор '{$authUser['username']}' удалил архивный снимок #$targetArchiveId", null, $authUser['id'], $authUser['username'], getClientIp());
         echo json_encode(['success' => true, 'message' => "Архивный снимок #$targetArchiveId удален"]);
         exit;
     }
@@ -2592,7 +2645,7 @@ if (strpos($route, '/admin/archives') === 0) {
         $input = getJsonInput();
         $shiftId = isset($input['shift_id']) ? (int)$input['shift_id'] : null;
         $dateInterval = trim($input['date_interval'] ?? date('d.m.Y'));
-        $dispatcher = trim($input['dispatcher_name'] ?? $admin['full_name'] ?? $admin['username']);
+        $dispatcher = trim($input['dispatcher_name'] ?? $authUser['full_name'] ?? $authUser['username']);
         $reason = trim($input['reason'] ?? 'manual');
         $flights = $input['flights'] ?? [];
         $meta = $input['shift_metadata'] ?? null;

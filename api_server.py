@@ -48,7 +48,8 @@ from auth import (
     create_jwt_token,
     get_current_user,
     get_optional_user,
-    require_admin
+    require_admin,
+    require_admin_or_moderator
 )
 
 # Импортируем функции парсера
@@ -420,11 +421,11 @@ def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get
     return {"success": True, "message": "Пароль успешно изменен"}
 
 
-# --- 2. ПАНЕЛЬ АДМИНИСТРАТОРА (УПРАВЛЕНИЕ УЧЁТНЫМИ ЗАПИСЯМИ) ---
+# --- 2. ПАНЕЛЬ АДМИНИСТРАТОРА И МОДЕРАТОРА (УПРАВЛЕНИЕ УЧЁТНЫМИ ЗАПИСЯМИ) ---
 
 @app.get("/api/admin/users")
-def list_users(admin: dict = Depends(require_admin)):
-    """Получение списка всех пользователей (только для Администратора)"""
+def list_users(user: dict = Depends(require_admin_or_moderator)):
+    """Получение списка всех пользователей (для Администратора и Модератора)"""
     conn, engine = DatabaseConnection.get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, username, full_name, role, is_active, created_at FROM plan_users ORDER BY id ASC;")
@@ -434,8 +435,13 @@ def list_users(admin: dict = Depends(require_admin)):
 
 
 @app.post("/api/admin/users")
-def create_user(req: CreateUserRequest, admin: dict = Depends(require_admin)):
+def create_user(req: CreateUserRequest, user: dict = Depends(require_admin_or_moderator)):
     """Создание нового пользователя диспетчера или администратора"""
+    is_moderator = user.get("role") == "moderator"
+    req_role = req.role or "dispatcher"
+    if is_moderator and req_role != "dispatcher":
+        raise HTTPException(status_code=403, detail="Модератор может создавать пользователей только с ролью 'Диспетчер'")
+
     username = req.username.strip().lower()
     if not username or not req.password:
         raise HTTPException(status_code=400, detail="Логин и пароль обязательны")
@@ -455,7 +461,7 @@ def create_user(req: CreateUserRequest, admin: dict = Depends(require_admin)):
         INSERT INTO plan_users (username, password_hash, salt, full_name, role, is_active, created_at)
         VALUES (%s, %s, %s, %s, %s, 1, %s);
         """, engine),
-        (username, pwd_hash, salt, req.full_name.strip(), req.role, now_str)
+        (username, pwd_hash, salt, req.full_name.strip(), req_role, now_str)
     )
 
     new_id = cursor.lastrowid
@@ -463,27 +469,40 @@ def create_user(req: CreateUserRequest, admin: dict = Depends(require_admin)):
         conn.commit()
     conn.close()
 
+    actor_title = "Модератор" if is_moderator else "Администратор"
     log_system_event(
         "INFO", "auth",
-        f"Администратор '{admin['username']}' создал пользователя '{username}' (роль: {req.role}, ФИО: {req.full_name})",
-        user_id=admin["id"], username=admin["username"]
+        f"{actor_title} '{user['username']}' создал пользователя '{username}' (роль: {req_role}, ФИО: {req.full_name})",
+        user_id=user["id"], username=user["username"]
     )
 
     return {"success": True, "user_id": new_id, "message": f"Пользователь {username} успешно создан"}
 
 
 @app.put("/api/admin/users/{user_id}")
-def update_user(user_id: int, req: UpdateUserRequest, admin: dict = Depends(require_admin)):
-    """Обновление данных пользователя или сброс пароля администратором"""
+def update_user(user_id: int, req: UpdateUserRequest, user: dict = Depends(require_admin_or_moderator)):
+    """Обновление данных пользователя или сброс пароля (Администратор / Модератор)"""
+    is_moderator = user.get("role") == "moderator"
+
     conn, engine = DatabaseConnection.get_connection()
     cursor = conn.cursor()
-    cursor.execute(q("SELECT id, username FROM plan_users WHERE id = %s;", engine), (user_id,))
+    cursor.execute(q("SELECT id, username, role FROM plan_users WHERE id = %s;", engine), (user_id,))
     target_user = cursor.fetchone()
     if not target_user:
         conn.close()
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
     target_dict = dict(target_user)
+
+    # Ограничения для роли Модератор:
+    if is_moderator:
+        if target_dict.get("role") in ("admin", "moderator") and user_id != user["id"]:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Модератор не может редактировать учетные записи Администраторов и Модераторов")
+        if req.role is not None and req.role != "dispatcher":
+            conn.close()
+            raise HTTPException(status_code=403, detail="Модератор не может назначать роли кроме 'Диспетчер'")
+
     updates = []
     params = []
 
@@ -519,11 +538,12 @@ def update_user(user_id: int, req: UpdateUserRequest, admin: dict = Depends(requ
 
     conn.close()
 
+    actor_title = "Модератор" if is_moderator else "Администратор"
     log_system_event(
         "INFO", "auth",
-        f"Администратор '{admin['username']}' обновил пользователя '{target_dict.get('username')}' (ID: {user_id})",
+        f"{actor_title} '{user['username']}' обновил пользователя '{target_dict.get('username')}' (ID: {user_id})",
         details={"updated_fields": [u.split(' =')[0] for u in updates]},
-        user_id=admin["id"], username=admin["username"]
+        user_id=user["id"], username=user["username"]
     )
 
     return {"success": True, "message": "Данные пользователя обновлены"}
@@ -531,7 +551,7 @@ def update_user(user_id: int, req: UpdateUserRequest, admin: dict = Depends(requ
 
 @app.delete("/api/admin/users/{user_id}")
 def delete_user(user_id: int, admin: dict = Depends(require_admin)):
-    """Удаление пользователя администратором"""
+    """Удаление пользователя (только Администратор)"""
     if user_id == admin["id"]:
         raise HTTPException(status_code=400, detail="Нельзя удалить собственную учетную запись администратора")
 
@@ -564,10 +584,10 @@ def get_system_logs(
     search: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
-    admin: dict = Depends(require_admin)
+    user: dict = Depends(require_admin_or_moderator)
 ):
     """
-    Получение системных логов и аудита ошибок с автоочисткой устаревших (только для Администратора).
+    Получение системных логов и аудита ошибок с автоочисткой устаревших (Администратор и Модератор).
     """
     # Выполняем автоочистку записей старше установленного срока
     cleanup_old_logs()
@@ -643,8 +663,8 @@ def get_system_logs(
 
 
 @app.get("/api/admin/logs/settings")
-def get_log_settings(admin: dict = Depends(require_admin)):
-    """Получение текущих настроек журнала логов"""
+def get_log_settings(user: dict = Depends(require_admin_or_moderator)):
+    """Получение текущих настроек журнала логов (Администратор и Модератор)"""
     return {
         "retention_days": get_log_retention_days()
     }
@@ -652,7 +672,7 @@ def get_log_settings(admin: dict = Depends(require_admin)):
 
 @app.post("/api/admin/logs/settings")
 def update_log_settings(req: LogSettingsRequest, admin: dict = Depends(require_admin)):
-    """Обновление срока хранения логов (3, 7, 14, 30 дней)"""
+    """Обновление срока хранения логов (только Администратор)"""
     days = max(1, min(365, req.retention_days))
     set_setting("log_retention_days", str(days))
     deleted = cleanup_old_logs(days)
@@ -673,7 +693,7 @@ def update_log_settings(req: LogSettingsRequest, admin: dict = Depends(require_a
 
 @app.post("/api/admin/logs/clear")
 def clear_system_logs(req: ClearLogsRequest, admin: dict = Depends(require_admin)):
-    """Очистка журнала логов администратором"""
+    """Очистка журнала логов (только Администратор)"""
     conn, engine = DatabaseConnection.get_connection()
     cursor = conn.cursor()
 
@@ -744,15 +764,20 @@ def receive_client_error(
     return {"success": True}
 
 
-# --- 2.2. НАСТРОЙКИ TELEGRAM-ОПОВЕЩЕНИЙ (ТОЛЬКО АДМИНИСТРАТОР) ---
+# --- 2.2. НАСТРОЙКИ TELEGRAM-ОПОВЕЩЕНИЙ (АДМИНИСТРАТОР И МОДЕРАТОР) ---
 
 @app.get("/api/admin/telegram/settings")
-def get_telegram_settings(admin: dict = Depends(require_admin)):
-    """Получение настроек интеграции с Telegram (только для Администратора)"""
+def get_telegram_settings(user: dict = Depends(require_admin_or_moderator)):
+    """Получение настроек интеграции с Telegram (для Администратора и Модератора)"""
+    is_moderator = user.get("role") == "moderator"
     token = get_setting("tg_bot_token", "")
     masked_token = (token[:6] + "..." + token[-4:]) if len(token) > 12 else ("*" * len(token) if token else "")
+    
+    # Для модератора токен не раскрывается в открытом виде
+    safe_token = "" if is_moderator else token
+
     return {
-        "bot_token": token,
+        "bot_token": safe_token,
         "masked_token": masked_token,
         "has_token": bool(token),
         "chat_id": get_setting("tg_chat_id", ""),
@@ -764,7 +789,7 @@ def get_telegram_settings(admin: dict = Depends(require_admin)):
 
 @app.post("/api/admin/telegram/settings")
 def update_telegram_settings(req: TelegramSettingsRequest, admin: dict = Depends(require_admin)):
-    """Сохранение настроек интеграции с Telegram"""
+    """Сохранение настроек интеграции с Telegram (только Администратор)"""
     set_setting("tg_bot_token", req.bot_token.strip() if req.bot_token else "")
     set_setting("tg_chat_id", req.chat_id.strip() if req.chat_id else "")
     set_setting("tg_notify_errors", "1" if req.notify_errors else "0")
@@ -781,8 +806,8 @@ def update_telegram_settings(req: TelegramSettingsRequest, admin: dict = Depends
 
 
 @app.post("/api/admin/telegram/test")
-def test_telegram_connection(req: TelegramTestRequest, admin: dict = Depends(require_admin)):
-    """Проверка отправки тестового сообщения в Telegram"""
+def test_telegram_connection(req: TelegramTestRequest, user: dict = Depends(require_admin_or_moderator)):
+    """Проверка отправки тестового сообщения в Telegram (Администратор и Модератор)"""
     token = (req.bot_token or get_setting("tg_bot_token", "")).strip()
     chat_id = (req.chat_id or get_setting("tg_chat_id", "")).strip()
 
@@ -798,6 +823,8 @@ def test_telegram_connection(req: TelegramTestRequest, admin: dict = Depends(req
         "disable_web_page_preview": True
     }
 
+    actor_title = "Модератор" if user.get("role") == "moderator" else "Администратор"
+
     try:
         data = json.dumps(payload).encode("utf-8")
         http_req = urllib.request.Request(
@@ -810,8 +837,8 @@ def test_telegram_connection(req: TelegramTestRequest, admin: dict = Depends(req
             if resp.status == 200 and resp_body.get("ok"):
                 log_system_event(
                     "INFO", "system",
-                    f"Успешный тест связи с Telegram-ботом (Chat ID: {chat_id})",
-                    user_id=admin["id"], username=admin["username"]
+                    f"Успешный тест связи с Telegram-ботом от {actor_title} '{user['username']}' (Chat ID: {chat_id})",
+                    user_id=user["id"], username=user["username"]
                 )
                 return {"success": True, "message": "Тестовое сообщение успешно доставлено в Telegram!"}
             else:
@@ -820,7 +847,7 @@ def test_telegram_connection(req: TelegramTestRequest, admin: dict = Depends(req
         log_system_event(
             "ERROR", "system",
             f"Ошибка тестирования Telegram: {str(e)}",
-            user_id=admin["id"], username=admin["username"]
+            user_id=user["id"], username=user["username"]
         )
         raise HTTPException(status_code=502, detail=f"Не удалось отправить сообщение в Telegram: {str(e)}")
 
@@ -831,7 +858,7 @@ def test_telegram_connection(req: TelegramTestRequest, admin: dict = Depends(req
 def list_shift_archives(
     limit: int = 50,
     offset: int = 0,
-    admin: dict = Depends(require_admin)
+    user: dict = Depends(require_admin_or_moderator)
 ):
     """Получение списка архивных снимков смен (метаданные)"""
     archives = get_shift_archives(limit=limit, offset=offset)
@@ -839,7 +866,7 @@ def list_shift_archives(
 
 
 @app.get("/api/admin/archives/{archive_id}")
-def get_archive_detail(archive_id: int, admin: dict = Depends(require_admin)):
+def get_archive_detail(archive_id: int, user: dict = Depends(require_admin_or_moderator)):
     """Получение подробных данных снимка смены, включая состав рейсов"""
     archive = get_shift_archive_by_id(archive_id)
     if not archive:
@@ -848,12 +875,12 @@ def get_archive_detail(archive_id: int, admin: dict = Depends(require_admin)):
 
 
 @app.post("/api/admin/archives/create")
-def create_manual_archive(req: CreateArchiveSnapshotRequest, admin: dict = Depends(require_admin)):
-    """Создание ручного снимка состояния смены"""
+def create_manual_archive(req: CreateArchiveSnapshotRequest, user: dict = Depends(require_admin_or_moderator)):
+    """Создание ручного снимка состояния смены (Администратор и Модератор)"""
     archive_id = create_shift_snapshot(
         shift_id=req.shift_id,
         date_interval=req.date_interval,
-        dispatcher_name=req.dispatcher_name or admin.get("full_name") or admin.get("username"),
+        dispatcher_name=req.dispatcher_name or user.get("full_name") or user.get("username"),
         reason=req.reason or "manual",
         flights=req.flights,
         shift_metadata=req.shift_metadata

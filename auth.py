@@ -133,3 +133,10 @@ def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)) -> D
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Доступ разрешен только Администратору")
     return current_user
+
+
+def require_admin_or_moderator(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Зависимость FastAPI для проверки прав Администратора или Модератора"""
+    if current_user.get("role") not in ("admin", "moderator"):
+        raise HTTPException(status_code=403, detail="Доступ разрешен только Администратору или Модератору")
+    return current_user

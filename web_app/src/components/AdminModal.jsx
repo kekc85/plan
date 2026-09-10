@@ -26,6 +26,8 @@ import {
 } from '../utils/api';
 
 export default function AdminModal({ isOpen, onClose, currentUser }) {
+  const isModerator = currentUser?.role === 'moderator';
+
   // Навигация по вкладкам: 'users' | 'logs' | 'archives' | 'telegram'
   const [activeTab, setActiveTab] = useState('users');
 
@@ -243,7 +245,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
   };
 
   const handleTestTelegram = async () => {
-    if (!tgBotToken.trim() || !tgChatId.trim()) {
+    if (!isModerator && (!tgBotToken.trim() || !tgChatId.trim())) {
       setErrorMsg('Укажите Bot Token и Chat ID для отправки тестового оповещения');
       return;
     }
@@ -251,11 +253,13 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
     setTgTestResult(null);
     setErrorMsg('');
     try {
-      const res = await adminTestTelegram({
-        bot_token: tgBotToken.trim(),
-        chat_id: tgChatId.trim(),
+      const payload = {
         message: '🔔 <b>Тест связи AeroPlan W&B</b>\n\nОповещения Telegram успешно настроены и функционируют штатно!'
-      });
+      };
+      if (tgBotToken.trim()) payload.bot_token = tgBotToken.trim();
+      if (tgChatId.trim()) payload.chat_id = tgChatId.trim();
+
+      const res = await adminTestTelegram(payload);
       setTgTestResult({ success: true, message: res.message || 'Сообщение успешно доставлено!' });
       setSuccessMsg(res.message || 'Тестовое сообщение доставлено в Telegram');
     } catch (err) {
@@ -501,13 +505,19 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
             </div>
             <div>
               <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 leading-none flex items-center gap-2">
-                Панель администратора
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                  AeroPlan W&B
+                {isModerator ? 'Панель управления (Модератор)' : 'Панель администратора'}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  isModerator
+                    ? 'bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800'
+                    : 'bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                }`}>
+                  {isModerator ? 'Модератор' : 'Администратор'}
                 </span>
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-medium">
-                Управление пользователями и аудит системных событий
+                {isModerator
+                  ? 'Управление диспетчерами, просмотр логов и посменных архивов'
+                  : 'Управление пользователями, аудит системных событий и настройки'}
               </p>
             </div>
           </div>
@@ -722,10 +732,16 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                   <select
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    disabled={isModerator}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-75 disabled:cursor-not-allowed"
                   >
                     <option value="dispatcher">Диспетчер по центровке</option>
-                    <option value="admin">Администратор системы</option>
+                    {!isModerator && (
+                      <>
+                        <option value="moderator">Модератор смены</option>
+                        <option value="admin">Администратор системы</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
@@ -837,10 +853,16 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                                 <select
                                   value={editRole}
                                   onChange={(e) => setEditRole(e.target.value)}
-                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+                                  disabled={isModerator}
+                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
                                 >
                                   <option value="dispatcher">Диспетчер</option>
-                                  <option value="admin">Администратор</option>
+                                  {!isModerator && (
+                                    <>
+                                      <option value="moderator">Модератор</option>
+                                      <option value="admin">Администратор</option>
+                                    </>
+                                  )}
                                 </select>
                               </div>
                             </div>
@@ -870,6 +892,9 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                     );
                   }
 
+                  const canEdit = !isModerator || u.role === 'dispatcher' || isCurrent;
+                  const canToggleStatus = !isCurrent && (!isModerator || u.role === 'dispatcher');
+
                   return (
                     <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-850/50 transition-colors">
                       
@@ -894,8 +919,12 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                           <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 rounded-full text-[10px] font-extrabold">
                             Админ
                           </span>
-                        ) : (
+                        ) : u.role === 'moderator' ? (
                           <span className="px-2 py-0.5 bg-sky-100 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 rounded-full text-[10px] font-bold">
+                            Модератор
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-full text-[10px] font-semibold">
                             Диспетчер
                           </span>
                         )}
@@ -904,14 +933,20 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                       {/* Статус */}
                       <td className="px-4 py-3">
                         <button
-                          onClick={() => !isCurrent && handleToggleStatus(u)}
-                          disabled={isCurrent}
+                          onClick={() => canToggleStatus && handleToggleStatus(u)}
+                          disabled={!canToggleStatus}
                           className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold transition-all ${
                             u.is_active
                               ? 'bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
                               : 'bg-rose-100 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
-                          } ${!isCurrent ? 'cursor-pointer hover:scale-105' : 'cursor-default opacity-80'}`}
-                          title={isCurrent ? 'Нельзя отключить свой аккаунт' : 'Нажмите для переключения'}
+                          } ${canToggleStatus ? 'cursor-pointer hover:scale-105' : 'cursor-default opacity-70'}`}
+                          title={
+                            isCurrent
+                              ? 'Нельзя отключить свой аккаунт'
+                              : isModerator && u.role !== 'dispatcher'
+                              ? 'Модератор не может отключать Администраторов и Модераторов'
+                              : 'Нажмите для переключения'
+                          }
                         >
                           {u.is_active ? 'Активен' : 'Отключен'}
                         </button>
@@ -922,15 +957,24 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                         <div className="flex items-center justify-end gap-1.5">
                           {/* Редактировать / Сменить пароль / Переименовать */}
                           <button
-                            onClick={() => startEditUser(u)}
-                            className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/50 rounded-lg transition-colors"
-                            title="Редактировать ФИО, логин и пароль"
+                            onClick={() => canEdit && startEditUser(u)}
+                            disabled={!canEdit}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              canEdit
+                                ? 'text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/50'
+                                : 'text-slate-300 dark:text-slate-700 cursor-not-allowed opacity-40'
+                            }`}
+                            title={
+                              canEdit
+                                ? 'Редактировать ФИО, логин и пароль'
+                                : 'Модератор не может редактировать учетные записи Администраторов и Модераторов'
+                            }
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Удалить */}
-                          {!isCurrent && (
+                          {/* Удалить (только Администратор) */}
+                          {!isModerator && !isCurrent && (
                             <button
                               onClick={() => handleDelete(u.id, u.username)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
@@ -1065,9 +1109,10 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                 </span>
                 <select
                   value={retentionDays}
-                  disabled={isChangingRetention}
+                  disabled={isChangingRetention || isModerator}
                   onChange={(e) => handleRetentionChange(Number(e.target.value))}
-                  className="bg-transparent text-slate-900 dark:text-slate-100 font-extrabold focus:outline-none cursor-pointer text-xs"
+                  className="bg-transparent text-slate-900 dark:text-slate-100 font-extrabold focus:outline-none cursor-pointer text-xs disabled:opacity-75 disabled:cursor-not-allowed"
+                  title={isModerator ? 'Срок хранения настраивается только Администратором' : 'Выбрать срок авторотации логов'}
                 >
                   <option value={3}>3 дня</option>
                   <option value={7}>7 дней (стандарт)</option>
@@ -1097,14 +1142,16 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                   <span>Экспорт</span>
                 </button>
 
-                <button
-                  onClick={() => handleClearLogs(false)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-xl text-xs font-semibold transition-colors"
-                  title="Очистить устаревшие записи"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Очистить старые</span>
-                </button>
+                {!isModerator && (
+                  <button
+                    onClick={() => handleClearLogs(false)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-xl text-xs font-semibold transition-colors"
+                    title="Очистить устаревшие записи (только Администратор)"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Очистить старые</span>
+                  </button>
+                )}
               </div>
 
             </div>
@@ -1340,13 +1387,15 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                                 <Eye className="w-3.5 h-3.5" />
                                 <span>Состав</span>
                               </button>
-                              <button
-                                onClick={() => handleDeleteArchive(a.id, a.date_interval)}
-                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
-                                title="Удалить архивный снимок"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {!isModerator && (
+                                <button
+                                  onClick={() => handleDeleteArchive(a.id, a.date_interval)}
+                                  className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
+                                  title="Удалить архивный снимок (только Администратор)"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1393,27 +1442,37 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                 </div>
               </div>
 
+              {isModerator && (
+                <div className="p-3 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 rounded-xl text-xs text-sky-800 dark:text-sky-300 font-medium flex items-center gap-2">
+                  <Info className="w-4 h-4 text-sky-500 shrink-0" />
+                  <span>В режиме Модератора доступна проверка связи (отправка теста). Токен бота и Chat ID защищены и настраиваются только Администратором.</span>
+                </div>
+              )}
+
               <form onSubmit={handleSaveTelegram} className="space-y-4">
                 {/* Bot Token */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Telegram Bot Token <span className="text-rose-500">*</span>
+                    Telegram Bot Token {!isModerator && <span className="text-rose-500">*</span>}
                   </label>
                   <div className="relative">
                     <input
-                      type={showTgToken ? "text" : "password"}
-                      value={tgBotToken}
+                      type={showTgToken && !isModerator ? "text" : "password"}
+                      value={isModerator ? "" : tgBotToken}
                       onChange={(e) => setTgBotToken(e.target.value)}
-                      placeholder="Например: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none pr-10"
+                      disabled={isModerator}
+                      placeholder={isModerator ? "•••••••••••••••••••• (скрыто для безопасности)" : "Например: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none pr-10 disabled:opacity-75 disabled:cursor-not-allowed"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowTgToken(!showTgToken)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                    >
-                      {showTgToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+                    {!isModerator && (
+                      <button
+                        type="button"
+                        onClick={() => setShowTgToken(!showTgToken)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      >
+                        {showTgToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    )}
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1">
                     Токен выдается ботом <span className="font-semibold text-sky-600 dark:text-sky-400">@BotFather</span> при создании бота
@@ -1423,14 +1482,15 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                 {/* Chat ID */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Chat ID / ID группы / ID канала <span className="text-rose-500">*</span>
+                    Chat ID / ID группы / ID канала {!isModerator && <span className="text-rose-500">*</span>}
                   </label>
                   <input
                     type="text"
                     value={tgChatId}
                     onChange={(e) => setTgChatId(e.target.value)}
-                    placeholder="Например: -1001987654321 или 123456789"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                    disabled={isModerator}
+                    placeholder={isModerator ? "••••••••" : "Например: -1001987654321 или 123456789"}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none disabled:opacity-75 disabled:cursor-not-allowed"
                   />
                   <p className="text-[11px] text-slate-400 mt-1">
                     Для групп начинается с <code className="text-xs text-sky-600 dark:text-sky-400">-100...</code>. Узнать свой ID можно через <span className="font-semibold text-sky-600 dark:text-sky-400">@userinfobot</span>
@@ -1448,7 +1508,8 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                       type="checkbox"
                       checked={tgNotifyErrors}
                       onChange={(e) => setTgNotifyErrors(e.target.checked)}
-                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300"
+                      disabled={isModerator}
+                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 disabled:cursor-not-allowed"
                     />
                     <div>
                       <div className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
@@ -1466,7 +1527,8 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                       type="checkbox"
                       checked={tgNotifyHandover}
                       onChange={(e) => setTgNotifyHandover(e.target.checked)}
-                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300"
+                      disabled={isModerator}
+                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 disabled:cursor-not-allowed"
                     />
                     <div>
                       <div className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
@@ -1484,7 +1546,8 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                       type="checkbox"
                       checked={tgNotifyAviabit}
                       onChange={(e) => setTgNotifyAviabit(e.target.checked)}
-                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300"
+                      disabled={isModerator}
+                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 disabled:cursor-not-allowed"
                     />
                     <div>
                       <div className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
@@ -1515,21 +1578,23 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                   <button
                     type="button"
                     onClick={handleTestTelegram}
-                    disabled={tgTesting || !tgBotToken.trim() || !tgChatId.trim()}
+                    disabled={tgTesting || (!isModerator && (!tgBotToken.trim() || !tgChatId.trim()))}
                     className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-sky-950/50 text-slate-800 dark:text-slate-200 hover:text-sky-600 dark:hover:text-sky-400 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
                   >
                     <Send className={`w-3.5 h-3.5 ${tgTesting ? 'animate-pulse' : ''}`} />
                     <span>{tgTesting ? 'Отправка теста...' : 'Проверить связь (Тест)'}</span>
                   </button>
 
-                  <button
-                    type="submit"
-                    disabled={tgSaving}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-md shadow-sky-600/20 transition-all disabled:opacity-50"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{tgSaving ? 'Сохранение...' : 'Сохранить настройки'}</span>
-                  </button>
+                  {!isModerator && (
+                    <button
+                      type="submit"
+                      disabled={tgSaving}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-md shadow-sky-600/20 transition-all disabled:opacity-50"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{tgSaving ? 'Сохранение...' : 'Сохранить настройки'}</span>
+                    </button>
+                  )}
                 </div>
               </form>
             </div>

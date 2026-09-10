@@ -194,20 +194,26 @@ export default function Header({
                       {currentUser.full_name || currentUser.username}
                     </span>
                     <span className="text-[9px] font-mono text-slate-400">
-                      {currentUser.role === 'admin' ? 'Администратор' : 'Диспетчер'}
+                      {currentUser.role === 'admin' ? 'Администратор' : currentUser.role === 'moderator' ? 'Модератор' : 'Диспетчер'}
                     </span>
                   </div>
                 </div>
 
-                {/* Кнопка Админ панели (для роли admin) */}
-                {currentUser.role === 'admin' && (
+                {/* Кнопка Панели управления (для роли admin и moderator) */}
+                {(currentUser.role === 'admin' || currentUser.role === 'moderator') && (
                   <button
                     onClick={onOpenAdminModal}
-                    className="flex items-center gap-1 bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-purple-300 dark:border-purple-800 shadow-sm transition-all"
-                    title="Управление учетными записями диспетчеров"
+                    className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-xl border shadow-sm transition-all ${
+                      currentUser.role === 'admin'
+                        ? 'bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-800'
+                        : 'bg-sky-100 hover:bg-sky-200 dark:bg-sky-950/60 dark:hover:bg-sky-900/60 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-800'
+                    }`}
+                    title={currentUser.role === 'admin' ? "Панель администратора" : "Панель управления (Модератор)"}
                   >
                     <Shield className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Учётные записи</span>
+                    <span className="hidden sm:inline">
+                      {currentUser.role === 'admin' ? 'Админка' : 'Модерация'}
+                    </span>
                   </button>
                 )}
 
