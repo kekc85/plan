@@ -144,7 +144,27 @@ CREATE TABLE IF NOT EXISTS `plan_shift_archives` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------
--- 8. Таблица системных настроек
+-- 8. Таблица истории правок рейсов (Flight Audit Trail)
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `plan_flight_audit_logs` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `flight_id` VARCHAR(64) NOT NULL,
+    `flight_number` VARCHAR(32) NOT NULL,
+    `flight_date` VARCHAR(16) NULL,
+    `field_name` VARCHAR(64) NOT NULL,
+    `field_label` VARCHAR(64) NULL,
+    `old_val` TEXT NULL,
+    `new_val` TEXT NULL,
+    `changed_by` VARCHAR(128) NOT NULL,
+    `user_id` INT NULL,
+    `created_at` VARCHAR(64) NOT NULL,
+    INDEX `idx_flight_history` (`flight_number`, `flight_date`),
+    INDEX `idx_flight_id` (`flight_id`),
+    INDEX `idx_audit_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------
+-- 9. Таблица системных настроек
 -- ----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `plan_settings` (
     `setting_key` VARCHAR(64) PRIMARY KEY,
@@ -157,7 +177,7 @@ VALUES ('log_retention_days', '7', NOW())
 ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;
 
 -- ----------------------------------------------------------
--- 9. Начальные учётные записи (пароли: admin123 / dispatch123)
+-- 10. Начальные учётные записи (пароли: admin123 / dispatch123)
 -- ----------------------------------------------------------
 INSERT INTO `plan_users` (`username`, `password_hash`, `salt`, `full_name`, `role`, `is_active`, `created_at`)
 VALUES 

@@ -268,6 +268,26 @@ def init_db():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """)
 
+        # Таблица истории правок рейсов (Flight Audit Trail)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS plan_flight_audit_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            flight_id VARCHAR(64) NOT NULL,
+            flight_number VARCHAR(32) NOT NULL,
+            flight_date VARCHAR(16) NULL,
+            field_name VARCHAR(64) NOT NULL,
+            field_label VARCHAR(64) NULL,
+            old_val TEXT NULL,
+            new_val TEXT NULL,
+            changed_by VARCHAR(128) NOT NULL,
+            user_id INT NULL,
+            created_at VARCHAR(64) NOT NULL,
+            INDEX idx_flight_history (flight_number, flight_date),
+            INDEX idx_flight_id (flight_id),
+            INDEX idx_audit_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """)
+
         # Значение по умолчанию для срока хранения логов (7 дней)
         cursor.execute("""
         INSERT IGNORE INTO plan_settings (setting_key, setting_value, updated_at)
@@ -466,6 +486,26 @@ def init_db():
         );
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_archives_created ON plan_shift_archives(created_at);")
+
+        # Таблица истории правок рейсов (Flight Audit Trail)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS plan_flight_audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            flight_id TEXT NOT NULL,
+            flight_number TEXT NOT NULL,
+            flight_date TEXT,
+            field_name TEXT NOT NULL,
+            field_label TEXT,
+            old_val TEXT,
+            new_val TEXT,
+            changed_by TEXT NOT NULL,
+            user_id INTEGER,
+            created_at TEXT NOT NULL
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_flight_history ON plan_flight_audit_logs(flight_number, flight_date);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_flight_id ON plan_flight_audit_logs(flight_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_created ON plan_flight_audit_logs(created_at);")
 
         # Таблица системных настроек
         cursor.execute("""
@@ -794,6 +834,177 @@ def delete_shift_archive(archive_id: int) -> bool:
             cursor.execute("DELETE FROM plan_shift_archives WHERE id = ?;", (archive_id,))
             conn.commit()
         return True
+    finally:
+        conn.close()
+
+
+FIELD_LABELS = {
+    "flight_number": "№ Рейса",
+    "flight_date": "Дата рейса",
+    "departure_time": "Время вылета",
+    "release_time": "Время выпуска (-40м)",
+    "route_city": "Город маршрута",
+    "route_airports": "Аэропорты маршрута",
+    "ac_num": "Бортовой номер",
+    "ac_type": "Тип ВС",
+    "ac_config": "Компоновка",
+    "pax": "Пассажиры (PAX)",
+    "crew": "Экипаж",
+    "fuel_block": "Топливо Block",
+    "fuel_trip": "Топливо Trip",
+    "fuel_taxi": "Топливо Taxi",
+    "dow": "DOW (Сухой вес)",
+    "doi": "DOI (Индекс)",
+    "galley": "Кухня (Galley)",
+    "mtow": "MTOW",
+    "cargo": "Груз (Cargo)",
+    "mail": "Почта (Mail)",
+    "baggage": "Багаж",
+    "lir_sent": "Чекбокс LIR",
+    "szv_sent": "Чекбокс СЗВ",
+    "ldm_sent": "Чекбокс LDM",
+    "astra_times_sent": "Чекбокс Времена",
+    "status": "Статус рейса",
+    "notes": "Примечания / Заметки",
+    "inbound_flight": "Прибывающий рейс",
+    "inbound_takeoff_time": "Взлет входящего",
+    "inbound_landing_time": "Посадка входящего",
+    "outbound_takeoff_time": "Фактический вылет",
+    "plane_status": "Движение борта"
+}
+
+
+def record_flight_change(
+    flight_id: str,
+    flight_number: str,
+    flight_date: str,
+    field_name: str,
+    old_val: Any,
+    new_val: Any,
+    changed_by: str,
+    user_id: Optional[int] = None
+):
+    """Фиксирует одиночное изменение поля рейса в журнале аудита plan_flight_audit_logs"""
+    old_s = str(old_val).strip() if old_val is not None else ""
+    new_s = str(new_val).strip() if new_val is not None else ""
+    if old_s == new_s:
+        return
+
+    field_label = FIELD_LABELS.get(field_name, field_name)
+    now_str = datetime.now(MSK_TZ).strftime('%Y-%m-%d %H:%M:%S')
+
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+    try:
+        if engine == "mysql":
+            cursor.execute("""
+            INSERT INTO plan_flight_audit_logs (
+                flight_id, flight_number, flight_date, field_name, field_label,
+                old_val, new_val, changed_by, user_id, created_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+            """, (str(flight_id), str(flight_number), str(flight_date), field_name, field_label, old_s, new_s, changed_by, user_id, now_str))
+            conn.commit()
+        else:
+            cursor.execute("""
+            INSERT INTO plan_flight_audit_logs (
+                flight_id, flight_number, flight_date, field_name, field_label,
+                old_val, new_val, changed_by, user_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """, (str(flight_id), str(flight_number), str(flight_date), field_name, field_label, old_s, new_s, changed_by, user_id, now_str))
+            conn.commit()
+    except Exception as e:
+        print(f"[Flight Audit Log Error] {e}")
+    finally:
+        conn.close()
+
+
+def record_flight_batch_changes(changes_list: List[dict]):
+    """Пакетная запись изменений рейсов"""
+    if not changes_list:
+        return
+    now_str = datetime.now(MSK_TZ).strftime('%Y-%m-%d %H:%M:%S')
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+    try:
+        for c in changes_list:
+            old_s = str(c.get("old_val", "")).strip() if c.get("old_val") is not None else ""
+            new_s = str(c.get("new_val", "")).strip() if c.get("new_val") is not None else ""
+            if old_s == new_s:
+                continue
+            f_name = c.get("field_name", "")
+            f_label = FIELD_LABELS.get(f_name, f_name)
+            params = (
+                str(c.get("flight_id", "")),
+                str(c.get("flight_number", "")),
+                str(c.get("flight_date", "")),
+                f_name,
+                f_label,
+                old_s,
+                new_s,
+                str(c.get("changed_by", "system")),
+                c.get("user_id"),
+                now_str
+            )
+            if engine == "mysql":
+                cursor.execute("""
+                INSERT INTO plan_flight_audit_logs (
+                    flight_id, flight_number, flight_date, field_name, field_label,
+                    old_val, new_val, changed_by, user_id, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """, params)
+            else:
+                cursor.execute("""
+                INSERT INTO plan_flight_audit_logs (
+                    flight_id, flight_number, flight_date, field_name, field_label,
+                    old_val, new_val, changed_by, user_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """, params)
+        if engine == "sqlite":
+            conn.commit()
+    except Exception as e:
+        print(f"[Flight Batch Audit Log Error] {e}")
+    finally:
+        conn.close()
+
+
+def get_flight_audit_history(
+    flight_id: Optional[str] = None,
+    flight_number: Optional[str] = None,
+    flight_date: Optional[str] = None,
+    limit: int = 100
+) -> List[dict]:
+    """Возвращает историю правок рейса по flight_id или номеру и дате рейса"""
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+    conditions = []
+    params = []
+
+    if flight_id:
+        conditions.append("flight_id = %s" if engine == "mysql" else "flight_id = ?")
+        params.append(str(flight_id))
+    elif flight_number:
+        clean_num = flight_number.replace("-", "").replace(" ", "").upper()
+        conditions.append("REPLACE(REPLACE(UPPER(flight_number), '-', ''), ' ', '') = %s" if engine == "mysql" else "REPLACE(REPLACE(UPPER(flight_number), '-', ''), ' ', '') = ?")
+        params.append(clean_num)
+        if flight_date:
+            conditions.append("flight_date = %s" if engine == "mysql" else "flight_date = ?")
+            params.append(str(flight_date).strip())
+
+    where_sql = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    limit_clause = f"LIMIT {int(limit)}"
+
+    try:
+        sql = f"""
+        SELECT id, flight_id, flight_number, flight_date, field_name, field_label,
+               old_val, new_val, changed_by, user_id, created_at
+        FROM plan_flight_audit_logs
+        {where_sql}
+        ORDER BY id DESC
+        {limit_clause};
+        """
+        cursor.execute(sql, tuple(params))
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
     finally:
         conn.close()
 
