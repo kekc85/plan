@@ -540,6 +540,133 @@ function logSystemEvent($level, $module, $message, $details = null, $userId = nu
     } catch (Exception $e) {}
 }
 
+function initArchivesTable($db) {
+    static $initialized = false;
+    if ($initialized) return;
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS plan_shift_archives (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            shift_id INT NULL,
+            date_interval VARCHAR(64) NOT NULL,
+            dispatcher_name VARCHAR(128) NOT NULL,
+            snapshot_reason VARCHAR(64) NOT NULL DEFAULT 'handover',
+            flights_count INT NOT NULL DEFAULT 0,
+            flights_data MEDIUMTEXT NOT NULL,
+            shift_metadata TEXT NULL,
+            created_at VARCHAR(64) NOT NULL,
+            INDEX idx_archives_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $initialized = true;
+    } catch (Exception $e) {}
+}
+
+function sendTelegramNotification($text, $category = 'errors') {
+    $token = trim(getSystemSetting('tg_bot_token', ''));
+    $chatId = trim(getSystemSetting('tg_chat_id', ''));
+    if (!$token || !$chatId) return false;
+
+    if ($category === 'errors' && getSystemSetting('tg_notify_errors', '1') !== '1') return false;
+    if ($category === 'handover' && getSystemSetting('tg_notify_handover', '1') !== '1') return false;
+    if ($category === 'aviabit' && getSystemSetting('tg_notify_aviabit', '1') !== '1') return false;
+
+    $url = "https://api.telegram.org/bot{$token}/sendMessage";
+    $payload = json_encode([
+        'chat_id' => $chatId,
+        'text' => $text,
+        'parse_mode' => 'HTML',
+        'disable_web_page_preview' => true
+    ]);
+
+    $opts = [
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\nUser-Agent: AeroPlan-WB-Monitor\r\n",
+            'content' => $payload,
+            'timeout' => 5,
+            'ignore_errors' => true
+        ]
+    ];
+    $ctx = stream_context_create($opts);
+    @file_get_contents($url, false, $ctx);
+    return true;
+}
+
+function createShiftSnapshot($shiftId, $dateInterval, $dispatcherName, $reason, $flights, $metadata = null) {
+    try {
+        $db = getDb();
+        initArchivesTable($db);
+        $now = date('Y-m-d H:i:s');
+        $flightsJson = json_encode($flights, JSON_UNESCAPED_UNICODE);
+        $metaJson = $metadata ? json_encode($metadata, JSON_UNESCAPED_UNICODE) : null;
+        $count = count($flights);
+
+        $stmt = $db->prepare("INSERT INTO plan_shift_archives (shift_id, date_interval, dispatcher_name, snapshot_reason, flights_count, flights_data, shift_metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$shiftId, $dateInterval, $dispatcherName, $reason, $count, $flightsJson, $metaJson, $now]);
+        $newId = (int)$db->lastInsertId();
+
+        logSystemEvent('INFO', 'shift', "Создан архивный снимок смены '$dateInterval' (причина: $reason, рейсов: $count)", null, null, $dispatcherName);
+        return $newId;
+    } catch (Exception $e) {
+        return 0;
+    }
+}
+
+function getShiftArchives($limit = 50, $offset = 0) {
+    try {
+        $db = getDb();
+        initArchivesTable($db);
+        $limit = max(1, min(200, (int)$limit));
+        $offset = max(0, (int)$offset);
+        $stmt = $db->prepare("SELECT id, shift_id, date_interval, dispatcher_name, snapshot_reason, flights_count, shift_metadata, created_at
+            FROM plan_shift_archives ORDER BY id DESC LIMIT ? OFFSET ?");
+        $stmt->bindValue(1, $limit, PDO::PARAM_INT);
+        $stmt->bindValue(2, $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$r) {
+            if (!empty($r['shift_metadata'])) {
+                $r['shift_metadata'] = json_decode($r['shift_metadata'], true) ?: $r['shift_metadata'];
+            }
+        }
+        return $rows;
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+function getShiftArchiveById($id) {
+    try {
+        $db = getDb();
+        initArchivesTable($db);
+        $stmt = $db->prepare("SELECT * FROM plan_shift_archives WHERE id = ?");
+        $stmt->execute([(int)$id]);
+        $row = $stmt->fetch();
+        if (!$row) return null;
+        if (!empty($row['flights_data'])) {
+            $row['flights_data'] = json_decode($row['flights_data'], true) ?: [];
+        }
+        if (!empty($row['shift_metadata'])) {
+            $row['shift_metadata'] = json_decode($row['shift_metadata'], true) ?: $row['shift_metadata'];
+        }
+        return $row;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+function deleteShiftArchive($id) {
+    try {
+        $db = getDb();
+        initArchivesTable($db);
+        $stmt = $db->prepare("DELETE FROM plan_shift_archives WHERE id = ?");
+        $stmt->execute([(int)$id]);
+        return true;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
 // ----------------------------------------------------
 // 2. МАРШРУТИЗАЦИЯ
 // ----------------------------------------------------
@@ -1000,12 +1127,18 @@ if ($route === '/shift/handover') {
     $nowStr = date('Y-m-d H:i:s');
 
     $db = getDb();
-    $stmt = $db->query("SELECT * FROM plan_flights WHERE status != 'closed' ORDER BY departure_time ASC");
-    $activeFlights = $stmt->fetchAll();
+    initArchivesTable($db);
 
+    $stmtAll = $db->query("SELECT * FROM plan_flights ORDER BY sort_order ASC, departure_time ASC");
+    $allFlights = $stmtAll->fetchAll();
+
+    $activeFlights = [];
     $summary = [];
-    foreach ($activeFlights as $f) {
-        $summary[] = "{$f['flight_number']} ({$f['departure_time']}) - {$f['status']}";
+    foreach ($allFlights as $f) {
+        if (($f['status'] ?? '') !== 'closed') {
+            $activeFlights[] = $f;
+            $summary[] = "{$f['flight_number']} ({$f['departure_time']}) - {$f['status']}";
+        }
     }
     $summaryText = implode('; ', array_slice($summary, 0, 10));
 
@@ -1024,15 +1157,51 @@ if ($route === '/shift/handover') {
         $notes
     ]);
 
-    $activeShift = $db->query("SELECT id FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1")->fetch();
+    $activeShift = $db->query("SELECT id, date_interval FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1")->fetch();
+    $shiftId = null;
+    $shiftDateInterval = date('d.m.Y');
     if ($activeShift) {
+        $shiftId = $activeShift['id'];
+        $shiftDateInterval = $activeShift['date_interval'] ?: date('d.m.Y');
         $upd = $db->prepare("UPDATE plan_shifts SET dispatcher_name = ? WHERE id = ?");
-        $upd->execute([$acceptedBy, $activeShift['id']]);
+        $upd->execute([$acceptedBy, $shiftId]);
     }
+
+    // Создаем архивный снимок до удаления закрытых рейсов
+    createShiftSnapshot(
+        $shiftId,
+        $shiftDateInterval,
+        $handedOverBy,
+        'handover',
+        $allFlights,
+        [
+            'handed_over_by' => $handedOverBy,
+            'accepted_by' => $acceptedBy,
+            'notes' => $notes,
+            'active_flights_count' => count($activeFlights),
+            'total_flights_count' => count($allFlights)
+        ]
+    );
 
     if ($archiveClosed) {
         $db->exec("DELETE FROM plan_flights WHERE status = 'closed'");
     }
+
+    logSystemEvent(
+        'INFO', 'shift',
+        "Смена успешно передана: $handedOverBy ➔ $acceptedBy (передано рейсов: " . count($activeFlights) . ")",
+        ['notes' => $notes, 'active_flights' => $summaryText],
+        null, $acceptedBy, getClientIp()
+    );
+
+    // Отправка оповещения в Telegram
+    $tgText = "🔄 <b>Смена успешно передана</b>\n\n"
+        . "👤 <b>Сдал:</b> $handedOverBy\n"
+        . "👤 <b>Принял:</b> $acceptedBy\n"
+        . "📅 <b>Интервал:</b> $shiftDateInterval\n"
+        . "✈️ <b>Активных рейсов:</b> " . count($activeFlights) . "\n"
+        . "📝 <b>Заметки:</b> " . ($notes ?: '—');
+    sendTelegramNotification($tgText, 'handover');
 
     echo json_encode([
         'success' => true,
@@ -2011,6 +2180,7 @@ if ($route === '/logs/client_error' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = getJsonInput();
     $message = trim($input['message'] ?? 'Неизвестная ошибка фронтенда');
     $clientIp = getClientIp();
+    $uName = $user ? $user['username'] : 'anonymous';
 
     logSystemEvent(
         'ERROR',
@@ -2018,12 +2188,182 @@ if ($route === '/logs/client_error' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         "Клиентская ошибка: $message",
         $input,
         $user ? $user['id'] : null,
-        $user ? $user['username'] : 'anonymous',
+        $uName,
         $clientIp
     );
 
+    // Оповещение в Telegram об ошибке
+    $tgText = "🚨 <b>Клиентская ошибка интерфейса</b>\n\n"
+        . "<b>Пользователь:</b> $uName\n"
+        . "<b>IP:</b> $clientIp\n"
+        . "<b>Ошибка:</b> <code>" . htmlspecialchars(substr($message, 0, 300)) . "</code>\n"
+        . "<b>URL:</b> " . htmlspecialchars($input['url'] ?? '—');
+    sendTelegramNotification($tgText, 'errors');
+
     echo json_encode(['success' => true]);
     exit;
+}
+
+// ----------------------------------------------------
+// ЭНДПОИНТЫ: /admin/telegram/* (Настройки Telegram-оповещений)
+// ----------------------------------------------------
+if (strpos($route, '/admin/telegram') === 0) {
+    $admin = getAuthUser();
+    if ($admin['role'] !== 'admin') {
+        http_response_code(403);
+        echo json_encode(['detail' => 'Доступ разрешен только Администратору']);
+        exit;
+    }
+
+    $method = $_SERVER['REQUEST_METHOD'];
+
+    if ($route === '/admin/telegram/settings') {
+        if ($method === 'GET') {
+            $token = getSystemSetting('tg_bot_token', '');
+            $maskedToken = (strlen($token) > 12) ? (substr($token, 0, 6) . '...' . substr($token, -4)) : (str_repeat('*', strlen($token)));
+            echo json_encode([
+                'bot_token' => $token,
+                'masked_token' => $maskedToken,
+                'has_token' => !empty($token),
+                'chat_id' => getSystemSetting('tg_chat_id', ''),
+                'notify_errors' => getSystemSetting('tg_notify_errors', '1') === '1',
+                'notify_handover' => getSystemSetting('tg_notify_handover', '1') === '1',
+                'notify_aviabit' => getSystemSetting('tg_notify_aviabit', '1') === '1'
+            ]);
+            exit;
+        }
+
+        if ($method === 'POST') {
+            $input = getJsonInput();
+            setSystemSetting('tg_bot_token', trim($input['bot_token'] ?? ''));
+            setSystemSetting('tg_chat_id', trim($input['chat_id'] ?? ''));
+            setSystemSetting('tg_notify_errors', !empty($input['notify_errors']) ? '1' : '0');
+            setSystemSetting('tg_notify_handover', !empty($input['notify_handover']) ? '1' : '0');
+            setSystemSetting('tg_notify_aviabit', !empty($input['notify_aviabit']) ? '1' : '0');
+
+            logSystemEvent('INFO', 'system', "Администратор '{$admin['username']}' обновил настройки Telegram-оповещений", null, $admin['id'], $admin['username'], getClientIp());
+
+            echo json_encode(['success' => true, 'message' => 'Настройки Telegram успешно сохранены']);
+            exit;
+        }
+    }
+
+    if ($route === '/admin/telegram/test' && $method === 'POST') {
+        $input = getJsonInput();
+        $token = trim($input['bot_token'] ?? getSystemSetting('tg_bot_token', ''));
+        $chatId = trim($input['chat_id'] ?? getSystemSetting('tg_chat_id', ''));
+        $msg = trim($input['message'] ?? "🔔 <b>Тест связи AeroPlan W&B</b>\nОповещения Telegram успешно настроены и функционируют штатно!");
+
+        if (!$token || !$chatId) {
+            http_response_code(400);
+            echo json_encode(['detail' => 'Не указан Bot Token или Chat ID для отправки теста']);
+            exit;
+        }
+
+        $url = "https://api.telegram.org/bot{$token}/sendMessage";
+        $payload = json_encode([
+            'chat_id' => $chatId,
+            'text' => $msg,
+            'parse_mode' => 'HTML',
+            'disable_web_page_preview' => true
+        ]);
+
+        $opts = [
+            'http' => [
+                'method' => 'POST',
+                'header' => "Content-Type: application/json\r\nUser-Agent: AeroPlan-WB-Monitor\r\n",
+                'content' => $payload,
+                'timeout' => 8,
+                'ignore_errors' => true
+            ]
+        ];
+        $ctx = stream_context_create($opts);
+        $res = @file_get_contents($url, false, $ctx);
+
+        if ($res) {
+            $jsonRes = json_decode($res, true);
+            if (!empty($jsonRes['ok'])) {
+                logSystemEvent('INFO', 'system', "Успешный тест связи с Telegram-ботом (Chat ID: $chatId)", null, $admin['id'], $admin['username'], getClientIp());
+                echo json_encode(['success' => true, 'message' => 'Тестовое сообщение успешно доставлено в Telegram!']);
+                exit;
+            } else {
+                $errDesc = $jsonRes['description'] ?? 'Ошибка Telegram API';
+                logSystemEvent('ERROR', 'system', "Ошибка Telegram теста: $errDesc", null, $admin['id'], $admin['username'], getClientIp());
+                http_response_code(502);
+                echo json_encode(['detail' => "Telegram API вернул ошибку: $errDesc"]);
+                exit;
+            }
+        } else {
+            http_response_code(502);
+            echo json_encode(['detail' => 'Не удалось связаться с сервером Telegram API']);
+            exit;
+        }
+    }
+}
+
+// ----------------------------------------------------
+// ЭНДПОИНТЫ: /admin/archives/* (Посменные архивы и снимки)
+// ----------------------------------------------------
+if (strpos($route, '/admin/archives') === 0) {
+    $admin = getAuthUser();
+    if ($admin['role'] !== 'admin') {
+        http_response_code(403);
+        echo json_encode(['detail' => 'Доступ разрешен только Администратору']);
+        exit;
+    }
+
+    $method = $_SERVER['REQUEST_METHOD'];
+
+    $targetArchiveId = null;
+    if (preg_match('#/admin/archives/(\d+)#', $route, $matches)) {
+        $targetArchiveId = (int)$matches[1];
+    } elseif (isset($_GET['id'])) {
+        $targetArchiveId = (int)$_GET['id'];
+    }
+
+    // Детальный просмотр архива
+    if ($targetArchiveId && $method === 'GET') {
+        $archive = getShiftArchiveById($targetArchiveId);
+        if (!$archive) {
+            http_response_code(404);
+            echo json_encode(['detail' => 'Архивный снимок смены не найден']);
+            exit;
+        }
+        echo json_encode(['archive' => $archive]);
+        exit;
+    }
+
+    // Удаление снимка
+    if ($targetArchiveId && $method === 'DELETE') {
+        deleteShiftArchive($targetArchiveId);
+        logSystemEvent('WARN', 'shift', "Администратор '{$admin['username']}' удалил архивный снимок #$targetArchiveId", null, $admin['id'], $admin['username'], getClientIp());
+        echo json_encode(['success' => true, 'message' => "Архивный снимок #$targetArchiveId удален"]);
+        exit;
+    }
+
+    // Ручное создание снимка
+    if ($route === '/admin/archives/create' && $method === 'POST') {
+        $input = getJsonInput();
+        $shiftId = isset($input['shift_id']) ? (int)$input['shift_id'] : null;
+        $dateInterval = trim($input['date_interval'] ?? date('d.m.Y'));
+        $dispatcher = trim($input['dispatcher_name'] ?? $admin['full_name'] ?? $admin['username']);
+        $reason = trim($input['reason'] ?? 'manual');
+        $flights = $input['flights'] ?? [];
+        $meta = $input['shift_metadata'] ?? null;
+
+        $newId = createShiftSnapshot($shiftId, $dateInterval, $dispatcher, $reason, $flights, $meta);
+        echo json_encode(['success' => true, 'archive_id' => $newId, 'message' => 'Снимок смены успешно создан и сохранен в архив']);
+        exit;
+    }
+
+    // Список снимков
+    if ($method === 'GET') {
+        $limit = max(1, min(200, (int)($_GET['limit'] ?? 50)));
+        $offset = max(0, (int)($_GET['offset'] ?? 0));
+        $archives = getShiftArchives($limit, $offset);
+        echo json_encode(['archives' => $archives]);
+        exit;
+    }
 }
 
 

@@ -289,3 +289,50 @@ export function initGlobalErrorLogging() {
   };
 }
 
+// --- ИНТЕГРАЦИЯ С TELEGRAM-БОТОМ (АДМИНИСТРАТОР) ---
+
+export async function adminGetTelegramSettings() {
+  return request('/admin/telegram/settings');
+}
+
+export async function adminUpdateTelegramSettings(settings) {
+  return request('/admin/telegram/settings', {
+    method: 'POST',
+    body: JSON.stringify(settings)
+  });
+}
+
+export async function adminTestTelegram(testData = {}) {
+  return request('/admin/telegram/test', {
+    method: 'POST',
+    body: JSON.stringify(testData)
+  });
+}
+
+// --- ПОСМЕННЫЕ АРХИВЫ И СНИМКИ (АДМИНИСТРАТОР) ---
+
+export async function adminGetArchives(params = {}) {
+  const query = new URLSearchParams();
+  if (params.limit) query.append('limit', params.limit);
+  if (params.offset) query.append('offset', params.offset);
+  const qStr = query.toString();
+  return request(`/admin/archives${qStr ? `?${qStr}` : ''}`);
+}
+
+export async function adminGetArchiveDetail(archiveId) {
+  return request(`/admin/archives/${archiveId}`);
+}
+
+export async function adminCreateArchive(archiveData) {
+  return request('/admin/archives/create', {
+    method: 'POST',
+    body: JSON.stringify(archiveData)
+  });
+}
+
+export async function adminDeleteArchive(archiveId) {
+  return request(`/admin/archives/${archiveId}`, {
+    method: 'DELETE'
+  });
+}
+

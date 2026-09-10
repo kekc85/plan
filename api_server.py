@@ -35,7 +35,12 @@ from db import (
     cleanup_old_logs,
     get_setting,
     set_setting,
-    get_log_retention_days
+    get_log_retention_days,
+    send_telegram_notification,
+    create_shift_snapshot,
+    get_shift_archives,
+    get_shift_archive_by_id,
+    delete_shift_archive
 )
 from auth import (
     create_jwt_token,
@@ -206,6 +211,29 @@ class LogSettingsRequest(BaseModel):
 class ClearLogsRequest(BaseModel):
     clear_all: Optional[bool] = False
     days: Optional[int] = None
+
+
+class TelegramSettingsRequest(BaseModel):
+    bot_token: Optional[str] = ""
+    chat_id: Optional[str] = ""
+    notify_errors: Optional[bool] = True
+    notify_handover: Optional[bool] = True
+    notify_aviabit: Optional[bool] = True
+
+
+class TelegramTestRequest(BaseModel):
+    bot_token: Optional[str] = None
+    chat_id: Optional[str] = None
+    message: Optional[str] = "🔔 <b>Тест связи AeroPlan W&B</b>\nОповещения Telegram успешно настроены и функционируют штатно!"
+
+
+class CreateArchiveSnapshotRequest(BaseModel):
+    shift_id: Optional[int] = None
+    date_interval: str
+    dispatcher_name: str
+    reason: Optional[str] = "manual"
+    flights: List[dict] = []
+    shift_metadata: Optional[dict] = None
 
 
 
@@ -701,7 +729,146 @@ def receive_client_error(
         ip_address=client_ip
     )
 
+    # Оповещение в Telegram об ошибке интерфейса
+    tg_text = (
+        f"🚨 <b>Клиентская ошибка интерфейса</b>\n\n"
+        f"<b>Пользователь:</b> {u_name}\n"
+        f"<b>IP:</b> {client_ip}\n"
+        f"<b>Ошибка:</b> <code>{req.message[:300]}</code>\n"
+        f"<b>URL:</b> {req.url or '—'}"
+    )
+    send_telegram_notification(tg_text, category="errors")
+
     return {"success": True}
+
+
+# --- 2.2. НАСТРОЙКИ TELEGRAM-ОПОВЕЩЕНИЙ (ТОЛЬКО АДМИНИСТРАТОР) ---
+
+@app.get("/api/admin/telegram/settings")
+def get_telegram_settings(admin: dict = Depends(require_admin)):
+    """Получение настроек интеграции с Telegram (только для Администратора)"""
+    token = get_setting("tg_bot_token", "")
+    masked_token = (token[:6] + "..." + token[-4:]) if len(token) > 12 else ("*" * len(token) if token else "")
+    return {
+        "bot_token": token,
+        "masked_token": masked_token,
+        "has_token": bool(token),
+        "chat_id": get_setting("tg_chat_id", ""),
+        "notify_errors": get_setting("tg_notify_errors", "1") == "1",
+        "notify_handover": get_setting("tg_notify_handover", "1") == "1",
+        "notify_aviabit": get_setting("tg_notify_aviabit", "1") == "1"
+    }
+
+
+@app.post("/api/admin/telegram/settings")
+def update_telegram_settings(req: TelegramSettingsRequest, admin: dict = Depends(require_admin)):
+    """Сохранение настроек интеграции с Telegram"""
+    set_setting("tg_bot_token", req.bot_token.strip() if req.bot_token else "")
+    set_setting("tg_chat_id", req.chat_id.strip() if req.chat_id else "")
+    set_setting("tg_notify_errors", "1" if req.notify_errors else "0")
+    set_setting("tg_notify_handover", "1" if req.notify_handover else "0")
+    set_setting("tg_notify_aviabit", "1" if req.notify_aviabit else "0")
+
+    log_system_event(
+        "INFO", "system",
+        f"Администратор '{admin['username']}' обновил настройки Telegram-оповещений (Chat ID: {req.chat_id or '—'})",
+        user_id=admin["id"], username=admin["username"]
+    )
+
+    return {"success": True, "message": "Настройки Telegram успешно сохранены"}
+
+
+@app.post("/api/admin/telegram/test")
+def test_telegram_connection(req: TelegramTestRequest, admin: dict = Depends(require_admin)):
+    """Проверка отправки тестового сообщения в Telegram"""
+    token = (req.bot_token or get_setting("tg_bot_token", "")).strip()
+    chat_id = (req.chat_id or get_setting("tg_chat_id", "")).strip()
+
+    if not token or not chat_id:
+        raise HTTPException(status_code=400, detail="Не указан Bot Token или Chat ID для отправки теста")
+
+    import urllib.request
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": req.message or "🔔 <b>Тест связи AeroPlan W&B</b>\nОповещения Telegram успешно настроены и функционируют штатно!",
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
+    }
+
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        http_req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json", "User-Agent": "AeroPlan-WB-Monitor"}
+        )
+        with urllib.request.urlopen(http_req, timeout=8) as resp:
+            resp_body = json.loads(resp.read().decode("utf-8"))
+            if resp.status == 200 and resp_body.get("ok"):
+                log_system_event(
+                    "INFO", "system",
+                    f"Успешный тест связи с Telegram-ботом (Chat ID: {chat_id})",
+                    user_id=admin["id"], username=admin["username"]
+                )
+                return {"success": True, "message": "Тестовое сообщение успешно доставлено в Telegram!"}
+            else:
+                raise HTTPException(status_code=502, detail=f"Telegram API вернул ошибку: {resp_body.get('description', 'Неизвестная ошибка')}")
+    except Exception as e:
+        log_system_event(
+            "ERROR", "system",
+            f"Ошибка тестирования Telegram: {str(e)}",
+            user_id=admin["id"], username=admin["username"]
+        )
+        raise HTTPException(status_code=502, detail=f"Не удалось отправить сообщение в Telegram: {str(e)}")
+
+
+# --- 2.3. ПОСМЕННЫЕ АРХИВЫ И АВТО-СНАПШОТЫ ---
+
+@app.get("/api/admin/archives")
+def list_shift_archives(
+    limit: int = 50,
+    offset: int = 0,
+    admin: dict = Depends(require_admin)
+):
+    """Получение списка архивных снимков смен (метаданные)"""
+    archives = get_shift_archives(limit=limit, offset=offset)
+    return {"archives": archives}
+
+
+@app.get("/api/admin/archives/{archive_id}")
+def get_archive_detail(archive_id: int, admin: dict = Depends(require_admin)):
+    """Получение подробных данных снимка смены, включая состав рейсов"""
+    archive = get_shift_archive_by_id(archive_id)
+    if not archive:
+        raise HTTPException(status_code=404, detail="Архивный снимок смены не найден")
+    return {"archive": archive}
+
+
+@app.post("/api/admin/archives/create")
+def create_manual_archive(req: CreateArchiveSnapshotRequest, admin: dict = Depends(require_admin)):
+    """Создание ручного снимка состояния смены"""
+    archive_id = create_shift_snapshot(
+        shift_id=req.shift_id,
+        date_interval=req.date_interval,
+        dispatcher_name=req.dispatcher_name or admin.get("full_name") or admin.get("username"),
+        reason=req.reason or "manual",
+        flights=req.flights,
+        shift_metadata=req.shift_metadata
+    )
+    return {"success": True, "archive_id": archive_id, "message": "Снимок смены успешно создан и сохранен в архив"}
+
+
+@app.delete("/api/admin/archives/{archive_id}")
+def delete_archive(archive_id: int, admin: dict = Depends(require_admin)):
+    """Удаление архивного снимка"""
+    delete_shift_archive(archive_id)
+    log_system_event(
+        "WARN", "shift",
+        f"Администратор '{admin['username']}' удалил архивный снимок #{archive_id}",
+        user_id=admin["id"], username=admin["username"]
+    )
+    return {"success": True, "message": f"Архивный снимок #{archive_id} удален"}
 
 
 
@@ -1043,14 +1210,38 @@ def shift_handover(req: HandoverRequest, current_user: dict = Depends(get_curren
         )
     )
 
-    cursor.execute("SELECT id FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1;")
+    cursor.execute("SELECT id, date_interval FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1;")
     active_shift = cursor.fetchone()
+    shift_id = None
+    shift_date_interval = ""
     if active_shift:
-        shift_id = dict(active_shift)["id"]
+        shift_dict = dict(active_shift)
+        shift_id = shift_dict.get("id")
+        shift_date_interval = shift_dict.get("date_interval", "")
         cursor.execute(
             q("UPDATE plan_shifts SET dispatcher_name = %s WHERE id = %s;", engine),
             (req.accepted_by.strip(), shift_id)
         )
+
+    if not shift_date_interval:
+        shift_date_interval = datetime.now(MSK_TZ).strftime("%d.%m.%Y")
+
+    # Создаем полный снимок смены в архиве до очистки закрытых рейсов
+    all_flights_dicts = [dict(r) for r in rows]
+    create_shift_snapshot(
+        shift_id=shift_id,
+        date_interval=shift_date_interval,
+        dispatcher_name=req.handed_over_by.strip(),
+        reason="handover",
+        flights=all_flights_dicts,
+        shift_metadata={
+            "handed_over_by": req.handed_over_by.strip(),
+            "accepted_by": req.accepted_by.strip(),
+            "notes": req.notes or "",
+            "active_flights_count": len(active_flights),
+            "total_flights_count": len(all_flights_dicts)
+        }
+    )
 
     if req.archive_closed_flights:
         cursor.execute("DELETE FROM plan_flights WHERE status = 'closed';")
@@ -1066,6 +1257,17 @@ def shift_handover(req: HandoverRequest, current_user: dict = Depends(get_curren
         user_id=current_user.get("id"),
         username=current_user.get("username")
     )
+
+    # Отправка уведомления в Telegram о сдаче смены
+    tg_text = (
+        f"🔄 <b>Смена успешно передана</b>\n\n"
+        f"👤 <b>Сдал:</b> {req.handed_over_by.strip()}\n"
+        f"👤 <b>Принял:</b> {req.accepted_by.strip()}\n"
+        f"📅 <b>Интервал:</b> {shift_date_interval}\n"
+        f"✈️ <b>Активных рейсов:</b> {len(active_flights)}\n"
+        f"📝 <b>Заметки:</b> {req.notes.strip() if req.notes else '—'}"
+    )
+    send_telegram_notification(tg_text, category="handover")
 
     return {
         "success": True,
@@ -1134,7 +1336,14 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
             errors.append(f"Ошибка Икар: {str(e)}")
 
     if not all_raw_flights and errors:
-        raise HTTPException(status_code=502, detail="; ".join(errors))
+        err_msg = "; ".join(errors)
+        send_telegram_notification(
+            f"⚠️ <b>Сбой интеграции с AviaBit</b>\n\n"
+            f"<b>Авиакомпания:</b> {req.airline}\n"
+            f"<b>Ошибка:</b> <code>{err_msg[:400]}</code>",
+            category="aviabit"
+        )
+        raise HTTPException(status_code=502, detail=err_msg)
 
     active_deps = None
     if req.allowed_departures:

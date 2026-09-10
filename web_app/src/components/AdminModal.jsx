@@ -3,7 +3,9 @@ import {
   X, Users, UserPlus, Shield, Trash2, CheckCircle2, AlertCircle, 
   RefreshCw, Edit3, Eye, EyeOff, Save, Activity, Terminal, 
   Search, Download, Clock, Filter, ChevronRight, Copy, Check,
-  AlertTriangle, Info, Server, Laptop, Database, Lock
+  AlertTriangle, Info, Server, Laptop, Database, Lock, Send,
+  Bell, Archive, FileSpreadsheet, Calendar, CheckSquare, MessageSquare,
+  ExternalLink, Plane, Layers, HelpCircle
 } from 'lucide-react';
 import { 
   adminListUsers, 
@@ -13,11 +15,18 @@ import {
   adminGetLogs,
   adminGetLogSettings,
   adminUpdateLogSettings,
-  adminClearLogs
+  adminClearLogs,
+  adminGetTelegramSettings,
+  adminUpdateTelegramSettings,
+  adminTestTelegram,
+  adminGetArchives,
+  adminGetArchiveDetail,
+  adminCreateArchive,
+  adminDeleteArchive
 } from '../utils/api';
 
 export default function AdminModal({ isOpen, onClose, currentUser }) {
-  // Навигация по вкладкам: 'users' | 'logs'
+  // Навигация по вкладкам: 'users' | 'logs' | 'archives' | 'telegram'
   const [activeTab, setActiveTab] = useState('users');
 
   // Состояние: Пользователи
@@ -55,6 +64,26 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
   const [copiedSuccess, setCopiedSuccess] = useState(false);
   const [isChangingRetention, setIsChangingRetention] = useState(false);
 
+  // Состояние: Telegram-оповещения
+  const [tgBotToken, setTgBotToken] = useState('');
+  const [tgChatId, setTgChatId] = useState('');
+  const [tgNotifyErrors, setTgNotifyErrors] = useState(true);
+  const [tgNotifyHandover, setTgNotifyHandover] = useState(true);
+  const [tgNotifyAviabit, setTgNotifyAviabit] = useState(true);
+  const [showTgToken, setShowTgToken] = useState(false);
+  const [tgLoading, setTgLoading] = useState(false);
+  const [tgSaving, setTgSaving] = useState(false);
+  const [tgTesting, setTgTesting] = useState(false);
+  const [tgTestResult, setTgTestResult] = useState(null);
+
+  // Состояние: Посменные архивы
+  const [archives, setArchives] = useState([]);
+  const [archivesLoading, setArchivesLoading] = useState(false);
+  const [archiveSearch, setArchiveSearch] = useState('');
+  const [selectedArchiveDetail, setSelectedArchiveDetail] = useState(null);
+  const [archiveDetailLoading, setArchiveDetailLoading] = useState(false);
+  const [archiveFlightSearch, setArchiveFlightSearch] = useState('');
+
   useEffect(() => {
     if (isOpen) {
       if (activeTab === 'users') {
@@ -62,6 +91,10 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
       } else if (activeTab === 'logs') {
         loadLogs();
         loadRetentionSettings();
+      } else if (activeTab === 'archives') {
+        loadArchives();
+      } else if (activeTab === 'telegram') {
+        loadTelegramSettings();
       }
     }
   }, [isOpen, activeTab]);
@@ -165,6 +198,128 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
     navigator.clipboard.writeText(text);
     setCopiedSuccess(true);
     setTimeout(() => setCopiedSuccess(false), 2000);
+  };
+
+  // --- МЕТОДЫ TELEGRAM-ОПОВЕЩЕНИЙ ---
+
+  const loadTelegramSettings = async () => {
+    setTgLoading(true);
+    setTgTestResult(null);
+    try {
+      const res = await adminGetTelegramSettings();
+      if (res) {
+        setTgBotToken(res.bot_token || '');
+        setTgChatId(res.chat_id || '');
+        setTgNotifyErrors(res.notify_errors !== false);
+        setTgNotifyHandover(res.notify_handover !== false);
+        setTgNotifyAviabit(res.notify_aviabit !== false);
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Не удалось загрузить настройки Telegram');
+    } finally {
+      setTgLoading(false);
+    }
+  };
+
+  const handleSaveTelegram = async (e) => {
+    if (e) e.preventDefault();
+    setTgSaving(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      await adminUpdateTelegramSettings({
+        bot_token: tgBotToken.trim(),
+        chat_id: tgChatId.trim(),
+        notify_errors: tgNotifyErrors,
+        notify_handover: tgNotifyHandover,
+        notify_aviabit: tgNotifyAviabit
+      });
+      setSuccessMsg('Настройки Telegram успешно сохранены');
+    } catch (err) {
+      setErrorMsg(err.message || 'Ошибка сохранения настроек Telegram');
+    } finally {
+      setTgSaving(false);
+    }
+  };
+
+  const handleTestTelegram = async () => {
+    if (!tgBotToken.trim() || !tgChatId.trim()) {
+      setErrorMsg('Укажите Bot Token и Chat ID для отправки тестового оповещения');
+      return;
+    }
+    setTgTesting(true);
+    setTgTestResult(null);
+    setErrorMsg('');
+    try {
+      const res = await adminTestTelegram({
+        bot_token: tgBotToken.trim(),
+        chat_id: tgChatId.trim(),
+        message: '🔔 <b>Тест связи AeroPlan W&B</b>\n\nОповещения Telegram успешно настроены и функционируют штатно!'
+      });
+      setTgTestResult({ success: true, message: res.message || 'Сообщение успешно доставлено!' });
+      setSuccessMsg(res.message || 'Тестовое сообщение доставлено в Telegram');
+    } catch (err) {
+      setTgTestResult({ success: false, message: err.message || 'Не удалось отправить сообщение в Telegram' });
+      setErrorMsg(err.message || 'Ошибка отправки теста Telegram');
+    } finally {
+      setTgTesting(false);
+    }
+  };
+
+  // --- МЕТОДЫ ПОСМЕННЫХ АРХИВОВ ---
+
+  const loadArchives = async () => {
+    setArchivesLoading(true);
+    setErrorMsg('');
+    try {
+      const res = await adminGetArchives({ limit: 100 });
+      if (res && res.archives) {
+        setArchives(res.archives);
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Не удалось загрузить список архивов');
+    } finally {
+      setArchivesLoading(false);
+    }
+  };
+
+  const handleViewArchiveDetail = async (archiveId) => {
+    setArchiveDetailLoading(true);
+    setArchiveFlightSearch('');
+    try {
+      const res = await adminGetArchiveDetail(archiveId);
+      if (res && res.archive) {
+        setSelectedArchiveDetail(res.archive);
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Не удалось загрузить детальный состав архива');
+    } finally {
+      setArchiveDetailLoading(false);
+    }
+  };
+
+  const handleDeleteArchive = async (archiveId, title) => {
+    if (window.confirm(`Вы уверены, что хотите удалить архивный снимок #${archiveId} (${title})?`)) {
+      try {
+        await adminDeleteArchive(archiveId);
+        setSuccessMsg(`Архив #${archiveId} удален`);
+        await loadArchives();
+      } catch (err) {
+        setErrorMsg(err.message || 'Ошибка удаления архива');
+      }
+    }
+  };
+
+  const handleExportArchiveJson = (archive) => {
+    if (!archive) return;
+    const content = JSON.stringify(archive, null, 2);
+    const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shift_archive_${archive.id}_${(archive.date_interval || '').replace(/[^\w.-]/g, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
 
@@ -358,14 +513,14 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
           </div>
 
           {/* Вкладки переключения */}
-          <div className="flex items-center bg-slate-200/70 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-300 dark:border-slate-700 gap-1">
+          <div className="flex items-center bg-slate-200/70 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-300 dark:border-slate-700 gap-1 overflow-x-auto max-w-[65%]">
             <button
               onClick={() => {
                 setActiveTab('users');
                 setErrorMsg('');
                 setSuccessMsg('');
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                 activeTab === 'users'
                   ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -384,18 +539,58 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                 setErrorMsg('');
                 setSuccessMsg('');
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                 activeTab === 'logs'
                   ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <Activity className="w-3.5 h-3.5" />
-              <span>Журнал событий и ошибок</span>
+              <span>Журнал событий</span>
               {logStats.error > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
                   {logStats.error}
                 </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('archives');
+                setErrorMsg('');
+                setSuccessMsg('');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                activeTab === 'archives'
+                  ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Archive className="w-3.5 h-3.5" />
+              <span>Архив смен</span>
+              {archives.length > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                  {archives.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('telegram');
+                setErrorMsg('');
+                setSuccessMsg('');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                activeTab === 'telegram'
+                  ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Send className="w-3.5 h-3.5 text-sky-500" />
+              <span>Telegram-бот</span>
+              {tgChatId && (
+                <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" title="Настроен" />
               )}
             </button>
           </div>
@@ -1018,6 +1213,365 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
         </div>
       )}
 
+      {/* ========================================================== */}
+      {/* ВКЛАДКА 3: ПОСМЕННЫЕ АРХИВЫ (РЕЗЕРВНЫЕ СНИМКИ) */}
+      {/* ========================================================== */}
+      {activeTab === 'archives' && (
+        <div className="space-y-4">
+          
+          {/* Action Toolbar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-850/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-2 flex-1 max-w-md">
+              <div className="relative w-full">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Поиск по дате, смене или диспетчеру..."
+                  value={archiveSearch}
+                  onChange={(e) => setArchiveSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                />
+                {archiveSearch && (
+                  <button 
+                    onClick={() => setArchiveSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadArchives}
+                disabled={archivesLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold transition-all border border-slate-200 dark:border-slate-700"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${archivesLoading ? 'animate-spin' : ''}`} />
+                <span>Обновить</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Список архивных снимков */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto max-h-[55vh]">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-850/90 border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                    <th className="px-3.5 py-2.5"># ID</th>
+                    <th className="px-3.5 py-2.5">Интервал смены</th>
+                    <th className="px-3.5 py-2.5">Диспетчер</th>
+                    <th className="px-3.5 py-2.5">Причина снимка</th>
+                    <th className="px-3.5 py-2.5 text-center">Рейсов</th>
+                    <th className="px-3.5 py-2.5">Дата и время</th>
+                    <th className="px-3.5 py-2.5 text-right">Действия</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {archivesLoading ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-sky-500" />
+                        <span>Загрузка архивов смен...</span>
+                      </td>
+                    </tr>
+                  ) : archives.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                        <Archive className="w-6 h-6 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                        <div className="font-bold text-sm text-slate-600 dark:text-slate-400">Архив пуст</div>
+                        <div className="text-[11px] mt-1">Резервные снимки создаются автоматически при каждой передаче смены</div>
+                      </td>
+                    </tr>
+                  ) : (
+                    archives
+                      .filter(a => {
+                        if (!archiveSearch.trim()) return true;
+                        const q = archiveSearch.toLowerCase();
+                        return (
+                          (a.date_interval || '').toLowerCase().includes(q) ||
+                          (a.dispatcher_name || '').toLowerCase().includes(q) ||
+                          String(a.id).includes(q)
+                        );
+                      })
+                      .map(a => (
+                        <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-850/50 transition-colors">
+                          <td className="px-3.5 py-2.5 font-mono text-[11px] text-slate-400 font-bold">
+                            #{a.id}
+                          </td>
+                          <td className="px-3.5 py-2.5 font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-sky-500" />
+                              {a.date_interval}
+                            </span>
+                          </td>
+                          <td className="px-3.5 py-2.5 font-medium text-slate-700 dark:text-slate-300">
+                            {a.dispatcher_name}
+                          </td>
+                          <td className="px-3.5 py-2.5 whitespace-nowrap">
+                            {a.snapshot_reason === 'handover' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300">
+                                🔄 Сдача смены
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
+                                💾 Ручной снимок
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-center">
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-sky-100 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                              {a.flights_count}
+                            </span>
+                          </td>
+                          <td className="px-3.5 py-2.5 font-mono text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                            {a.created_at ? a.created_at.slice(0, 19) : '-'}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleViewArchiveDetail(a.id)}
+                                disabled={archiveDetailLoading}
+                                className="px-2.5 py-1 bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1"
+                                title="Просмотреть полный состав рейсов смены"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Состав</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteArchive(a.id, a.date_interval)}
+                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
+                                title="Удалить архивный снимок"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================== */}
+      {/* ВКЛАДКА 4: TELEGRAM-ОПОВЕЩЕНИЯ */}
+      {/* ========================================================== */}
+      {activeTab === 'telegram' && (
+        <div className="space-y-4">
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            
+            {/* Левая колонка: Форма настроек */}
+            <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+                    <Send className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">Интеграция с Telegram-ботом</h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Мгновенные оповещения в дежурный чат или канал</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={loadTelegramSettings}
+                    disabled={tgLoading}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                    title="Обновить данные"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${tgLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveTelegram} className="space-y-4">
+                {/* Bot Token */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Telegram Bot Token <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showTgToken ? "text" : "password"}
+                      value={tgBotToken}
+                      onChange={(e) => setTgBotToken(e.target.value)}
+                      placeholder="Например: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowTgToken(!showTgToken)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      {showTgToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Токен выдается ботом <span className="font-semibold text-sky-600 dark:text-sky-400">@BotFather</span> при создании бота
+                  </p>
+                </div>
+
+                {/* Chat ID */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Chat ID / ID группы / ID канала <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={tgChatId}
+                    onChange={(e) => setTgChatId(e.target.value)}
+                    placeholder="Например: -1001987654321 или 123456789"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Для групп начинается с <code className="text-xs text-sky-600 dark:text-sky-400">-100...</code>. Узнать свой ID можно через <span className="font-semibold text-sky-600 dark:text-sky-400">@userinfobot</span>
+                  </p>
+                </div>
+
+                {/* Категории уведомлений */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+                  <span className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Категории отправляемых уведомлений:
+                  </span>
+
+                  <label className="flex items-center gap-3 p-2.5 bg-slate-50 dark:bg-slate-850/60 rounded-xl border border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={tgNotifyErrors}
+                      onChange={(e) => setTgNotifyErrors(e.target.checked)}
+                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300"
+                    />
+                    <div>
+                      <div className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+                        Критические ошибки и аварии
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Оповещение о фатальных сбоях бэкенда и ошибках интерфейса диспетчеров
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-2.5 bg-slate-50 dark:bg-slate-850/60 rounded-xl border border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={tgNotifyHandover}
+                      onChange={(e) => setTgNotifyHandover(e.target.checked)}
+                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300"
+                    />
+                    <div>
+                      <div className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-indigo-500" />
+                        Сдача и приёмка смен
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Сводка с именами диспетчеров, количеством активных рейсов и заметками смены
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-2.5 bg-slate-50 dark:bg-slate-850/60 rounded-xl border border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={tgNotifyAviabit}
+                      onChange={(e) => setTgNotifyAviabit(e.target.checked)}
+                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300"
+                    />
+                    <div>
+                      <div className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                        Сбои парсера AviaBit
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Предупреждения о разрыве сессии, смене пароля или сетевых сбоях AviaBit
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Результат теста */}
+                {tgTestResult && (
+                  <div className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 animate-in fade-in ${
+                    tgTestResult.success
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
+                  }`}>
+                    {tgTestResult.success ? <Check className="w-4 h-4 text-emerald-500 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />}
+                    <span>{tgTestResult.message}</span>
+                  </div>
+                )}
+
+                {/* Кнопки действий */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={handleTestTelegram}
+                    disabled={tgTesting || !tgBotToken.trim() || !tgChatId.trim()}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-sky-950/50 text-slate-800 dark:text-slate-200 hover:text-sky-600 dark:hover:text-sky-400 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                  >
+                    <Send className={`w-3.5 h-3.5 ${tgTesting ? 'animate-pulse' : ''}`} />
+                    <span>{tgTesting ? 'Отправка теста...' : 'Проверить связь (Тест)'}</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={tgSaving}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-md shadow-sky-600/20 transition-all disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{tgSaving ? 'Сохранение...' : 'Сохранить настройки'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Правая колонка: Инструкция по настройке */}
+            <div className="bg-slate-50 dark:bg-slate-850/60 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3.5 text-xs text-slate-600 dark:text-slate-300">
+              <h4 className="font-extrabold text-xs text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-1.5">
+                <HelpCircle className="w-4 h-4 text-sky-500" />
+                Инструкция по настройке
+              </h4>
+
+              <ol className="list-decimal pl-4 space-y-2 text-[11px] leading-relaxed">
+                <li>
+                  Откройте в Telegram бота <strong className="text-slate-900 dark:text-slate-100">@BotFather</strong> и отправьте команду <code className="px-1 py-0.5 bg-slate-200 dark:bg-slate-800 rounded font-mono">/newbot</code>.
+                </li>
+                <li>
+                  Придумайте имя и юзернейм (например, <code className="px-1 py-0.5 bg-slate-200 dark:bg-slate-800 rounded font-mono">AeroPlanNotifier_bot</code>).
+                </li>
+                <li>
+                  Скопируйте выданный <strong className="text-slate-900 dark:text-slate-100">HTTP API Token</strong> и вставьте в поле выше.
+                </li>
+                <li>
+                  Добавьте созданного бота в ваш рабочий чат или канал диспетчеров (для канала назначьте бота администратором с правом публикации).
+                </li>
+                <li>
+                  Узнайте ID чата через бота <strong className="text-slate-900 dark:text-slate-100">@userinfobot</strong> и вставьте в поле <em>Chat ID</em>.
+                </li>
+                <li>
+                  Нажмите кнопку <strong className="text-sky-600 dark:text-sky-400">«Проверить связь»</strong> для отправки пробного уведомления.
+                </li>
+              </ol>
+
+              <div className="p-3 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 rounded-xl text-[11px] text-sky-800 dark:text-sky-300">
+                <strong>Безопасность:</strong> Токен и Chat ID хранятся в защищенной базе данных на сервере и не попадают в исходный код программы.
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
     </div>
 
     {/* Modal: Просмотр стектрейса / подробностей ошибки */}
@@ -1090,6 +1644,182 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
               className="px-4 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold"
             >
               Закрыть
+            </button>
+          </div>
+
+        </div>
+      </div>
+    )}
+
+    {/* Modal: Просмотр детального состава архивного снимка */}
+    {selectedArchiveDetail && (
+      <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-2 sm:p-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95">
+          
+          {/* Header детального снимка */}
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                <Archive className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  Архивный снимок смены #{selectedArchiveDetail.id}
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                    {selectedArchiveDetail.date_interval}
+                  </span>
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Диспетчер: <strong>{selectedArchiveDetail.dispatcher_name}</strong> • Снимок от: {selectedArchiveDetail.created_at} • Рейсов: {selectedArchiveDetail.flights_count}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleExportArchiveJson(selectedArchiveDetail)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
+                title="Экспортировать снимок в формате JSON"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>JSON</span>
+              </button>
+              <button
+                onClick={() => setSelectedArchiveDetail(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Фильтр по рейсам архива */}
+          <div className="px-5 py-2.5 bg-slate-50/50 dark:bg-slate-850/40 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Поиск по рейсу, ВС, маршруту..."
+                value={archiveFlightSearch}
+                onChange={(e) => setArchiveFlightSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-1 focus:ring-sky-500 focus:outline-none"
+              />
+            </div>
+            {selectedArchiveDetail.shift_metadata?.notes && (
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-md">
+                <strong>Заметки смены:</strong> {selectedArchiveDetail.shift_metadata.notes}
+              </div>
+            )}
+          </div>
+
+          {/* Таблица рейсов снимка */}
+          <div className="p-4 overflow-y-auto flex-1">
+            <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto max-h-[60vh]">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                      <th className="px-2.5 py-2">Рейс</th>
+                      <th className="px-2.5 py-2">Дата</th>
+                      <th className="px-2.5 py-2">Вылет</th>
+                      <th className="px-2.5 py-2">Маршрут</th>
+                      <th className="px-2.5 py-2">Борт / Тип</th>
+                      <th className="px-2.5 py-2">Конфиг</th>
+                      <th className="px-2.5 py-2">ПАКС</th>
+                      <th className="px-2.5 py-2">Экипаж</th>
+                      <th className="px-2.5 py-2">Топливо</th>
+                      <th className="px-2.5 py-2">DOW/DOI</th>
+                      <th className="px-2.5 py-2">Груз/Почта</th>
+                      <th className="px-2.5 py-2">Чекбоксы</th>
+                      <th className="px-2.5 py-2">Статус</th>
+                      <th className="px-2.5 py-2">Заметки</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono text-[11px]">
+                    {(!selectedArchiveDetail.flights_data || selectedArchiveDetail.flights_data.length === 0) ? (
+                      <tr>
+                        <td colSpan={14} className="px-4 py-8 text-center text-slate-400 font-sans">
+                          Нет сохраненных рейсов в этом снимке
+                        </td>
+                      </tr>
+                    ) : (
+                      selectedArchiveDetail.flights_data
+                        .filter(f => {
+                          if (!archiveFlightSearch.trim()) return true;
+                          const q = archiveFlightSearch.toLowerCase();
+                          return (
+                            (f.flight_number || f.flight || '').toLowerCase().includes(q) ||
+                            (f.ac_num || '').toLowerCase().includes(q) ||
+                            (f.route_airports || f.route_city || '').toLowerCase().includes(q)
+                          );
+                        })
+                        .map((f, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-850/50">
+                            <td className="px-2.5 py-1.5 font-bold text-slate-900 dark:text-slate-100 font-sans whitespace-nowrap">
+                              {f.flight_number || f.flight || '-'}
+                            </td>
+                            <td className="px-2.5 py-1.5 text-slate-500 whitespace-nowrap">
+                              {f.flight_date || '-'}
+                            </td>
+                            <td className="px-2.5 py-1.5 font-bold text-sky-600 dark:text-sky-400 whitespace-nowrap">
+                              {f.departure_time || f.time || '-'}
+                            </td>
+                            <td className="px-2.5 py-1.5 font-sans whitespace-nowrap">
+                              <div className="font-bold text-slate-800 dark:text-slate-200">{f.route_city || '-'}</div>
+                              <div className="text-[10px] text-slate-400">{f.route_airports || ''}</div>
+                            </td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">
+                              <div className="font-bold text-slate-900 dark:text-slate-100">{f.ac_num || '-'}</div>
+                              <div className="text-[10px] text-slate-400">{f.ac_type || ''}</div>
+                            </td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">{f.ac_config || '-'}</td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">{f.pax || '-'}</td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">{f.crew || '-'}</td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">
+                              <div title="Block">{f.fuel_block || f.fuel || '-'}</div>
+                              {(f.fuel_trip || f.fuel_taxi) && (
+                                <div className="text-[10px] text-slate-400">T:{f.fuel_trip || '-'} X:{f.fuel_taxi || '-'}</div>
+                              )}
+                            </td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">
+                              {f.dow || '-'}/{f.doi || '-'}
+                            </td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap">
+                              <div>C: {f.cargo || '0'}</div>
+                              <div className="text-[10px] text-slate-400">M: {f.mail || '0'}</div>
+                            </td>
+                            <td className="px-2.5 py-1.5 whitespace-nowrap font-sans text-[10px]">
+                              <span className={f.lir_sent ? "text-emerald-600 font-bold" : "text-slate-300"}>LIR </span>
+                              <span className={f.szv_sent ? "text-emerald-600 font-bold" : "text-slate-300"}>СЗВ </span>
+                              <span className={f.ldm_sent ? "text-emerald-600 font-bold" : "text-slate-300"}>LDM</span>
+                            </td>
+                            <td className="px-2.5 py-1.5 font-sans whitespace-nowrap">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                f.status === 'closed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                                f.status === 'in_progress' ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300' :
+                                'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                              }`}>
+                                {f.status || 'pending'}
+                              </span>
+                            </td>
+                            <td className="px-2.5 py-1.5 font-sans text-[10px] text-slate-500 max-w-[150px] truncate" title={f.notes || ''}>
+                              {f.notes || '—'}
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 flex justify-end">
+            <button
+              onClick={() => setSelectedArchiveDetail(null)}
+              className="px-4 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold"
+            >
+              Закрыть просмотр
             </button>
           </div>
 

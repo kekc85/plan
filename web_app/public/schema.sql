@@ -121,7 +121,23 @@ CREATE TABLE IF NOT EXISTS `plan_system_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------
--- 7. Таблица системных настроек
+-- 7. Таблица посменных архивов (авто-бэкапы при сдаче смены)
+-- ----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `plan_shift_archives` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `shift_id` INT NULL,
+    `date_interval` VARCHAR(64) NOT NULL,
+    `dispatcher_name` VARCHAR(128) NOT NULL,
+    `snapshot_reason` VARCHAR(64) NOT NULL DEFAULT 'handover',
+    `flights_count` INT NOT NULL DEFAULT 0,
+    `flights_data` MEDIUMTEXT NOT NULL,
+    `shift_metadata` TEXT NULL,
+    `created_at` VARCHAR(64) NOT NULL,
+    INDEX `idx_archives_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------
+-- 8. Таблица системных настроек
 -- ----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `plan_settings` (
     `setting_key` VARCHAR(64) PRIMARY KEY,
@@ -134,7 +150,7 @@ VALUES ('log_retention_days', '7', NOW())
 ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;
 
 -- ----------------------------------------------------------
--- 8. Начальные учётные записи (пароли: admin123 / dispatch123)
+-- 9. Начальные учётные записи (пароли: admin123 / dispatch123)
 -- ----------------------------------------------------------
 INSERT INTO `plan_users` (`username`, `password_hash`, `salt`, `full_name`, `role`, `is_active`, `created_at`)
 VALUES 

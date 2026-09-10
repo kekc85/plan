@@ -10,6 +10,8 @@ import os
 import json
 import hashlib
 import secrets
+import urllib.request
+import urllib.parse
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 
@@ -250,6 +252,22 @@ def init_db():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """)
 
+        # Таблица посменных архивов (авто-бэкапы при сдаче смены)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS plan_shift_archives (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            shift_id INT NULL,
+            date_interval VARCHAR(64) NOT NULL,
+            dispatcher_name VARCHAR(128) NOT NULL,
+            snapshot_reason VARCHAR(64) NOT NULL DEFAULT 'handover',
+            flights_count INT NOT NULL DEFAULT 0,
+            flights_data MEDIUMTEXT NOT NULL,
+            shift_metadata TEXT NULL,
+            created_at VARCHAR(64) NOT NULL,
+            INDEX idx_archives_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """)
+
         # Значение по умолчанию для срока хранения логов (7 дней)
         cursor.execute("""
         INSERT IGNORE INTO plan_settings (setting_key, setting_value, updated_at)
@@ -433,6 +451,22 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_level ON plan_system_logs(level);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_module ON plan_system_logs(module);")
 
+        # Таблица посменных архивов (авто-бэкапы при сдаче смены)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS plan_shift_archives (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shift_id INTEGER,
+            date_interval TEXT NOT NULL,
+            dispatcher_name TEXT NOT NULL,
+            snapshot_reason TEXT NOT NULL DEFAULT 'handover',
+            flights_count INTEGER NOT NULL DEFAULT 0,
+            flights_data TEXT NOT NULL,
+            shift_metadata TEXT,
+            created_at TEXT NOT NULL
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_archives_created ON plan_shift_archives(created_at);")
+
         # Таблица системных настроек
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS plan_settings (
@@ -596,6 +630,174 @@ def log_system_event(
         print(f"[Logging Failure] {e} | Message: {message}")
 
 
+def send_telegram_notification(text: str, category: str = "errors") -> bool:
+    """
+    Отправляет уведомление в Telegram бот администратора.
+    Категории: 'errors', 'handover', 'aviabit'
+    """
+    bot_token = get_setting("tg_bot_token", "").strip()
+    chat_id = get_setting("tg_chat_id", "").strip()
+    if not bot_token or not chat_id:
+        return False
+
+    # Проверяем, включено ли уведомление для данной категории
+    if category == "errors" and get_setting("tg_notify_errors", "1") != "1":
+        return False
+    if category == "handover" and get_setting("tg_notify_handover", "1") != "1":
+        return False
+    if category == "aviabit" and get_setting("tg_notify_aviabit", "1") != "1":
+        return False
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
+    }
+
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json", "User-Agent": "AeroPlan-WB-Monitor"}
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status == 200
+    except Exception as e:
+        print(f"[Telegram Notification Error] {e}")
+        return False
+
+
+def create_shift_snapshot(
+    shift_id: Optional[int],
+    date_interval: str,
+    dispatcher_name: str,
+    reason: str,
+    flights: List[dict],
+    shift_metadata: Optional[dict] = None
+) -> int:
+    """
+    Создает снимок (архивный снапшот) смены со всеми рейсами и их полями.
+    Возвращает ID созданного архива.
+    """
+    now_str = datetime.now(MSK_TZ).strftime('%Y-%m-%d %H:%M:%S')
+    flights_json = json.dumps(flights, ensure_ascii=False)
+    meta_json = json.dumps(shift_metadata, ensure_ascii=False) if shift_metadata else None
+    count = len(flights)
+
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+    new_id = 0
+    try:
+        if engine == "mysql":
+            cursor.execute("""
+            INSERT INTO plan_shift_archives (
+                shift_id, date_interval, dispatcher_name, snapshot_reason,
+                flights_count, flights_data, shift_metadata, created_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
+            """, (shift_id, date_interval, dispatcher_name, reason, count, flights_json, meta_json, now_str))
+            new_id = cursor.lastrowid
+            conn.commit()
+        else:
+            cursor.execute("""
+            INSERT INTO plan_shift_archives (
+                shift_id, date_interval, dispatcher_name, snapshot_reason,
+                flights_count, flights_data, shift_metadata, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """, (shift_id, date_interval, dispatcher_name, reason, count, flights_json, meta_json, now_str))
+            new_id = cursor.lastrowid
+            conn.commit()
+    finally:
+        conn.close()
+
+    log_system_event(
+        "INFO", "shift",
+        f"Создан архивный снимок смены '{date_interval}' (причина: {reason}, рейсов: {count})",
+        user_id=None, username=dispatcher_name
+    )
+    return new_id
+
+
+def get_shift_archives(limit: int = 50, offset: int = 0) -> List[dict]:
+    """Возвращает список архивных снимков смен (метаданные без тяжелого flights_data)"""
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+    try:
+        if engine == "mysql":
+            cursor.execute("""
+            SELECT id, shift_id, date_interval, dispatcher_name, snapshot_reason, flights_count, shift_metadata, created_at
+            FROM plan_shift_archives
+            ORDER BY id DESC
+            LIMIT %s OFFSET %s;
+            """, (limit, offset))
+        else:
+            cursor.execute("""
+            SELECT id, shift_id, date_interval, dispatcher_name, snapshot_reason, flights_count, shift_metadata, created_at
+            FROM plan_shift_archives
+            ORDER BY id DESC
+            LIMIT ? OFFSET ?;
+            """, (limit, offset))
+        rows = cursor.fetchall()
+        archives = []
+        for r in rows:
+            d = dict(r)
+            if d.get("shift_metadata"):
+                try:
+                    d["shift_metadata"] = json.loads(d["shift_metadata"])
+                except Exception:
+                    pass
+            archives.append(d)
+        return archives
+    finally:
+        conn.close()
+
+
+def get_shift_archive_by_id(archive_id: int) -> Optional[dict]:
+    """Возвращает детальные данные снимка смены, включая полный массив flights_data"""
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+    try:
+        if engine == "mysql":
+            cursor.execute("SELECT * FROM plan_shift_archives WHERE id = %s;", (archive_id,))
+        else:
+            cursor.execute("SELECT * FROM plan_shift_archives WHERE id = ?;", (archive_id,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        if d.get("flights_data"):
+            try:
+                d["flights_data"] = json.loads(d["flights_data"])
+            except Exception:
+                pass
+        if d.get("shift_metadata"):
+            try:
+                d["shift_metadata"] = json.loads(d["shift_metadata"])
+            except Exception:
+                pass
+        return d
+    finally:
+        conn.close()
+
+
+def delete_shift_archive(archive_id: int) -> bool:
+    """Удаляет архивный снимок по ID"""
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+    try:
+        if engine == "mysql":
+            cursor.execute("DELETE FROM plan_shift_archives WHERE id = %s;", (archive_id,))
+            conn.commit()
+        else:
+            cursor.execute("DELETE FROM plan_shift_archives WHERE id = ?;", (archive_id,))
+            conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
 def execute_query(sql_mysql: str, sql_sqlite: str, params: tuple = ()):
     """Универсальный исполнитель запросов для MySQL и SQLite"""
     conn, engine = DatabaseConnection.get_connection()
@@ -615,4 +817,5 @@ def execute_query(sql_mysql: str, sql_sqlite: str, params: tuple = ()):
 if __name__ == "__main__":
     init_db()
     print("Инициализация базы данных завершена.")
+
 
