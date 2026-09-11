@@ -28,11 +28,11 @@ function ChangeBadge({ change, onAcknowledge }) {
         e.stopPropagation();
         onAcknowledge?.();
       }}
-      className="inline-flex items-center gap-0.5 bg-amber-500 hover:bg-amber-600 text-white font-mono text-[8px] font-black px-1 py-0.2 rounded shadow transition-transform active:scale-95 cursor-pointer shrink-0 mt-0.5"
+      className="inline-flex items-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900/90 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-600/70 font-mono text-[9px] font-black px-1.5 py-0.5 rounded shadow-xs transition-transform active:scale-95 cursor-pointer shrink-0 mt-0.5"
       title={`Изменено в AviaBit!\nБыло: ${change.old || '—'} → Стало: ${change.new}\nНажмите, чтобы подтвердить ознакомление`}
     >
       <span>было {change.old || '—'}</span>
-      <Check className="w-2 h-2 stroke-[3]" />
+      <Check className="w-2.5 h-2.5 stroke-[3] text-amber-700 dark:text-amber-400" />
     </button>
   );
 }
@@ -367,11 +367,11 @@ export default function FlightRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
-              className="inline-flex items-center gap-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow animate-pulse cursor-pointer shrink-0"
+              className="inline-flex items-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-xs animate-pulse cursor-pointer shrink-0"
               title="Новый рейс из AviaBit! Нажмите для подтверждения"
             >
               <span>НОВЫЙ</span>
-              <Check className="w-2.5 h-2.5 stroke-[3]" />
+              <Check className="w-2.5 h-2.5 stroke-[3] text-amber-700 dark:text-amber-400" />
             </button>
           )}
         </div>
@@ -981,10 +981,10 @@ export default function FlightRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
-              className="flex items-center justify-center gap-0.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-extrabold px-1 py-0.5 rounded shadow-sm transition-all active:scale-95 animate-pulse shrink-0 cursor-pointer"
+              className="flex items-center justify-center gap-1 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black px-1.5 py-0.5 rounded shadow-xs transition-all active:scale-95 animate-pulse shrink-0 cursor-pointer"
               title="Подтвердить ознакомление со всеми изменениями в этом рейсе"
             >
-              <Check className="w-2.5 h-2.5 stroke-[3]" />
+              <Check className="w-2.5 h-2.5 stroke-[3] text-amber-700 dark:text-amber-400" />
               <span>✓{unreadCount > 0 ? ` (${unreadCount})` : ''}</span>
             </button>
           )}

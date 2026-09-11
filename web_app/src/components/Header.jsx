@@ -315,15 +315,15 @@ export default function Header({
             
             {/* БЕЙДЖ НЕПОДТВЕРЖДЕННЫХ ИЗМЕНЕНИЙ В РЕЙСАХ */}
             {unreadChangesCount > 0 && (
-              <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/80 border-2 border-amber-500 rounded-xl px-2.5 py-1 text-xs text-amber-950 dark:text-amber-200 shadow-md animate-pulse">
-                <Bell className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 fill-current" />
+              <div className="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-950/90 border-2 border-amber-400 dark:border-amber-500/80 rounded-xl px-2.5 py-1 text-xs text-amber-950 dark:text-amber-200 shadow-md animate-pulse">
+                <Bell className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0 fill-current" />
                 <span className="font-extrabold whitespace-nowrap">
-                  Изменений: <span className="underline decoration-amber-500 font-mono text-sm">{unreadChangesCount}</span>
+                  Изменений: <span className="underline decoration-amber-500 dark:decoration-amber-400 font-mono text-sm">{unreadChangesCount}</span>
                 </span>
                 <button
                   type="button"
                   onClick={onAcknowledgeAll}
-                  className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-lg shadow transition-all active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
+                  className="bg-amber-600 hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-400 text-white dark:text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-lg shadow transition-all active:scale-95 cursor-pointer ml-1 whitespace-nowrap"
                   title="Подтвердить ознакомление со всеми изменениями во всех рейсах смены"
                 >
                   Ознакомиться со всеми ✓

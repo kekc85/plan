@@ -962,9 +962,9 @@ export default function App() {
 
         {/* Всплывающее уведомление об обнаруженных изменениях из AviaBit */}
         {changeToast && (
-          <div className="mb-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-xs px-4 py-2.5 rounded-2xl shadow-lg flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 no-print border border-amber-400">
+          <div className="mb-3.5 bg-amber-50 dark:bg-slate-900 border-2 border-amber-400 dark:border-amber-500 text-amber-950 dark:text-amber-100 font-extrabold text-xs px-4 py-2.5 rounded-2xl shadow-lg flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 no-print">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 bg-white/20 rounded-lg">
+              <div className="p-1.5 bg-amber-200 dark:bg-amber-500/20 text-amber-800 dark:text-amber-400 rounded-lg">
                 <Bell className="w-4 h-4 fill-current animate-bounce" />
               </div>
               <span className="tracking-wide">{changeToast}</span>
@@ -973,14 +973,14 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleAcknowledgeAll}
-                className="bg-white hover:bg-slate-100 text-amber-900 font-extrabold text-[11px] px-2.5 py-1 rounded-lg shadow transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                className="bg-amber-600 hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-400 text-white dark:text-slate-950 font-black text-[11px] px-2.5 py-1 rounded-lg shadow transition-all active:scale-95 cursor-pointer whitespace-nowrap"
               >
                 Ознакомиться со всеми ✓
               </button>
               <button
                 type="button"
                 onClick={() => setChangeToast(null)}
-                className="p-1 hover:bg-black/20 rounded-lg text-white/80 hover:text-white cursor-pointer"
+                className="p-1 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
