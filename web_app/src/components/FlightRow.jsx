@@ -21,6 +21,7 @@ import { getSafeUnreadChanges, TRACKED_AVIABIT_FIELDS } from '../utils/deltaSync
 // Компактный бейдж для подтверждения изменившегося параметра
 function ChangeBadge({ change, onAcknowledge }) {
   if (!change) return null;
+  const oldVal = change.old || '—';
   return (
     <button
       type="button"
@@ -28,11 +29,11 @@ function ChangeBadge({ change, onAcknowledge }) {
         e.stopPropagation();
         onAcknowledge?.();
       }}
-      className="inline-flex items-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900/90 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-600/70 font-mono text-[9px] font-black px-1.5 py-0.5 rounded shadow-xs transition-transform active:scale-95 cursor-pointer shrink-0 mt-0.5"
-      title={`Изменено в AviaBit!\nБыло: ${change.old || '—'} → Стало: ${change.new}\nНажмите, чтобы подтвердить ознакомление`}
+      className="inline-flex items-center justify-center gap-0.5 max-w-full bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900/90 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-600/70 font-mono text-[8px] font-black px-1 py-0.2 rounded shadow-xs transition-transform active:scale-95 cursor-pointer shrink-0 mt-0.5 overflow-hidden"
+      title={`Изменено в AviaBit!\nБыло: ${oldVal} → Стало: ${change.new}\nНажмите, чтобы подтвердить ознакомление`}
     >
-      <span>было {change.old || '—'}</span>
-      <Check className="w-2.5 h-2.5 stroke-[3] text-amber-700 dark:text-amber-400" />
+      <span className="truncate">{oldVal}</span>
+      <Check className="w-2 h-2 stroke-[3] text-amber-700 dark:text-amber-400 shrink-0" />
     </button>
   );
 }
@@ -609,7 +610,7 @@ export default function FlightRow({
 
       {/* 6. Компановка */}
       <td className={`py-1 px-0.5 font-mono text-xs text-slate-800 dark:text-slate-200 whitespace-nowrap text-center w-10 min-w-[38px] max-w-[42px] ${overdueBorderTopBottom}`}>
-        <div className="flex flex-col items-center justify-center">
+        <div className="flex flex-col items-center justify-center max-w-full">
           <input
             type="text"
             value={flight.ac_config || ''}
@@ -628,7 +629,7 @@ export default function FlightRow({
 
       {/* 7. PAX */}
       <td className={`py-1 px-0.5 font-mono font-extrabold text-sm text-slate-950 dark:text-white whitespace-nowrap text-center w-11 min-w-[42px] max-w-[46px] ${overdueBorderTopBottom}`}>
-        <div className="flex flex-col items-center justify-center">
+        <div className="flex flex-col items-center justify-center max-w-full">
           <input
             type="text"
             value={flight.pax || ''}
@@ -647,7 +648,7 @@ export default function FlightRow({
 
       {/* 8. Экипаж */}
       <td className={`py-1 px-0.5 font-mono text-xs text-slate-900 dark:text-slate-200 whitespace-nowrap text-center w-14 min-w-[54px] max-w-[60px] ${overdueBorderTopBottom}`}>
-        <div className="flex flex-col items-center justify-center">
+        <div className="flex flex-col items-center justify-center max-w-full">
           <input
             type="text"
             value={flight.crew || ''}
