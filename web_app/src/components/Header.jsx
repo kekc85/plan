@@ -58,7 +58,22 @@ export default function Header({
 }) {
   const [utcTime, setUtcTime] = useState('');
   const [mskTime, setMskTime] = useState('');
-  const [currentDateStr, setCurrentDateStr] = useState('');
+  const [utcDateStr, setUtcDateStr] = useState('');
+  const [mskDateStr, setMskDateStr] = useState('');
+  const [timeMode, setTimeMode] = useState(() => {
+    try {
+      return localStorage.getItem('aeroplan_time_mode') || 'MSK';
+    } catch (e) {
+      return 'MSK';
+    }
+  });
+
+  const handleSetTimeMode = (mode) => {
+    setTimeMode(mode);
+    try {
+      localStorage.setItem('aeroplan_time_mode', mode);
+    } catch (e) {}
+  };
 
   // Идущие часы UTC, МСК и текущая дата (каждую секунду)
   useEffect(() => {
@@ -71,6 +86,11 @@ export default function Header({
       const uS = String(now.getUTCSeconds()).padStart(2, '0');
       setUtcTime(`${uH}:${uM}:${uS}`);
 
+      const uDay = String(now.getUTCDate()).padStart(2, '0');
+      const uMonth = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const uYear = now.getUTCFullYear();
+      setUtcDateStr(`${uDay}.${uMonth}.${uYear}`);
+
       // MSK (Europe/Moscow, UTC+3) Date & Time
       try {
         const mskDateFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -79,7 +99,7 @@ export default function Header({
           month: '2-digit',
           year: 'numeric'
         });
-        setCurrentDateStr(mskDateFormatter.format(now));
+        setMskDateStr(mskDateFormatter.format(now));
 
         const mskTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
           timeZone: 'Europe/Moscow',
@@ -91,6 +111,7 @@ export default function Header({
         setMskTime(mskTimeFormatter.format(now));
       } catch (e) {
         setMskTime(now.toLocaleTimeString('ru-RU'));
+        setMskDateStr(now.toLocaleDateString('ru-RU'));
       }
     };
 
@@ -144,40 +165,102 @@ export default function Header({
             </div>
           </div>
 
-          {/* Часы и Дата */}
+          {/* Часы и Дата с интерактивным переключателем МСК / UTC */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* ТЕКУЩЕЕ ЧИСЛО (МСК) */}
-            <div className="flex items-center gap-1 bg-sky-50/90 dark:bg-slate-900/90 border border-sky-300 dark:border-sky-500/40 rounded-lg px-2 py-1 shadow-sm">
-              <Calendar className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+            {/* Сегментированный переключатель МСК / UTC */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-300 dark:border-slate-700 shadow-inner">
+              <button
+                type="button"
+                onClick={() => handleSetTimeMode('MSK')}
+                className={`px-2 py-1 rounded-md text-[10px] font-extrabold transition-all cursor-pointer ${
+                  timeMode === 'MSK'
+                    ? 'bg-amber-500 text-white shadow-sm font-black'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+                title="Отображать дату и фокус по Московскому времени (МСК / UTC+3)"
+              >
+                МСК
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetTimeMode('UTC')}
+                className={`px-2 py-1 rounded-md text-[10px] font-extrabold transition-all cursor-pointer ${
+                  timeMode === 'UTC'
+                    ? 'bg-emerald-600 text-white shadow-sm font-black'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+                title="Отображать дату и фокус по всемирному времени (UTC / ZULU)"
+              >
+                UTC
+              </button>
+            </div>
+
+            {/* ТЕКУЩЕЕ ЧИСЛО (МСК / UTC) */}
+            <div className={`flex items-center gap-1 rounded-lg px-2 py-1 shadow-sm transition-all ${
+              timeMode === 'UTC'
+                ? 'bg-emerald-50/90 dark:bg-slate-900/90 border border-emerald-300 dark:border-emerald-500/40'
+                : 'bg-sky-50/90 dark:bg-slate-900/90 border border-sky-300 dark:border-sky-500/40'
+            }`}>
+              <Calendar className={`w-3.5 h-3.5 shrink-0 ${timeMode === 'UTC' ? 'text-emerald-600 dark:text-emerald-400' : 'text-sky-600 dark:text-sky-400'}`} />
               <div className="flex flex-col">
-                <span className="text-[8px] sm:text-[9px] uppercase font-extrabold text-sky-800 dark:text-sky-400 tracking-wider leading-none">ЧИСЛО (МСК)</span>
-                <span className="font-mono text-xs sm:text-sm font-black text-sky-700 dark:text-sky-300 tracking-wide leading-tight">
-                  {currentDateStr || '--.--.----'}
+                <span className={`text-[8px] sm:text-[9px] uppercase font-extrabold tracking-wider leading-none ${
+                  timeMode === 'UTC' ? 'text-emerald-800 dark:text-emerald-400' : 'text-sky-800 dark:text-sky-400'
+                }`}>
+                  {timeMode === 'UTC' ? 'ЧИСЛО (UTC)' : 'ЧИСЛО (МСК)'}
+                </span>
+                <span className={`font-mono text-xs sm:text-sm font-black tracking-wide leading-tight ${
+                  timeMode === 'UTC' ? 'text-emerald-700 dark:text-emerald-300' : 'text-sky-700 dark:text-sky-300'
+                }`}>
+                  {(timeMode === 'UTC' ? utcDateStr : mskDateStr) || '--.--.----'}
                 </span>
               </div>
             </div>
 
-            {/* UTC */}
-            <div className="flex items-center gap-1 bg-emerald-50/90 dark:bg-slate-900/90 border border-emerald-300 dark:border-emerald-500/40 rounded-lg px-2 py-1 shadow-sm">
-              <Globe className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 animate-pulse shrink-0" />
+            {/* UTC часы */}
+            <button
+              type="button"
+              onClick={() => handleSetTimeMode('UTC')}
+              className={`flex items-center gap-1 rounded-lg px-2 py-1 shadow-sm transition-all cursor-pointer text-left ${
+                timeMode === 'UTC'
+                  ? 'bg-emerald-100/90 dark:bg-emerald-950/90 border-2 border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30'
+                  : 'bg-emerald-50/60 dark:bg-slate-900/60 border border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-slate-900 opacity-80 hover:opacity-100'
+              }`}
+              title="Кликните для выбора UTC"
+            >
+              <Globe className={`w-3.5 h-3.5 shrink-0 ${timeMode === 'UTC' ? 'text-emerald-600 dark:text-emerald-400 animate-pulse' : 'text-emerald-600/70 dark:text-emerald-400/70'}`} />
               <div className="flex flex-col">
-                <span className="text-[8px] sm:text-[9px] uppercase font-extrabold text-emerald-800 dark:text-emerald-400/80 tracking-wider leading-none">UTC</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[8px] sm:text-[9px] uppercase font-extrabold text-emerald-800 dark:text-emerald-400/80 tracking-wider leading-none">UTC</span>
+                  {timeMode === 'UTC' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
+                </div>
                 <span className="font-mono text-xs sm:text-sm font-extrabold text-emerald-700 dark:text-emerald-300 tracking-wider leading-tight">
                   {utcTime || '--:--:--'}
                 </span>
               </div>
-            </div>
+            </button>
 
-            {/* МСК */}
-            <div className="flex items-center gap-1 bg-amber-50/90 dark:bg-slate-900/90 border border-amber-300 dark:border-amber-500/40 rounded-lg px-2 py-1 shadow-sm">
-              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            {/* МСК часы */}
+            <button
+              type="button"
+              onClick={() => handleSetTimeMode('MSK')}
+              className={`flex items-center gap-1 rounded-lg px-2 py-1 shadow-sm transition-all cursor-pointer text-left ${
+                timeMode === 'MSK'
+                  ? 'bg-amber-100/90 dark:bg-amber-950/90 border-2 border-amber-500 dark:border-amber-400 ring-2 ring-amber-500/30'
+                  : 'bg-amber-50/60 dark:bg-slate-900/60 border border-amber-200 dark:border-amber-500/30 hover:bg-amber-50 dark:hover:bg-slate-900 opacity-80 hover:opacity-100'
+              }`}
+              title="Кликните для выбора МСК"
+            >
+              <Clock className={`w-3.5 h-3.5 shrink-0 ${timeMode === 'MSK' ? 'text-amber-600 dark:text-amber-400' : 'text-amber-600/70 dark:text-amber-400/70'}`} />
               <div className="flex flex-col">
-                <span className="text-[8px] sm:text-[9px] uppercase font-extrabold text-amber-800 dark:text-amber-400/80 tracking-wider leading-none">МСК</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[8px] sm:text-[9px] uppercase font-extrabold text-amber-800 dark:text-amber-400/80 tracking-wider leading-none">МСК</span>
+                  {timeMode === 'MSK' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>}
+                </div>
                 <span className="font-mono text-xs sm:text-sm font-extrabold text-amber-700 dark:text-amber-300 tracking-wider leading-tight">
                   {mskTime || '--:--:--'}
                 </span>
               </div>
-            </div>
+            </button>
           </div>
 
           {/* User profile & Action toggles */}

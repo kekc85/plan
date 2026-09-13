@@ -776,7 +776,7 @@ export default function FlightRow({
       </td>
 
       {/* 10. MTOW */}
-      <td className={`py-1 px-0.5 text-center w-11 min-w-[42px] max-w-[46px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 text-center w-14 min-w-[54px] max-w-[58px] ${overdueBorderTopBottom}`}>
         <input
           type="text"
           value={flight.mtow || ''}
@@ -787,7 +787,7 @@ export default function FlightRow({
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="MTOW"
           maxLength={6}
-          className="w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-0.5 py-0.5 text-center font-mono text-[11px] font-bold text-slate-900 dark:text-slate-200 placeholder:text-[9px] placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none cursor-text"
+          className="w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-0.5 py-0.5 text-center font-mono text-[11px] font-extrabold tracking-tight text-slate-900 dark:text-slate-200 placeholder:text-[9px] placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none cursor-text"
           title="MTOW (Максимальная взлетная масса)"
         />
       </td>
