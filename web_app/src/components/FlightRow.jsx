@@ -406,7 +406,7 @@ export default function FlightRow({
       </td>
 
       {/* 2. № Рейса */}
-      <td className={`sticky left-[28px] z-20 py-1 px-0.5 font-mono font-extrabold text-sm text-sky-700 dark:text-sky-400 whitespace-nowrap w-[74px] min-w-[72px] max-w-[76px] text-center ${activeStickyBg} transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${overdueBorderTopBottom}`}>
+      <td className={`sticky left-[28px] z-20 py-1 px-0.5 font-mono font-extrabold text-sm text-sky-700 dark:text-sky-400 whitespace-nowrap w-[64px] min-w-[62px] max-w-[66px] text-center ${activeStickyBg} transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${overdueBorderTopBottom}`}>
         <div className="flex flex-col items-center justify-center gap-0.5">
           <input
             type="text"
@@ -416,24 +416,24 @@ export default function FlightRow({
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
-            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-16 font-black font-mono text-sm text-sky-700 dark:text-sky-400 outline-none cursor-text tracking-wide text-center"
+            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-[56px] font-black font-mono text-sm text-sky-700 dark:text-sky-400 outline-none cursor-text tracking-wide text-center"
           />
           {flight.is_new_flight && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
-              className="inline-flex items-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-xs animate-pulse cursor-pointer shrink-0"
+              className="inline-flex items-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black uppercase px-1 py-0.5 rounded shadow-xs animate-pulse cursor-pointer shrink-0 max-w-[58px] truncate"
               title="Новый рейс из AviaBit! Нажмите для подтверждения"
             >
-              <span>НОВЫЙ</span>
-              <Check className="w-2.5 h-2.5 stroke-[3] text-amber-700 dark:text-amber-400" />
+              <span className="truncate">НОВЫЙ</span>
+              <Check className="w-2.5 h-2.5 stroke-[3] text-amber-700 dark:text-amber-400 shrink-0" />
             </button>
           )}
         </div>
       </td>
 
       {/* 3. Маршрут */}
-      <td className={`py-1 px-0.5 whitespace-nowrap leading-tight text-center min-w-[85px] max-w-[105px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 whitespace-nowrap leading-tight text-center w-[82px] min-w-[78px] max-w-[86px] ${overdueBorderTopBottom}`}>
         <div className={`flex flex-col items-center justify-center gap-0.5 w-full rounded p-0.5 ${
           isChanged('route_city') || isChanged('route_airports') ? 'ring-2 ring-amber-500 bg-amber-50 dark:bg-amber-950/40' : ''
         }`}>
@@ -446,7 +446,7 @@ export default function FlightRow({
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="Город"
-            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 text-xs font-bold text-slate-900 dark:text-slate-100 outline-none w-full min-w-[75px] cursor-text text-center ${getChangedStyle('route_city')}`}
+            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 text-xs font-bold text-slate-900 dark:text-slate-100 outline-none w-full cursor-text text-center truncate ${getChangedStyle('route_city')}`}
             title={flight.route_city || ''}
           />
           <ChangeBadge change={unread.route_city} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'route_city')} />
@@ -459,7 +459,7 @@ export default function FlightRow({
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="DEP-ARR"
-            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400 outline-none w-full min-w-[75px] uppercase cursor-text tracking-wider text-center ${getChangedStyle('route_airports')}`}
+            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-1 py-0.5 text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400 outline-none w-full uppercase cursor-text tracking-wider text-center ${getChangedStyle('route_airports')}`}
           />
           <ChangeBadge change={unread.route_airports} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'route_airports')} />
 
@@ -545,7 +545,7 @@ export default function FlightRow({
       </td>
 
       {/* 4. ВРЕМЯ */}
-      <td className={`py-0.5 px-0.5 whitespace-nowrap text-center min-w-[78px] max-w-[84px] ${overdueBorderTopBottom}`}>
+      <td className={`py-0.5 px-0.5 whitespace-nowrap text-center w-[72px] min-w-[70px] max-w-[74px] ${overdueBorderTopBottom}`}>
         <div className={`flex flex-col items-center gap-0.5 rounded-md p-0.5 w-full transition-colors ${
           isOverdue
             ? 'bg-rose-100/95 dark:bg-rose-950/80 border-2 border-rose-500 shadow-sm'
@@ -569,7 +569,7 @@ export default function FlightRow({
               onMouseDown={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="--:--"
-              className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 rounded px-0.5 text-center font-mono font-extrabold text-xs outline-none w-12 cursor-text ${
+              className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 rounded px-0.5 text-center font-mono font-extrabold text-xs outline-none w-11 cursor-text ${
                 isOverdue
                   ? 'text-rose-900 dark:text-rose-100 focus:ring-rose-500 font-black'
                   : 'text-emerald-700 dark:text-emerald-300 focus:ring-emerald-500'
@@ -592,7 +592,7 @@ export default function FlightRow({
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 placeholder="00:00"
-                className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-amber-500 rounded px-0.5 text-center font-mono font-black text-[13px] text-amber-700 dark:text-amber-300 outline-none w-12 cursor-text ${getChangedStyle('time')}`}
+                className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-amber-500 rounded px-0.5 text-center font-mono font-black text-xs text-amber-700 dark:text-amber-300 outline-none w-11 cursor-text ${getChangedStyle('time')}`}
                 title={`Время вылета (${timeMode}) — нажмите Enter или смените поле для авто-сортировки`}
               />
             </div>
@@ -617,7 +617,7 @@ export default function FlightRow({
               }}
               placeholder="25.08"
               maxLength={5}
-              className={`bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-0.5 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-12 cursor-text tracking-wide ${getChangedStyle('flight_date')}`}
+              className={`bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-0.5 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-11 cursor-text tracking-wide ${getChangedStyle('flight_date')}`}
               title={`Дата рейса (${timeMode})`}
             />
             <ChangeBadge change={unread.flight_date} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'flight_date')} />
