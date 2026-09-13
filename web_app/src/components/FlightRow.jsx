@@ -406,7 +406,7 @@ export default function FlightRow({
       </td>
 
       {/* 2. № Рейса */}
-      <td className={`sticky left-[28px] z-20 py-1 px-0.5 font-mono font-extrabold text-sm text-sky-700 dark:text-sky-400 whitespace-nowrap w-[64px] min-w-[62px] max-w-[66px] text-center ${activeStickyBg} transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${overdueBorderTopBottom}`}>
+      <td className={`sticky left-[28px] z-20 py-1 px-0.5 font-mono font-extrabold text-sm text-sky-700 dark:text-sky-400 whitespace-nowrap w-[68px] min-w-[64px] max-w-[72px] text-center ${activeStickyBg} transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${overdueBorderTopBottom}`}>
         <div className="flex flex-col items-center justify-center gap-0.5">
           <input
             type="text"
@@ -416,13 +416,13 @@ export default function FlightRow({
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
-            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-[56px] font-black font-mono text-sm text-sky-700 dark:text-sky-400 outline-none cursor-text tracking-wide text-center"
+            className="bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-[58px] font-black font-mono text-sm text-sky-700 dark:text-sky-400 outline-none cursor-text tracking-wide text-center"
           />
           {flight.is_new_flight && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
-              className="inline-flex items-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black uppercase px-1 py-0.5 rounded shadow-xs animate-pulse cursor-pointer shrink-0 max-w-[58px] truncate"
+              className="inline-flex items-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black uppercase px-1 py-0.5 rounded shadow-xs animate-pulse cursor-pointer shrink-0 max-w-[60px] truncate"
               title="Новый рейс из AviaBit! Нажмите для подтверждения"
             >
               <span className="truncate">НОВЫЙ</span>
@@ -433,7 +433,7 @@ export default function FlightRow({
       </td>
 
       {/* 3. Маршрут */}
-      <td className={`py-1 px-0.5 whitespace-nowrap leading-tight text-center w-[82px] min-w-[78px] max-w-[86px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 whitespace-nowrap leading-tight text-center w-[104px] min-w-[98px] max-w-[112px] ${overdueBorderTopBottom}`}>
         <div className={`flex flex-col items-center justify-center gap-0.5 w-full rounded p-0.5 ${
           isChanged('route_city') || isChanged('route_airports') ? 'ring-2 ring-amber-500 bg-amber-50 dark:bg-amber-950/40' : ''
         }`}>
@@ -476,7 +476,7 @@ export default function FlightRow({
               const t = displayTimes.outbound_takeoff_time || '';
               return (
                 <div
-                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-blue-500/15 dark:bg-blue-950/60 border border-blue-400/50 text-blue-700 dark:text-blue-300 text-[9px] font-extrabold tracking-tight leading-none w-full max-w-[105px] truncate cursor-default shadow-xs"
+                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-blue-500/15 dark:bg-blue-950/60 border border-blue-400/50 text-blue-700 dark:text-blue-300 text-[9px] font-extrabold tracking-tight leading-none w-full max-w-full truncate cursor-default shadow-xs"
                   title={`Борт вылетел из ${dep}${t ? ' в ' + t + ` (${timeMode})` : ''}. Рейс отправлен.`}
                 >
                   <span className="text-[10px]">🛫</span>
@@ -489,7 +489,7 @@ export default function FlightRow({
               const t = displayTimes.inbound_landing_time || '';
               return (
                 <div
-                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-emerald-500/20 dark:bg-emerald-950/70 border-2 border-emerald-500 text-emerald-900 dark:text-emerald-100 text-[9px] font-black tracking-tight leading-none shadow-sm w-full max-w-[105px] truncate cursor-default ring-1 ring-emerald-500/40"
+                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-emerald-500/20 dark:bg-emerald-950/70 border-2 border-emerald-500 text-emerald-900 dark:text-emerald-100 text-[9px] font-black tracking-tight leading-none shadow-sm w-full max-w-full truncate cursor-default ring-1 ring-emerald-500/40"
                   title={`БОРТ СЕЛ В ${dep}${t ? ' в ' + t + ` (${timeMode})` : ''}! Запросите трип-инфо у экипажа.`}
                 >
                   <span className="text-[10px]">🛬</span>
@@ -503,7 +503,7 @@ export default function FlightRow({
               const fromStr = flight.inbound_dep ? `из ${flight.inbound_dep}` : '';
               return (
                 <div
-                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-amber-500/15 dark:bg-amber-950/60 border border-amber-500/40 text-amber-800 dark:text-amber-200 text-[9px] font-bold tracking-tight leading-none w-full max-w-[105px] truncate cursor-default animate-pulse"
+                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-amber-500/15 dark:bg-amber-950/60 border border-amber-500/40 text-amber-800 dark:text-amber-200 text-[9px] font-bold tracking-tight leading-none w-full max-w-full truncate cursor-default animate-pulse"
                   title={`Борт в воздухе: летит ${fromStr} в ${dep}${calcT ? ', расчетная посадка' + calcT + ` (${timeMode})` : ''}`}
                 >
                   <span className="text-[10px]">✈️</span>
@@ -518,7 +518,7 @@ export default function FlightRow({
               const targetCity = flight.inbound_dep || '';
               return (
                 <div
-                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-purple-500/15 dark:bg-purple-950/60 border border-purple-400/50 text-purple-800 dark:text-purple-200 text-[9px] font-bold tracking-tight leading-none w-full max-w-[105px] truncate cursor-default"
+                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-purple-500/15 dark:bg-purple-950/60 border border-purple-400/50 text-purple-800 dark:text-purple-200 text-[9px] font-bold tracking-tight leading-none w-full max-w-full truncate cursor-default"
                   title={`Борт в воздухе: выполняет другой рейс ${otherFl} (прилёт в ${targetCity}${calcT}). До нашего вылета из ${dep} запланированы промежуточные плечи.`}
                 >
                   <span className="text-[10px]">✈️</span>
@@ -530,7 +530,7 @@ export default function FlightRow({
             if (flight.inbound_dep) {
               return (
                 <div
-                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[9px] font-semibold tracking-tight leading-none w-full max-w-[105px] truncate cursor-default"
+                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[9px] font-semibold tracking-tight leading-none w-full max-w-full truncate cursor-default"
                   title={`Ожидает вылета из ${flight.inbound_dep} в ${dep}`}
                 >
                   <span className="text-[10px]">⏳</span>
@@ -545,7 +545,7 @@ export default function FlightRow({
       </td>
 
       {/* 4. ВРЕМЯ */}
-      <td className={`py-0.5 px-0.5 whitespace-nowrap text-center w-[72px] min-w-[70px] max-w-[74px] ${overdueBorderTopBottom}`}>
+      <td className={`py-0.5 px-0.5 whitespace-nowrap text-center w-[84px] min-w-[80px] max-w-[88px] ${overdueBorderTopBottom}`}>
         <div className={`flex flex-col items-center gap-0.5 rounded-md p-0.5 w-full transition-colors ${
           isOverdue
             ? 'bg-rose-100/95 dark:bg-rose-950/80 border-2 border-rose-500 shadow-sm'
@@ -569,7 +569,7 @@ export default function FlightRow({
               onMouseDown={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="--:--"
-              className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 rounded px-0.5 text-center font-mono font-extrabold text-xs outline-none w-11 cursor-text ${
+              className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 rounded px-0.5 text-center font-mono font-extrabold text-xs outline-none w-12 cursor-text ${
                 isOverdue
                   ? 'text-rose-900 dark:text-rose-100 focus:ring-rose-500 font-black'
                   : 'text-emerald-700 dark:text-emerald-300 focus:ring-emerald-500'
@@ -592,7 +592,7 @@ export default function FlightRow({
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 placeholder="00:00"
-                className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-amber-500 rounded px-0.5 text-center font-mono font-black text-xs text-amber-700 dark:text-amber-300 outline-none w-11 cursor-text ${getChangedStyle('time')}`}
+                className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-amber-500 rounded px-0.5 text-center font-mono font-black text-xs text-amber-700 dark:text-amber-300 outline-none w-12 cursor-text ${getChangedStyle('time')}`}
                 title={`Время вылета (${timeMode}) — нажмите Enter или смените поле для авто-сортировки`}
               />
             </div>
@@ -617,7 +617,7 @@ export default function FlightRow({
               }}
               placeholder="25.08"
               maxLength={5}
-              className={`bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-0.5 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-11 cursor-text tracking-wide ${getChangedStyle('flight_date')}`}
+              className={`bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-0.5 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-12 cursor-text tracking-wide ${getChangedStyle('flight_date')}`}
               title={`Дата рейса (${timeMode})`}
             />
             <ChangeBadge change={unread.flight_date} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'flight_date')} />
@@ -864,7 +864,7 @@ export default function FlightRow({
       </td>
 
       {/* 12. Груз */}
-      <td className={`py-1 px-0.5 text-center w-[84px] min-w-[80px] max-w-[92px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 text-center w-[120px] min-w-[110px] max-w-[135px] ${overdueBorderTopBottom}`}>
         <div className="flex flex-col items-center justify-center">
           <textarea
             rows={2}
@@ -886,8 +886,8 @@ export default function FlightRow({
       </td>
 
       {/* 13. Почта */}
-      <td className={`py-1 px-0.5 text-center min-w-[44px] max-w-[52px] ${overdueBorderTopBottom}`}>
-        <div className="flex flex-col items-center justify-center">
+      <td className={`py-1 px-0.5 text-center w-12 min-w-[46px] max-w-[50px] ${overdueBorderTopBottom}`}>
+        <div className="flex flex-col items-center justify-center max-w-[48px] mx-auto">
           <textarea
             rows={2}
             value={flight.mail || ''}
@@ -895,11 +895,11 @@ export default function FlightRow({
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
-            placeholder="Почта..."
+            placeholder="Почта"
             title={flight.mail || ''}
             className={`w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-0.5 py-0.5 text-center outline-none cursor-text transition-all shadow-sm break-words [word-break:break-word] ${
-              (flight.mail || '').length > 12
-                ? 'text-[11px] leading-[1.2] font-mono font-semibold tracking-tight'
+              (flight.mail || '').length > 8
+                ? 'text-[10px] leading-[1.2] font-mono font-semibold tracking-tight'
                 : 'text-xs font-medium'
             } text-slate-900 dark:text-slate-200 ${getChangedStyle('mail')}`}
           />
