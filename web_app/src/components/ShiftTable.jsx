@@ -78,8 +78,8 @@ export default function ShiftTable({
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-amber-700 dark:text-amber-300 shadow-sm">СЗВ</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-emerald-700 dark:text-emerald-300 shadow-sm">LDM</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-teal-700 dark:text-teal-300 shadow-sm">Астра<br/><span className="text-[9px] font-medium text-slate-500">Времена</span></th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[120px] min-w-[115px] max-w-[124px] shadow-sm">Статус</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 font-extrabold tracking-wider uppercase w-[75px] min-w-[70px] max-w-[80px] shadow-sm">Примечания</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[100px] min-w-[96px] max-w-[104px] shadow-sm">Статус</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 font-extrabold tracking-wider uppercase w-[95px] min-w-[90px] max-w-[105px] shadow-sm">Примечания</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 pr-2 text-center font-extrabold tracking-wider uppercase w-[120px] min-w-[115px] max-w-[125px] no-print shadow-sm">Действия</th>
             </tr>
           </thead>

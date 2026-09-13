@@ -1002,13 +1002,13 @@ export default function FlightRow({
       </td>
 
       {/* 18. СТАТУС РЕЙСА */}
-      <td className={`py-1 px-0.5 text-center whitespace-nowrap w-[120px] min-w-[115px] max-w-[124px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 text-center whitespace-nowrap w-[100px] min-w-[96px] max-w-[104px] ${overdueBorderTopBottom}`}>
         <select
           value={currentStatus}
           onChange={handleStatusSelectChange}
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
-          className={`text-[11px] font-bold rounded px-1 py-1 pr-3 border focus:outline-none cursor-pointer shadow-sm w-full leading-tight tracking-tight ${statusBadgeStyle[currentStatus] || statusBadgeStyle.pending}`}
+          className={`text-[10.5px] font-bold rounded px-1 py-1 pr-1 border focus:outline-none cursor-pointer shadow-sm w-full leading-tight tracking-tight ${statusBadgeStyle[currentStatus] || statusBadgeStyle.pending}`}
         >
           <option value="pending" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-300">⚪ Ожидание</option>
           <option value="prepared" className="bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300">🔵 Подготовлен</option>
@@ -1019,7 +1019,7 @@ export default function FlightRow({
       </td>
 
       {/* 19. Примечания */}
-      <td className={`py-1 px-0.5 w-[75px] min-w-[70px] max-w-[80px] overflow-hidden ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 w-[95px] min-w-[90px] max-w-[105px] overflow-hidden ${overdueBorderTopBottom}`}>
         <textarea
           rows={2}
           value={flight.notes || ''}
