@@ -77,21 +77,25 @@ function normalizeFlight(f) {
   let status = f.status || 'pending';
   if (status === 'in_progress') status = 'pending';
 
-  const hasManualWork = !!(f.fuel_block || f.dow || f.doi || (f.notes && f.notes.trim()));
   const isRen = isRenDeparture(f);
 
-  if (f.astra_times_sent && isRen) {
-    status = 'closed';
-  } else if (f.ldm_sent && !isRen) {
-    status = 'closed';
-  } else if (f.szv_sent) {
-    status = 'released';
-  } else if (f.lir_sent) {
-    status = 'lir_sent';
-  }
+  const lir_sent = f.lir_sent === true || f.lir_sent === 1 || f.lir_sent === '1' || f.lir_sent === 'true';
+  const szv_sent = f.szv_sent === true || f.szv_sent === 1 || f.szv_sent === '1' || f.szv_sent === 'true';
+  const ldm_sent = f.ldm_sent === true || f.ldm_sent === 1 || f.ldm_sent === '1' || f.ldm_sent === 'true';
+  const astra_times_sent = isRen && (f.astra_times_sent === true || f.astra_times_sent === 1 || f.astra_times_sent === '1' || f.astra_times_sent === 'true');
+  const crew_manual = f.crew_manual === true || f.crew_manual === 1 || f.crew_manual === '1' || f.crew_manual === 'true';
 
-  // Для рейсов, вылетающих НЕ из Оренбурга, чекбокс Времена (Astra) не применяется
-  const astra_times_sent = isRen ? !!f.astra_times_sent : false;
+  if (astra_times_sent && isRen) {
+    status = 'closed';
+  } else if (ldm_sent && !isRen) {
+    status = 'closed';
+  } else if (szv_sent) {
+    status = 'released';
+  } else if (lir_sent) {
+    if (status !== 'released' && status !== 'closed') {
+      status = 'lir_sent';
+    }
+  }
 
   // Интеллектуальное определение типа ВС (332, 333, 321, 772, 739, 738, 190)
   const ac_type = f.ac_type ? normalizePlaneType(f.ac_type) : detectPlaneType(f);
@@ -99,13 +103,19 @@ function normalizeFlight(f) {
   const unread_changes = getSafeUnreadChanges(f);
   const hasUnread = Object.keys(unread_changes).length > 0;
 
-  const flight = f.flight || f.flight_no || '';
+  const flight = f.flight || f.flight_no || f.flight_number || '';
+  const id = f.id || `fl_${flight}_${f.flight_date || ''}_${(f.time || '').replace(':', '')}_${Math.random().toString(36).substr(2, 6)}`;
 
   return { 
     ...f, 
+    id,
     flight,
     status, 
+    lir_sent,
+    szv_sent,
+    ldm_sent,
     astra_times_sent, 
+    crew_manual,
     ac_type,
     unread_changes: hasUnread ? unread_changes : undefined,
     is_new_flight: hasUnread ? !!f.is_new_flight : false
@@ -936,7 +946,6 @@ export default function App() {
         onOpenAviaBitModal={() => setIsAviaBitModalOpen(true)}
         onOpenAirportsModal={() => setIsAirportsModalOpen(true)}
         departureAirportsCount={departureAirports.filter(a => a.is_enabled).length}
-        onImportExcelFile={handleImportExcelFile}
         onAddFlight={() => setIsAddModalOpen(true)}
         onExportExcel={handleExportExcel}
         onResetShift={handleResetShift}

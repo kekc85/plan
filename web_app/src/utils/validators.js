@@ -117,10 +117,28 @@ export function formatValidAcConfig(raw) {
   return raw.replace(/[^0-9\/]/g, '').slice(0, 7);
 }
 
-// MTOW: не более 6 цифр
+// MTOW / TOW: не более 6 цифр
 export function formatValidMtow(raw) {
   if (!raw) return '';
-  return raw.replace(/\D/g, '').slice(0, 6);
+  return raw.replace(/[^0-9.]/g, '').slice(0, 6);
+}
+
+// DOW: не более 6 символов (цифры, точка, запятая)
+export function formatValidDow(raw) {
+  if (!raw) return '';
+  return raw.replace(/[^0-9.,]/g, '').slice(0, 6);
+}
+
+// DOI: не более 5 символов (цифры, точка, запятая, минус)
+export function formatValidDoi(raw) {
+  if (!raw) return '';
+  return raw.replace(/[^0-9.,\-]/g, '').slice(0, 5);
+}
+
+// Топливо (BLOCK, TRIP, TAXI): не более 5 цифр/символов
+export function formatValidFuel(raw) {
+  if (!raw) return '';
+  return raw.replace(/[^0-9.]/g, '').slice(0, 5);
 }
 
 // Авто-маска для ввода полной календарной даты (ДД.ММ.ГГГГ) без необходимости вручную ставить точки

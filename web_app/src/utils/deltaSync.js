@@ -193,6 +193,7 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
   let newFlightsCount = 0;
 
   const mergedFlights = [];
+  const matchedOldIds = new Set();
 
   for (const inc of incomingFlights) {
     const key = getFlightKey(inc);
@@ -224,6 +225,10 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
         }
       });
       continue;
+    }
+
+    if (old && old.id) {
+      matchedOldIds.add(old.id);
     }
 
     // Выявляем изменившиеся оперативные параметры
@@ -291,6 +296,19 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
 
     mergedFlights.push(merged);
   }
+
+  // Сохраняем все рейсы из текущего плана, которых не было в новом ответе AviaBit
+  // (например, рейсы за предыдущую дату смены или добавленные вручную диспетчером)
+  currentFlights.forEach(f => {
+    if (!f || !f.id) return;
+    if (!matchedOldIds.has(f.id)) {
+      const fVariants = getFlightKeyVariants(f);
+      const isDeleted = fVariants.some(v => deletedSet.has(v));
+      if (!isDeleted) {
+        mergedFlights.push(f);
+      }
+    }
+  });
 
   return {
     mergedFlights,

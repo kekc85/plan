@@ -10,6 +10,9 @@ import {
   formatValidAcNum, 
   formatValidAcConfig,
   formatValidMtow,
+  formatValidDow,
+  formatValidDoi,
+  formatValidFuel,
   formatValidDayMonth,
   isFlightReleaseOverdue,
   isRenDeparture,
@@ -677,12 +680,13 @@ export default function FlightRow({
               <input
                 type="text"
                 value={flight.fuel_block || ''}
-                onChange={(e) => handleCellChange('fuel_block', e.target.value)}
+                onChange={(e) => handleCellChange('fuel_block', formatValidFuel(e.target.value))}
                 onFocus={(e) => e.target.select()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
+                maxLength={5}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-sky-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-xs font-extrabold text-sky-800 dark:text-sky-200 text-center outline-none cursor-text"
               />
             </div>
@@ -691,12 +695,13 @@ export default function FlightRow({
               <input
                 type="text"
                 value={flight.fuel_trip || ''}
-                onChange={(e) => handleCellChange('fuel_trip', e.target.value)}
+                onChange={(e) => handleCellChange('fuel_trip', formatValidFuel(e.target.value))}
                 onFocus={(e) => e.target.select()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
+                maxLength={5}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-sky-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-xs font-bold text-slate-800 dark:text-slate-200 text-center outline-none cursor-text"
               />
             </div>
@@ -705,12 +710,13 @@ export default function FlightRow({
               <input
                 type="text"
                 value={flight.fuel_taxi || ''}
-                onChange={(e) => handleCellChange('fuel_taxi', e.target.value)}
+                onChange={(e) => handleCellChange('fuel_taxi', formatValidFuel(e.target.value))}
                 onFocus={(e) => e.target.select()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
+                maxLength={5}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-sky-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-xs font-bold text-slate-800 dark:text-slate-200 text-center outline-none cursor-text"
               />
             </div>
@@ -722,12 +728,13 @@ export default function FlightRow({
               <input
                 type="text"
                 value={flight.dow || ''}
-                onChange={(e) => handleCellChange('dow', e.target.value)}
+                onChange={(e) => handleCellChange('dow', formatValidDow(e.target.value))}
                 onFocus={(e) => e.target.select()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
+                maxLength={6}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-[11px] font-extrabold text-indigo-800 dark:text-indigo-200 text-center outline-none cursor-text tracking-tight"
               />
             </div>
@@ -736,12 +743,13 @@ export default function FlightRow({
               <input
                 type="text"
                 value={flight.doi || ''}
-                onChange={(e) => handleCellChange('doi', e.target.value)}
+                onChange={(e) => handleCellChange('doi', formatValidDoi(e.target.value))}
                 onFocus={(e) => e.target.select()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
+                maxLength={5}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-[11px] font-extrabold text-indigo-800 dark:text-indigo-200 text-center outline-none cursor-text tracking-tight"
               />
             </div>
@@ -809,7 +817,7 @@ export default function FlightRow({
       </td>
 
       {/* 12. Груз */}
-      <td className={`py-1 px-0.5 text-center w-20 min-w-[70px] max-w-[85px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 text-center w-16 min-w-[60px] max-w-[70px] ${overdueBorderTopBottom}`}>
         <div className="flex flex-col items-center justify-center">
           <textarea
             rows={2}
@@ -820,7 +828,7 @@ export default function FlightRow({
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="Груз..."
             title={flight.cargo || ''}
-            className={`w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1 py-0.5 text-center outline-none cursor-text transition-all shadow-sm break-words [word-break:break-word] ${
+            className={`w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-0.5 py-0.5 text-center outline-none cursor-text transition-all shadow-sm break-words [word-break:break-word] ${
               (flight.cargo || '').length > 15
                 ? 'text-[11px] leading-[1.2] font-mono font-semibold tracking-tight'
                 : 'text-xs font-medium'
@@ -831,7 +839,7 @@ export default function FlightRow({
       </td>
 
       {/* 13. Почта */}
-      <td className={`py-1 px-0.5 text-center min-w-[44px] max-w-[56px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 text-center min-w-[44px] max-w-[52px] ${overdueBorderTopBottom}`}>
         <div className="flex flex-col items-center justify-center">
           <textarea
             rows={2}
@@ -853,7 +861,7 @@ export default function FlightRow({
       </td>
 
       {/* 14. Багаж */}
-      <td className={`py-1 px-0.5 w-20 min-w-[70px] max-w-[85px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 w-16 min-w-[60px] max-w-[70px] ${overdueBorderTopBottom}`}>
         <textarea
           rows={2}
           value={flight.baggage || ''}
@@ -861,9 +869,9 @@ export default function FlightRow({
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
-          placeholder="Особенности багажа..."
+          placeholder="Багаж..."
           title={flight.baggage || ''}
-          className="w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-1 py-0.5 text-xs font-medium text-slate-900 dark:text-slate-200 outline-none cursor-text transition-all shadow-sm"
+          className="w-full resize-none overflow-hidden hover:overflow-y-auto focus:overflow-y-auto leading-tight bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-0.5 py-0.5 text-xs font-medium text-slate-900 dark:text-slate-200 outline-none cursor-text transition-all shadow-sm"
         />
       </td>
 
@@ -947,7 +955,7 @@ export default function FlightRow({
       </td>
 
       {/* 18. СТАТУС РЕЙСА */}
-      <td className={`py-1 px-0.5 text-center whitespace-nowrap w-[124px] min-w-[120px] max-w-[128px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 text-center whitespace-nowrap w-[120px] min-w-[115px] max-w-[124px] ${overdueBorderTopBottom}`}>
         <select
           value={currentStatus}
           onChange={handleStatusSelectChange}
@@ -964,7 +972,7 @@ export default function FlightRow({
       </td>
 
       {/* 19. Примечания */}
-      <td className={`py-1 px-1 w-[80px] min-w-[75px] max-w-[85px] overflow-hidden ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 w-[75px] min-w-[70px] max-w-[80px] overflow-hidden ${overdueBorderTopBottom}`}>
         <textarea
           rows={2}
           value={flight.notes || ''}
@@ -979,7 +987,7 @@ export default function FlightRow({
       </td>
 
       {/* 20. Действия */}
-      <td className={`py-1 px-1 text-center whitespace-nowrap no-print rounded-r-2xl w-[110px] min-w-[105px] max-w-[115px] ${
+      <td className={`py-1 px-1 pr-2 text-center whitespace-nowrap no-print rounded-r-2xl w-[120px] min-w-[115px] max-w-[125px] ${
         isOverdue ? 'border-r-2 border-r-rose-500 border-t-2 border-b-2 border-rose-500' : 'border-r border-t border-b border-slate-200/80 dark:border-slate-800/80'
       }`}>
         <div className="flex items-center justify-center gap-1 w-full">
@@ -987,21 +995,21 @@ export default function FlightRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
-              className="flex items-center justify-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black px-1.5 py-0.5 rounded shadow-xs transition-all active:scale-95 animate-pulse shrink-0 cursor-pointer"
+              className="flex items-center justify-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[8px] font-black px-1 py-0.5 rounded shadow-xs transition-all active:scale-95 animate-pulse shrink-0 cursor-pointer"
               title="Подтвердить ознакомление со всеми изменениями в этом рейсе"
             >
-              <Check className="w-2.5 h-2.5 stroke-[3] text-amber-700 dark:text-amber-400" />
+              <Check className="w-2 h-2 stroke-[3] text-amber-700 dark:text-amber-400" />
               <span>✓{unreadCount > 0 ? ` (${unreadCount})` : ''}</span>
             </button>
           )}
 
-          <div className="flex items-center justify-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="flex items-center justify-center gap-0.5 opacity-80 group-hover:opacity-100 transition-opacity shrink-0">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onOpenHistory?.(flight); }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 rounded hover:bg-sky-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 rounded hover:bg-sky-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
               title="История изменений рейса (Flight Audit Trail)"
             >
               <History className="w-3.5 h-3.5" />
@@ -1012,7 +1020,7 @@ export default function FlightRow({
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               disabled={isFirst}
-              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0"
+              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
               title="Переместить вверх"
             >
               <ArrowUp className="w-3.5 h-3.5" />
@@ -1023,7 +1031,7 @@ export default function FlightRow({
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               disabled={isLast}
-              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0"
+              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
               title="Переместить вниз"
             >
               <ArrowDown className="w-3.5 h-3.5" />
@@ -1033,10 +1041,10 @@ export default function FlightRow({
               onClick={(e) => { e.stopPropagation(); onDeleteFlight(flight.id); }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              className="p-1 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-colors shrink-0"
+              className="p-1 text-rose-500 hover:text-rose-700 dark:hover:text-rose-300 rounded hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors shrink-0 cursor-pointer"
               title="Удалить рейс"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
             </button>
           </div>
         </div>

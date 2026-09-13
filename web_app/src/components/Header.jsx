@@ -3,7 +3,6 @@ import {
   Plane, 
   Calendar, 
   Plus, 
-  Download, 
   Upload,
   Printer, 
   Moon, 
@@ -31,7 +30,6 @@ export default function Header({
   onOpenAviaBitModal,
   onOpenAirportsModal,
   departureAirportsCount,
-  onImportExcelFile,
   onAddFlight,
   onExportExcel,
   onResetShift,
@@ -61,7 +59,6 @@ export default function Header({
   const [utcTime, setUtcTime] = useState('');
   const [mskTime, setMskTime] = useState('');
   const [currentDateStr, setCurrentDateStr] = useState('');
-  const fileInputRef = useRef(null);
 
   // Идущие часы UTC, МСК и текущая дата (каждую секунду)
   useEffect(() => {
@@ -414,23 +411,6 @@ export default function Header({
                 </span>
               )}
             </button>
-
-            {/* КНОПКА 2: ИМПОРТ EXCEL */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 transition-all active:scale-95"
-              title="Импортировать готовый файл расписания Excel (.xlsx)"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Импорт</span>
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelected}
-              accept=".xlsx, .xls"
-              className="hidden"
-            />
 
             {/* Кнопка Добавить пустую строку */}
             <button
