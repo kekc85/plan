@@ -926,10 +926,14 @@ def get_current_shift():
         if last_handover:
             lh = dict(last_handover)
             handover_data = {
+                "id": lh.get("id"),
                 "handed_over_by": lh.get("handed_over_by"),
                 "accepted_by": lh.get("accepted_by"),
                 "handover_time": lh.get("handover_time"),
-                "notes": lh.get("notes") or ""
+                "notes": lh.get("notes") or "",
+                "is_read": bool(lh.get("is_read")),
+                "read_at": lh.get("read_at"),
+                "read_by": lh.get("read_by")
             }
 
         deleted_raw = shift_dict.get("deleted_flights")
@@ -985,6 +989,7 @@ def get_current_shift():
             "doi": str(r.get("doi") or ""),
             "galley": str(r.get("galley") or "D"),
             "mtow": str(r.get("mtow") or ""),
+            "crew_manual": bool(r.get("crew_manual")),
             "lir_sent": bool(r.get("lir_sent")),
             "cargo": str(r.get("cargo") or ""),
             "mail": str(r.get("mail") or ""),
@@ -1041,6 +1046,29 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
             (date_interval, dispatcher, now_str, deleted_flights_json, now_str)
         )
         shift_id = cursor.lastrowid
+
+    # Обновление статуса прочтения замечаний по смене при необходимости
+    handover_info = shift_info.get("handover")
+    if isinstance(handover_info, dict) and handover_info.get("is_read"):
+        r_at = handover_info.get("read_at") or now_str
+        r_by = handover_info.get("read_by") or user_display
+        h_id = handover_info.get("id")
+        if h_id:
+            cursor.execute(
+                q("UPDATE plan_handover_logs SET is_read = 1, read_at = %s, read_by = %s WHERE id = %s;", engine),
+                (r_at, r_by, h_id)
+            )
+        else:
+            if engine == "mysql":
+                cursor.execute(
+                    "UPDATE plan_handover_logs SET is_read = 1, read_at = %s, read_by = %s WHERE id = (SELECT id FROM (SELECT id FROM plan_handover_logs ORDER BY id DESC LIMIT 1) as t);",
+                    (r_at, r_by)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE plan_handover_logs SET is_read = 1, read_at = ?, read_by = ? WHERE id = (SELECT id FROM plan_handover_logs ORDER BY id DESC LIMIT 1);",
+                    (r_at, r_by)
+                )
 
     # 1. Извлекаем текущее состояние рейсов для аудита изменений (Flight Audit Trail)
     cursor.execute("SELECT * FROM plan_flights;")
@@ -1141,7 +1169,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
             INSERT INTO plan_flights (
                 id, shift_id, flight_number, flight_date, route_city, route_airports,
                 departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
-                fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow,
+                fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow, crew_manual,
                 lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
                 status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
                 inbound_landing_calc, inbound_landing_time, outbound_takeoff_time,
@@ -1149,7 +1177,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
             ) VALUES (
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
                 %s, %s, %s,
@@ -1177,6 +1205,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
                 str(f.get("doi") or ""),
                 str(f.get("galley") or "D"),
                 str(f.get("mtow") or ""),
+                1 if f.get("crew_manual") else 0,
                 1 if f.get("lir_sent") else 0,
                 str(f.get("cargo") or ""),
                 str(f.get("mail") or ""),
@@ -1241,14 +1270,11 @@ def smart_merge_schedules(req: SmartMergeRequest, current_user: Optional[dict] =
     - Рейсы за пределами выбранного интервала очищаются.
     """
     existing_map = {}
-    existing_by_flight = {}
     for f in req.current_flights:
         flight_clean = f.get("flight", "").replace("-", "").replace(" ", "").strip().upper()
         flight_date = str(f.get("flight_date", "")).strip()
         key = f"{flight_clean}_{flight_date}"
         existing_map[key] = f
-        if flight_clean and flight_clean not in existing_by_flight:
-            existing_by_flight[flight_clean] = f
 
     merged_flights = []
 
@@ -1256,7 +1282,7 @@ def smart_merge_schedules(req: SmartMergeRequest, current_user: Optional[dict] =
         flight_clean = inc.get("flight", "").replace("-", "").replace(" ", "").strip().upper()
         flight_date = str(inc.get("flight_date", "")).strip()
         key = f"{flight_clean}_{flight_date}"
-        old = existing_map.get(key) or existing_by_flight.get(flight_clean)
+        old = existing_map.get(key)
 
         if old is not None:
             merged = inc.copy()
@@ -1273,6 +1299,11 @@ def smart_merge_schedules(req: SmartMergeRequest, current_user: Optional[dict] =
             for field in ["fuel_block", "fuel_trip", "fuel_taxi", "dow", "doi", "galley", "mtow", "baggage"]:
                 if old.get(field):
                     merged[field] = old[field]
+
+            # 1.1. Сохраняем ручной экипаж
+            if old.get("crew_manual"):
+                merged["crew"] = old.get("crew")
+                merged["crew_manual"] = True
 
             # 2. Выявляем изменения в оперативных полях AviaBit
             tracked_fields = [

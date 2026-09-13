@@ -8,6 +8,7 @@ import AviaBitFetchModal from './components/AviaBitFetchModal';
 import LoginModal from './components/LoginModal';
 import AdminModal from './components/AdminModal';
 import HandoverModal from './components/HandoverModal';
+import HandoverNotesModal from './components/HandoverNotesModal';
 import DownloadManualModal from './components/DownloadManualModal';
 import DepartureAirportsModal from './components/DepartureAirportsModal';
 import FlightHistoryModal from './components/FlightHistoryModal';
@@ -129,6 +130,7 @@ export default function App() {
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedHistoryFlight, setSelectedHistoryFlight] = useState(null);
+  const [isHandoverNotesModalOpen, setIsHandoverNotesModalOpen] = useState(false);
   const [isHandoverNotesDismissed, setIsHandoverNotesDismissed] = useState(() => {
     const saved = getStoredWithMigration('dismissed_handover_note');
     return !!saved;
@@ -388,6 +390,9 @@ export default function App() {
             setFlights(data.flights.map(normalizeFlight));
             if (data.shiftInfo) {
               setShiftInfo(prev => ({ ...prev, ...data.shiftInfo }));
+              if (data.shiftInfo.handover?.is_read) {
+                setIsHandoverNotesDismissed(true);
+              }
               if (Array.isArray(data.shiftInfo.deleted_flights)) {
                 setDeletedFlightKeys(data.shiftInfo.deleted_flights);
                 try {
@@ -822,24 +827,34 @@ export default function App() {
 
 
   // Подтверждение ознакомления с замечаниями сменщика
-  const handleDismissHandoverNotes = () => {
+  const handleDismissHandoverNotes = async () => {
     hasUserModifiedRef.current = true;
     setIsHandoverNotesDismissed(true);
     const noteKey = `${shiftInfo?.handover?.handover_time || ''}_${shiftInfo?.handover?.notes || ''}`;
     localStorage.setItem(`${STORAGE_KEY}_dismissed_handover_note`, noteKey);
 
-    // Помечаем замечание как прочитанное в shiftInfo и базе данных
-    setShiftInfo(prev => {
-      if (!prev?.handover) return prev;
-      return {
-        ...prev,
-        handover: {
-          ...prev.handover,
-          is_read: true,
-          read_at: new Date().toISOString()
-        }
-      };
-    });
+    const nowIso = new Date().toISOString();
+    const readerName = currentUser?.full_name || currentUser?.username || shiftInfo?.dispatcher || 'Диспетчер';
+
+    const updatedHandover = shiftInfo?.handover ? {
+      ...shiftInfo.handover,
+      is_read: true,
+      read_at: nowIso,
+      read_by: readerName
+    } : null;
+
+    const updatedShift = {
+      ...shiftInfo,
+      handover: updatedHandover
+    };
+
+    setShiftInfo(updatedShift);
+    try {
+      localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(updatedShift));
+      await saveShift(updatedShift, flights);
+    } catch (e) {
+      console.warn('Error saving dismissed handover notes state:', e);
+    }
   };
 
   // Передача смены
@@ -934,6 +949,8 @@ export default function App() {
         onOpenLoginModal={() => setIsLoginModalOpen(true)}
         onOpenAdminModal={() => setIsAdminModalOpen(true)}
         onOpenHandoverModal={() => setIsHandoverModalOpen(true)}
+        onOpenHandoverNotesModal={() => setIsHandoverNotesModalOpen(true)}
+        hasHandoverNotes={Boolean(shiftInfo?.handover?.notes && shiftInfo.handover.notes.trim())}
         onOpenManualModal={() => setIsManualModalOpen(true)}
         onLogout={handleLogout}
         autoSyncEnabled={autoSyncEnabled}
@@ -1124,6 +1141,13 @@ export default function App() {
         shiftInfo={shiftInfo}
         currentUser={currentUser}
         onHandoverSuccess={handleHandoverSuccess}
+      />
+
+      {/* Модальное окно просмотра замечаний по смене */}
+      <HandoverNotesModal
+        isOpen={isHandoverNotesModalOpen}
+        onClose={() => setIsHandoverNotesModalOpen(false)}
+        handoverData={shiftInfo?.handover}
       />
 
       {/* Модальное окно прямой загрузки из AviaBit */}

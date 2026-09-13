@@ -138,6 +138,7 @@ def init_db():
             doi VARCHAR(32) NULL,
             galley VARCHAR(16) DEFAULT 'D',
             mtow VARCHAR(32) NULL,
+            crew_manual TINYINT(1) DEFAULT 0,
             lir_sent TINYINT(1) DEFAULT 0,
             cargo VARCHAR(32) NULL,
             mail VARCHAR(32) NULL,
@@ -171,7 +172,10 @@ def init_db():
             handover_time VARCHAR(64) NOT NULL,
             active_flights_count INT NOT NULL DEFAULT 0,
             transferred_flights_summary TEXT NULL,
-            notes TEXT NULL
+            notes TEXT NULL,
+            is_read TINYINT(1) DEFAULT 0,
+            read_at VARCHAR(64) NULL,
+            read_by VARCHAR(128) NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """)
 
@@ -315,6 +319,25 @@ def init_db():
         except Exception:
             pass
 
+        # Автомиграция: добавление колонки crew_manual в plan_flights
+        try:
+            cursor.execute("ALTER TABLE plan_flights ADD COLUMN crew_manual TINYINT(1) DEFAULT 0;")
+            conn.commit()
+        except Exception:
+            pass
+
+        # Автомиграция: добавление колонок статуса прочтения в plan_handover_logs
+        for col, col_def in [
+            ("is_read", "TINYINT(1) DEFAULT 0"),
+            ("read_at", "VARCHAR(64) NULL"),
+            ("read_by", "VARCHAR(128) NULL")
+        ]:
+            try:
+                cursor.execute(f"ALTER TABLE plan_handover_logs ADD COLUMN {col} {col_def};")
+                conn.commit()
+            except Exception:
+                pass
+
     else:
         # SQLite таблицы
         cursor.execute("""
@@ -365,6 +388,7 @@ def init_db():
             doi TEXT,
             galley TEXT DEFAULT 'D',
             mtow TEXT,
+            crew_manual INTEGER DEFAULT 0,
             lir_sent INTEGER DEFAULT 0,
             cargo TEXT,
             mail TEXT,
@@ -397,7 +421,10 @@ def init_db():
             handover_time TEXT NOT NULL,
             active_flights_count INTEGER NOT NULL DEFAULT 0,
             transferred_flights_summary TEXT,
-            notes TEXT
+            notes TEXT,
+            is_read INTEGER DEFAULT 0,
+            read_at TEXT,
+            read_by TEXT
         );
         """)
 
@@ -523,7 +550,7 @@ def init_db():
         conn.commit()
 
         # Автомиграция: добавление колонок если их еще нет
-        for col in ["ac_type", "unread_changes", "inbound_flight", "inbound_dep", "inbound_takeoff_time", "inbound_landing_calc", "inbound_landing_time", "outbound_takeoff_time", "plane_status"]:
+        for col in ["ac_type", "unread_changes", "crew_manual", "inbound_flight", "inbound_dep", "inbound_takeoff_time", "inbound_landing_calc", "inbound_landing_time", "outbound_takeoff_time", "plane_status"]:
             try:
                 cursor.execute(f"ALTER TABLE plan_flights ADD COLUMN {col} TEXT;")
                 conn.commit()
@@ -535,6 +562,18 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+
+        # Автомиграция: добавление колонок статуса прочтения в plan_handover_logs (SQLite)
+        for col, col_def in [
+            ("is_read", "INTEGER DEFAULT 0"),
+            ("read_at", "TEXT"),
+            ("read_by", "TEXT")
+        ]:
+            try:
+                cursor.execute(f"ALTER TABLE plan_handover_logs ADD COLUMN {col} {col_def};")
+                conn.commit()
+            except Exception:
+                pass
 
     conn.close()
 

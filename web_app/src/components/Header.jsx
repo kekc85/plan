@@ -20,7 +20,8 @@ import {
   LogIn,
   BookOpen,
   Bell,
-  RefreshCw
+  RefreshCw,
+  MessageSquare
 } from 'lucide-react';
 import { formatValidDateInterval } from '../utils/validators';
 
@@ -43,6 +44,8 @@ export default function Header({
   onOpenLoginModal,
   onOpenAdminModal,
   onOpenHandoverModal,
+  onOpenHandoverNotesModal,
+  hasHandoverNotes = false,
   onOpenManualModal,
   onLogout,
   autoSyncEnabled = true,
@@ -459,6 +462,19 @@ export default function Header({
               <BookOpen className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
               <span>Инструкция</span>
             </button>
+
+            {/* КНОПКА 6: ЗАМЕЧАНИЯ ПО СМЕНЕ */}
+            {hasHandoverNotes && (
+              <button
+                type="button"
+                onClick={onOpenHandoverNotesModal}
+                className="flex items-center gap-1 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/80 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-300 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-amber-300 dark:border-amber-700/80 shadow-sm transition-all active:scale-95 cursor-pointer animate-in fade-in duration-150"
+                title="Посмотреть переданные замечания и указания по смене"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>Замечания смены</span>
+              </button>
+            )}
           </div>
 
         </div>

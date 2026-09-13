@@ -125,6 +125,11 @@ export function detectFlightChanges(oldFlight, incomingFlight) {
   const existingUnread = oldFlight.unread_changes || {};
 
   TRACKED_AVIABIT_FIELDS.forEach(field => {
+    // Если экипаж был изменен диспетчером вручную, не детектируем изменения из AviaBit
+    if (field === 'crew' && oldFlight.crew_manual) {
+      return;
+    }
+
     const oldVal = normalizeVal(oldFlight[field]);
     const newVal = normalizeVal(incomingFlight[field]);
 
@@ -171,19 +176,15 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
   });
 
   const existingMap = new Map();
-  const existingByFlight = new Map();
   const existingByDigits = new Map();
 
   currentFlights.forEach(f => {
     const key = getFlightKey(f);
     if (key) existingMap.set(key, f);
     const flNum = normalizeFlightNumber(f.flight || f.flight_no || f.flight_number || '');
-    if (flNum && !existingByFlight.has(flNum)) {
-      existingByFlight.set(flNum, f);
-    }
     const digits = flNum.replace(/\D/g, '');
     const flDate = normalizeFlightDate(f.flight_date);
-    if (digits && flDate && !existingByDigits.has(`${digits}_${flDate}`)) {
+    if (digits && flDate) {
       existingByDigits.set(`${digits}_${flDate}`, f);
     }
   });
@@ -198,7 +199,9 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     const flNum = normalizeFlightNumber(inc.flight || inc.flight_no || inc.flight_number || '');
     const digits = flNum.replace(/\D/g, '');
     const flDate = normalizeFlightDate(inc.flight_date);
-    const old = existingMap.get(key) || existingByFlight.get(flNum) || existingByDigits.get(`${digits}_${flDate}`);
+
+    // Строгое сопоставление по номеру рейса и дате (исключает ошибочную склейку рейсов за разные даты)
+    const old = existingMap.get(key) || (digits && flDate ? existingByDigits.get(`${digits}_${flDate}`) : null);
 
     if (!old) {
       // Проверяем: был ли этот рейс удален диспетчером ранее в текущей смене?
@@ -211,8 +214,10 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
 
       // Совершенно новый рейс, добавленный в расписание AviaBit
       newFlightsCount++;
+      const flightId = inc.id || `flight_${flNum || 'fl'}_${flDate || ''}_${(inc.time || '').replace(':', '')}_${Math.random().toString(36).substr(2, 6)}`;
       mergedFlights.push({
         ...inc,
+        id: flightId,
         is_new_flight: true,
         unread_changes: {
           _is_new: { old: null, new: true, ts: Date.now() }
@@ -229,7 +234,7 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     const merged = { ...inc };
 
     // 1. Сохраняем идентификатор
-    if (old.id) merged.id = old.id;
+    merged.id = old.id || inc.id || `flight_${flNum || 'fl'}_${flDate || ''}_${(inc.time || '').replace(':', '')}_${Math.random().toString(36).substr(2, 6)}`;
 
     // 2. Строго сохраняем ручные поля диспетчера центровки
     const manualFields = [
@@ -251,6 +256,12 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
         hasManualWork = true;
       }
     });
+
+    // 2.1. Если экипаж был введен/изменен вручную диспетчером — сохраняем его и не перезаписываем из AviaBit
+    if (old.crew_manual) {
+      merged.crew = old.crew;
+      merged.crew_manual = true;
+    }
 
     // 3. Сохраняем чекбоксы технологического графика
     if (old.lir_sent !== undefined) merged.lir_sent = old.lir_sent;

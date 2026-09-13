@@ -80,7 +80,11 @@ export default function FlightRow({
     if (unread[field] && onAcknowledgeField) {
       onAcknowledgeField(flight.id, field);
     }
-    onUpdateFlight(flight.id, { [field]: value });
+    const updates = { [field]: value };
+    if (field === 'crew') {
+      updates.crew_manual = true;
+    }
+    onUpdateFlight(flight.id, updates);
   };
 
   // Изменение времени вылета -> авто-расчет времени выпуска (-40 мин)
@@ -712,7 +716,7 @@ export default function FlightRow({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-0.5 text-xs pt-0.5 border-t border-slate-200 dark:border-slate-800 items-center">
+          <div className="grid grid-cols-[1.15fr_1.15fr_0.7fr] gap-0.5 text-xs pt-0.5 border-t border-slate-200 dark:border-slate-800 items-center">
             <div>
               <span className="text-indigo-700 dark:text-indigo-400 text-[10px] font-extrabold block leading-none mb-0.5">DOW</span>
               <input
@@ -724,7 +728,7 @@ export default function FlightRow({
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-xs font-extrabold text-indigo-800 dark:text-indigo-200 text-center outline-none cursor-text"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-[11px] font-extrabold text-indigo-800 dark:text-indigo-200 text-center outline-none cursor-text tracking-tight"
               />
             </div>
             <div>
@@ -738,7 +742,7 @@ export default function FlightRow({
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-xs font-extrabold text-indigo-800 dark:text-indigo-200 text-center outline-none cursor-text"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-[11px] font-extrabold text-indigo-800 dark:text-indigo-200 text-center outline-none cursor-text tracking-tight"
               />
             </div>
             <div>
@@ -773,9 +777,10 @@ export default function FlightRow({
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
-          placeholder="—"
+          placeholder="MTOW"
           maxLength={6}
-          className="w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-0.5 py-0.5 text-center font-mono text-xs font-bold text-slate-900 dark:text-slate-200 outline-none cursor-text"
+          className="w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-0.5 py-0.5 text-center font-mono text-[11px] font-bold text-slate-900 dark:text-slate-200 placeholder:text-[9px] placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none cursor-text"
+          title="MTOW (Максимальная взлетная масса)"
         />
       </td>
       {/* 11. LIR */}
@@ -804,7 +809,7 @@ export default function FlightRow({
       </td>
 
       {/* 12. Груз */}
-      <td className={`py-1 px-0.5 text-center min-w-[75px] max-w-[95px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 text-center w-20 min-w-[70px] max-w-[85px] ${overdueBorderTopBottom}`}>
         <div className="flex flex-col items-center justify-center">
           <textarea
             rows={2}
@@ -848,7 +853,7 @@ export default function FlightRow({
       </td>
 
       {/* 14. Багаж */}
-      <td className={`py-1 px-0.5 min-w-[75px] max-w-[95px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 w-20 min-w-[70px] max-w-[85px] ${overdueBorderTopBottom}`}>
         <textarea
           rows={2}
           value={flight.baggage || ''}
@@ -959,7 +964,7 @@ export default function FlightRow({
       </td>
 
       {/* 19. Примечания */}
-      <td className={`py-1 px-1 w-[85px] min-w-[80px] max-w-[95px] overflow-hidden ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-1 w-[80px] min-w-[75px] max-w-[85px] overflow-hidden ${overdueBorderTopBottom}`}>
         <textarea
           rows={2}
           value={flight.notes || ''}
@@ -974,15 +979,15 @@ export default function FlightRow({
       </td>
 
       {/* 20. Действия */}
-      <td className={`py-1 px-1 text-center whitespace-nowrap no-print rounded-r-2xl w-[84px] min-w-[82px] max-w-[88px] ${
+      <td className={`py-1 px-1 text-center whitespace-nowrap no-print rounded-r-2xl w-[110px] min-w-[105px] max-w-[115px] ${
         isOverdue ? 'border-r-2 border-r-rose-500 border-t-2 border-b-2 border-rose-500' : 'border-r border-t border-b border-slate-200/80 dark:border-slate-800/80'
       }`}>
-        <div className="flex items-center justify-center gap-0.5 w-full">
+        <div className="flex items-center justify-center gap-1 w-full">
           {hasUnreadChanges && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
-              className="flex items-center justify-center gap-1 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black px-1.5 py-0.5 rounded shadow-xs transition-all active:scale-95 animate-pulse shrink-0 cursor-pointer"
+              className="flex items-center justify-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black px-1.5 py-0.5 rounded shadow-xs transition-all active:scale-95 animate-pulse shrink-0 cursor-pointer"
               title="Подтвердить ознакомление со всеми изменениями в этом рейсе"
             >
               <Check className="w-2.5 h-2.5 stroke-[3] text-amber-700 dark:text-amber-400" />
@@ -990,7 +995,7 @@ export default function FlightRow({
             </button>
           )}
 
-          <div className="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="flex items-center justify-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity shrink-0">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onOpenHistory?.(flight); }}

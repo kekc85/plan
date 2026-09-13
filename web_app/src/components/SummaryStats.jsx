@@ -3,7 +3,8 @@ import { Plane, CheckCircle2, Clock, CheckSquare, CheckCircle, ShieldCheck } fro
 
 export default function SummaryStats({ flights }) {
   const total = flights.length;
-  const prepared = flights.filter(f => f.status === 'prepared').length;
+  // В "Подготовлено" учитываются все рейсы, с которыми были взаимодействия (подготовлены, отправлен LIR, выпущены, закрыты)
+  const prepared = flights.filter(f => f.status !== 'pending' || f.lir_sent || f.szv_sent || f.ldm_sent).length;
   const lirSentCount = flights.filter(f => f.lir_sent).length;
   const released = flights.filter(f => f.status === 'released' || f.szv_sent).length;
   const closed = flights.filter(f => f.status === 'closed' || f.ldm_sent).length;

@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS `plan_flights` (
     `doi` VARCHAR(32) NULL,
     `galley` VARCHAR(16) DEFAULT 'D',
     `mtow` VARCHAR(32) NULL,
+    `crew_manual` TINYINT(1) DEFAULT 0,
     `lir_sent` TINYINT(1) DEFAULT 0,
     `cargo` VARCHAR(32) NULL,
     `mail` VARCHAR(32) NULL,
@@ -87,7 +88,10 @@ CREATE TABLE IF NOT EXISTS `plan_handover_logs` (
     `handover_time` VARCHAR(64) NOT NULL,
     `active_flights_count` INT NOT NULL DEFAULT 0,
     `transferred_flights_summary` TEXT NULL,
-    `notes` TEXT NULL
+    `notes` TEXT NULL,
+    `is_read` TINYINT(1) DEFAULT 0,
+    `read_at` VARCHAR(64) NULL,
+    `read_by` VARCHAR(128) NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------

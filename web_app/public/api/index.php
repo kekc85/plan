@@ -82,8 +82,11 @@ function getDb() {
                 "ALTER TABLE plan_flights ADD COLUMN inbound_landing_time VARCHAR(16) NULL",
                 "ALTER TABLE plan_flights ADD COLUMN outbound_takeoff_time VARCHAR(16) NULL",
                 "ALTER TABLE plan_flights ADD COLUMN plane_status VARCHAR(32) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN updated_by VARCHAR(128) NULL",
-                "ALTER TABLE plan_shifts ADD COLUMN deleted_flights TEXT NULL"
+                "ALTER TABLE plan_flights ADD COLUMN crew_manual TINYINT(1) DEFAULT 0",
+                "ALTER TABLE plan_shifts ADD COLUMN deleted_flights TEXT NULL",
+                "ALTER TABLE plan_handover_logs ADD COLUMN is_read TINYINT(1) DEFAULT 0",
+                "ALTER TABLE plan_handover_logs ADD COLUMN read_at VARCHAR(64) NULL",
+                "ALTER TABLE plan_handover_logs ADD COLUMN read_by VARCHAR(128) NULL"
             ];
             foreach ($migrations as $mSql) {
                 try {
@@ -955,10 +958,14 @@ if ($route === '/shift/current') {
         $handoverData = null;
         if ($lastHandover) {
             $handoverData = [
+                'id' => (int)$lastHandover['id'],
                 'handed_over_by' => $lastHandover['handed_over_by'],
                 'accepted_by' => $lastHandover['accepted_by'],
                 'handover_time' => $lastHandover['handover_time'],
-                'notes' => $lastHandover['notes'] ?? ''
+                'notes' => $lastHandover['notes'] ?? '',
+                'is_read' => !empty($lastHandover['is_read']),
+                'read_at' => $lastHandover['read_at'] ?? null,
+                'read_by' => $lastHandover['read_by'] ?? null
             ];
         }
 
@@ -1005,6 +1012,7 @@ if ($route === '/shift/current') {
             'doi' => (string)($r['doi'] ?? ''),
             'galley' => (string)($r['galley'] ?? 'D'),
             'mtow' => (string)($r['mtow'] ?? ''),
+            'crew_manual' => !empty($r['crew_manual']),
             'lir_sent' => (bool)$r['lir_sent'],
             'cargo' => (string)($r['cargo'] ?? ''),
             'mail' => (string)($r['mail'] ?? ''),
@@ -1065,6 +1073,20 @@ if ($route === '/shift/save') {
             $ins = $db->prepare("INSERT INTO plan_shifts (date_interval, dispatcher_name, started_at, status, deleted_flights, created_at) VALUES (?, ?, ?, 'active', ?, ?)");
             $ins->execute([$dateInterval, $dispatcher, $nowStr, $deletedFlightsJson, $nowStr]);
             $shiftId = $db->lastInsertId();
+        }
+
+        // Обновление статуса прочтения замечаний по смене при необходимости
+        if (!empty($shiftInfo['handover']) && is_array($shiftInfo['handover']) && !empty($shiftInfo['handover']['is_read'])) {
+            $readAt = $shiftInfo['handover']['read_at'] ?? $nowStr;
+            $readBy = $shiftInfo['handover']['read_by'] ?? $dispatcher;
+            $handoverId = $shiftInfo['handover']['id'] ?? null;
+            if ($handoverId) {
+                $updHandover = $db->prepare("UPDATE plan_handover_logs SET is_read = 1, read_at = ?, read_by = ? WHERE id = ?");
+                $updHandover->execute([$readAt, $readBy, $handoverId]);
+            } else {
+                $updHandover = $db->prepare("UPDATE plan_handover_logs SET is_read = 1, read_at = ?, read_by = ? WHERE id = (SELECT id FROM (SELECT id FROM plan_handover_logs ORDER BY id DESC LIMIT 1) as t)");
+                $updHandover->execute([$readAt, $readBy]);
+            }
         }
 
         // 1. Извлекаем текущее состояние рейсов для аудита изменений (Flight Audit Trail)
@@ -1166,7 +1188,7 @@ if ($route === '/shift/save') {
             INSERT INTO plan_flights (
                 id, shift_id, flight_number, flight_date, route_city, route_airports,
                 departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
-                fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow,
+                fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow, crew_manual,
                 lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
                 status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
                 inbound_landing_calc, inbound_landing_time, outbound_takeoff_time,
@@ -1174,7 +1196,7 @@ if ($route === '/shift/save') {
             ) VALUES (
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
                 ?, ?, ?,
@@ -1206,6 +1228,7 @@ if ($route === '/shift/save') {
                 (string)($f['doi'] ?? ''),
                 (string)($f['galley'] ?? 'D'),
                 (string)($f['mtow'] ?? ''),
+                !empty($f['crew_manual']) ? 1 : 0,
                 !empty($f['lir_sent']) ? 1 : 0,
                 (string)($f['cargo'] ?? ''),
                 (string)($f['mail'] ?? ''),
@@ -1272,15 +1295,11 @@ if ($route === '/shift/smart_merge') {
     $incoming = $input['incoming_flights'] ?? [];
 
     $existingMap = [];
-    $existingByFlight = [];
     foreach ($current as $f) {
         $flightClean = strtoupper(str_replace(['-', ' '], '', trim($f['flight'] ?? '')));
         $flightDate = trim($f['flight_date'] ?? '');
         $key = "{$flightClean}_{$flightDate}";
         $existingMap[$key] = $f;
-        if (!empty($flightClean) && !isset($existingByFlight[$flightClean])) {
-            $existingByFlight[$flightClean] = $f;
-        }
     }
 
     $merged = [];
@@ -1289,7 +1308,7 @@ if ($route === '/shift/smart_merge') {
         $flightClean = strtoupper(str_replace(['-', ' '], '', trim($inc['flight'] ?? '')));
         $flightDate = trim($inc['flight_date'] ?? '');
         $key = "{$flightClean}_{$flightDate}";
-        $old = $existingMap[$key] ?? $existingByFlight[$flightClean] ?? null;
+        $old = $existingMap[$key] ?? null;
 
         if ($old !== null) {
             $item = $inc;
@@ -1306,6 +1325,12 @@ if ($route === '/shift/smart_merge') {
                 if (isset($old[$field]) && $old[$field] !== '') {
                     $item[$field] = $old[$field];
                 }
+            }
+
+            // 1.1. Сохраняем ручной экипаж
+            if (!empty($old['crew_manual'])) {
+                $item['crew'] = $old['crew'] ?? $inc['crew'];
+                $item['crew_manual'] = true;
             }
 
             // 2. Выявляем изменения в оперативных полях AviaBit

@@ -120,6 +120,7 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
 
     const newFlight = {
       id: `fl_manual_${Date.now()}`,
+      crew_manual: true,
       ...formData
     };
 
