@@ -54,13 +54,15 @@ export default function Header({
   isSyncing = false,
   lastSyncTime = '',
   unreadChangesCount = 0,
-  onAcknowledgeAll
+  onAcknowledgeAll,
+  timeMode: externalTimeMode,
+  onTimeModeChange
 }) {
   const [utcTime, setUtcTime] = useState('');
   const [mskTime, setMskTime] = useState('');
   const [utcDateStr, setUtcDateStr] = useState('');
   const [mskDateStr, setMskDateStr] = useState('');
-  const [timeMode, setTimeMode] = useState(() => {
+  const [internalTimeMode, setInternalTimeMode] = useState(() => {
     try {
       return localStorage.getItem('aeroplan_time_mode') || 'MSK';
     } catch (e) {
@@ -68,8 +70,13 @@ export default function Header({
     }
   });
 
+  const timeMode = externalTimeMode || internalTimeMode;
+
   const handleSetTimeMode = (mode) => {
-    setTimeMode(mode);
+    setInternalTimeMode(mode);
+    if (onTimeModeChange) {
+      onTimeModeChange(mode);
+    }
     try {
       localStorage.setItem('aeroplan_time_mode', mode);
     } catch (e) {}

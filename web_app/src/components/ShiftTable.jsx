@@ -24,7 +24,8 @@ export default function ShiftTable({
   onAcknowledgeField,
   onAcknowledgeFlight,
   onOpenHistory,
-  onAddFlight
+  onAddFlight,
+  timeMode = 'MSK'
 }) {
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -58,7 +59,7 @@ export default function ShiftTable({
               <th className="sticky top-0 left-[28px] z-40 bg-slate-100 dark:bg-slate-900 py-2 px-0.5 font-extrabold tracking-wider uppercase w-[74px] min-w-[72px] max-w-[76px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] text-center">№ Рейса</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 font-extrabold tracking-wider uppercase min-w-[85px] max-w-[105px] shadow-sm text-center">Маршрут</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[78px] max-w-[84px] text-amber-700 dark:text-amber-300 shadow-sm">
-                Время<br/>
+                Время ({timeMode})<br/>
                 <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">Вып (-40)</span> / <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400">Вылет</span>
               </th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 min-w-[54px] max-w-[58px] shadow-sm">
@@ -71,12 +72,12 @@ export default function ShiftTable({
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[158px] min-w-[158px] max-w-[158px] text-sky-800 dark:text-sky-300 shadow-sm">Топливо и Веса<br/><span className="text-[9px] font-medium text-slate-500">Block / Trip / Taxi / DOW / DOI / Кухня</span></th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 min-w-[54px] max-w-[58px] shadow-sm">MTOW</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-11 min-w-[42px] max-w-[46px] text-indigo-700 dark:text-indigo-300 shadow-sm">LIR</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-16 min-w-[60px] max-w-[70px] shadow-sm">Груз</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[84px] min-w-[80px] max-w-[92px] shadow-sm">Груз</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[44px] max-w-[52px] shadow-sm">Почта</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 font-extrabold tracking-wider uppercase w-16 min-w-[60px] max-w-[70px] shadow-sm">Багаж</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-amber-700 dark:text-amber-300 shadow-sm">СЗВ</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-emerald-700 dark:text-emerald-300 shadow-sm">LDM</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase min-w-[62px] max-w-[70px] text-teal-700 dark:text-teal-300 shadow-sm">Астра (REN)<br/><span className="text-[9px] font-medium text-slate-500">Времена</span></th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-teal-700 dark:text-teal-300 shadow-sm">Астра<br/><span className="text-[9px] font-medium text-slate-500">Времена</span></th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[120px] min-w-[115px] max-w-[124px] shadow-sm">Статус</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 font-extrabold tracking-wider uppercase w-[75px] min-w-[70px] max-w-[80px] shadow-sm">Примечания</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 pr-2 text-center font-extrabold tracking-wider uppercase w-[120px] min-w-[115px] max-w-[125px] no-print shadow-sm">Действия</th>
@@ -109,6 +110,7 @@ export default function ShiftTable({
                       onOpenHistory={onOpenHistory}
                       isFirst={index === 0}
                       isLast={index === flights.length - 1}
+                      timeMode={timeMode}
                     />
                   ))
                 ) : (

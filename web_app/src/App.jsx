@@ -24,6 +24,7 @@ import {
   normalizePlaneType,
   detectPlaneType
 } from './utils/validators';
+import { shiftTimeByHours } from './utils/timeZoneUtils';
 import { 
   getStoredUser, 
   authGetMe, 
@@ -159,6 +160,22 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [lastSaved, setLastSaved] = useState('');
+
+  // Глобальный режим времени: 'MSK' (UTC+3) или 'UTC' (ZULU)
+  const [timeMode, setTimeMode] = useState(() => {
+    try {
+      return localStorage.getItem('aeroplan_time_mode') || 'MSK';
+    } catch (e) {
+      return 'MSK';
+    }
+  });
+
+  const handleTimeModeChange = (mode) => {
+    setTimeMode(mode);
+    try {
+      localStorage.setItem('aeroplan_time_mode', mode);
+    } catch (e) {}
+  };
 
   // Состояние умной авто-подкачки AviaBit (Smart Delta Polling)
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => {
@@ -971,6 +988,8 @@ export default function App() {
         lastSyncTime={lastSyncTime}
         unreadChangesCount={unreadChangesCount}
         onAcknowledgeAll={handleAcknowledgeAll}
+        timeMode={timeMode}
+        onTimeModeChange={handleTimeModeChange}
       />
 
       {/* Main Content Area */}
@@ -1068,6 +1087,7 @@ export default function App() {
           onAcknowledgeFlight={handleAcknowledgeFlight}
           onOpenHistory={handleOpenFlightHistory}
           onAddFlight={() => setIsAddModalOpen(true)}
+          timeMode={timeMode}
         />
       </main>
 
@@ -1083,7 +1103,7 @@ export default function App() {
                 <div className="p-2 rounded-lg bg-amber-600 dark:bg-amber-500/20 text-white dark:text-amber-400">
                   <Bell className="w-5 h-5 animate-bounce" />
                 </div>
-                <span>ВРЕМЯ ВЫПУСКА РЕЙСА!</span>
+                <span>ВРЕМЯ ВЫПУСКА РЕЙСА! ({timeMode})</span>
               </div>
               <div className="flex items-center gap-1">
                 <button
@@ -1105,8 +1125,8 @@ export default function App() {
             <div className="text-xs text-amber-950 dark:text-slate-200 bg-white/60 dark:bg-slate-800/80 p-2.5 rounded-lg border border-amber-300 dark:border-slate-700 leading-snug">
               Пора выпускать рейс <strong className="text-sm font-mono text-sky-700 dark:text-sky-400">{activeAlert.flight}</strong> ({activeAlert.route_city || ''} {activeAlert.route_airports || ''}).
               <div className="flex items-center gap-3 mt-1.5 font-mono text-xs">
-                <span>Выпуск: <strong className="text-emerald-700 dark:text-emerald-400">{activeAlert.release_time}</strong></span>
-                <span>Вылет: <strong className="text-amber-700 dark:text-amber-400">{activeAlert.time}</strong></span>
+                <span>Выпуск: <strong className="text-emerald-700 dark:text-emerald-400">{timeMode === 'UTC' ? shiftTimeByHours(activeAlert.release_time, -3) : activeAlert.release_time}</strong></span>
+                <span>Вылет: <strong className="text-amber-700 dark:text-amber-400">{timeMode === 'UTC' ? shiftTimeByHours(activeAlert.time, -3) : activeAlert.time}</strong></span>
               </div>
             </div>
 
@@ -1185,6 +1205,7 @@ export default function App() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAdd={handleAddFlight}
+        timeMode={timeMode}
       />
 
       {/* Модальное окно скачивания руководства пользователя */}

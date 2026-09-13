@@ -20,6 +20,12 @@ import {
   detectPlaneType
 } from '../utils/validators';
 import { getSafeUnreadChanges, TRACKED_AVIABIT_FIELDS } from '../utils/deltaSync';
+import { 
+  getDisplayFlightTimes, 
+  convertUtcToMsk, 
+  shiftTimeByHours,
+  shiftDateByDays 
+} from '../utils/timeZoneUtils';
 
 // Компактный бейдж для подтверждения изменившегося параметра
 function ChangeBadge({ change, onAcknowledge }) {
@@ -52,7 +58,8 @@ export default function FlightRow({
   onAcknowledgeFlight,
   onOpenHistory,
   isFirst,
-  isLast
+  isLast,
+  timeMode = 'MSK'
 }) {
   const {
     attributes,
@@ -63,6 +70,10 @@ export default function FlightRow({
     isDragging
   } = useSortable({ id: flight.id });
 
+  // Временные поля рейса с учетом активного часового пояса (МСК или UTC)
+  const displayTimes = getDisplayFlightTimes(flight, timeMode);
+
+  // Непрочитанные изменения
   const unread = getSafeUnreadChanges(flight);
   const unreadCount = Object.keys(unread).filter(
     k => (TRACKED_AVIABIT_FIELDS.includes(k) && k !== 'release_time') || k === '_is_new'
@@ -79,13 +90,13 @@ export default function FlightRow({
   };
 
   const handleCellChange = (field, value) => {
-    // При ручном редактировании поля диспетчером автоматически снимаем подсветку с этого поля
-    if (unread[field] && onAcknowledgeField) {
-      onAcknowledgeField(flight.id, field);
-    }
     const updates = { [field]: value };
     if (field === 'crew') {
       updates.crew_manual = true;
+    }
+    // При ручном редактировании поля диспетчером автоматически снимаем подсветку с этого поля
+    if (unread[field] && onAcknowledgeField) {
+      onAcknowledgeField(flight.id, field);
     }
     onUpdateFlight(flight.id, updates);
   };
@@ -94,10 +105,26 @@ export default function FlightRow({
   const handleDepartureTimeChange = (e) => {
     const rawVal = e.target.value;
     const formatted = formatValidTime(rawVal);
-    const updates = { time: formatted };
+    let mskTime = formatted;
+    let mskRelTime = '';
 
-    if (formatted.length === 5 && formatted.includes(':')) {
-      updates.release_time = calcReleaseTime(formatted);
+    if (timeMode === 'UTC') {
+      if (formatted.length === 5 && formatted.includes(':')) {
+        const converted = convertUtcToMsk(formatted, flight.flight_date);
+        mskTime = converted.time;
+        mskRelTime = calcReleaseTime(mskTime);
+      } else {
+        mskTime = formatted;
+      }
+    } else {
+      if (formatted.length === 5 && formatted.includes(':')) {
+        mskRelTime = calcReleaseTime(formatted);
+      }
+    }
+
+    const updates = { time: mskTime };
+    if (mskRelTime) {
+      updates.release_time = mskRelTime;
     }
     if (unread['time'] && onAcknowledgeField) {
       onAcknowledgeField(flight.id, 'time');
@@ -122,7 +149,27 @@ export default function FlightRow({
   const handleReleaseTimeChange = (e) => {
     const rawVal = e.target.value;
     const formatted = formatValidTime(rawVal);
-    handleCellChange('release_time', formatted);
+    let mskRelease = formatted;
+    if (timeMode === 'UTC' && formatted.length === 5 && formatted.includes(':')) {
+      mskRelease = shiftTimeByHours(formatted, 3);
+    }
+    handleCellChange('release_time', mskRelease);
+  };
+
+  // Изменение даты рейса с учетом часового пояса
+  const handleFlightDateChange = (rawDate) => {
+    const formatted = formatValidDayMonth(rawDate);
+    let mskDate = formatted;
+    if (timeMode === 'UTC' && formatted.length >= 4) {
+      const flTime = flight.time || '';
+      if (flTime.includes(':')) {
+        const [h] = flTime.split(':').map(Number);
+        if (!isNaN(h) && h < 3) {
+          mskDate = shiftDateByDays(formatted, 1);
+        }
+      }
+    }
+    handleCellChange('flight_date', mskDate);
   };
 
   // Изменение бортового номера (с интеллектуальным определением типа ВС, если еще не задан)
@@ -426,11 +473,11 @@ export default function FlightRow({
             );
 
             if (status === 'departed' || flight.outbound_takeoff_time) {
-              const t = flight.outbound_takeoff_time || '';
+              const t = displayTimes.outbound_takeoff_time || '';
               return (
                 <div
                   className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-blue-500/15 dark:bg-blue-950/60 border border-blue-400/50 text-blue-700 dark:text-blue-300 text-[9px] font-extrabold tracking-tight leading-none w-full max-w-[105px] truncate cursor-default shadow-xs"
-                  title={`Борт вылетел из ${dep}${t ? ' в ' + t : ''}. Рейс отправлен.`}
+                  title={`Борт вылетел из ${dep}${t ? ' в ' + t + ` (${timeMode})` : ''}. Рейс отправлен.`}
                 >
                   <span className="text-[10px]">🛫</span>
                   <span className="truncate">ВЫЛЕТ {dep}{t ? ' ' + t : ''}</span>
@@ -439,11 +486,11 @@ export default function FlightRow({
             }
 
             if (status === 'landed' || flight.inbound_landing_time) {
-              const t = flight.inbound_landing_time || '';
+              const t = displayTimes.inbound_landing_time || '';
               return (
                 <div
                   className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-emerald-500/20 dark:bg-emerald-950/70 border-2 border-emerald-500 text-emerald-900 dark:text-emerald-100 text-[9px] font-black tracking-tight leading-none shadow-sm w-full max-w-[105px] truncate cursor-default ring-1 ring-emerald-500/40"
-                  title={`БОРТ СЕЛ В ${dep}${t ? ' в ' + t : ''}! Запросите трип-инфо у экипажа.`}
+                  title={`БОРТ СЕЛ В ${dep}${t ? ' в ' + t + ` (${timeMode})` : ''}! Запросите трип-инфо у экипажа.`}
                 >
                   <span className="text-[10px]">🛬</span>
                   <span className="truncate">СЕЛ В {dep}{t ? ' ' + t : ''}</span>
@@ -452,12 +499,12 @@ export default function FlightRow({
             }
 
             if (status === 'inbound_flying' || flight.inbound_takeoff_time) {
-              const calcT = flight.inbound_landing_calc ? ` (~${flight.inbound_landing_calc})` : '';
+              const calcT = displayTimes.inbound_landing_calc ? ` (~${displayTimes.inbound_landing_calc})` : '';
               const fromStr = flight.inbound_dep ? `из ${flight.inbound_dep}` : '';
               return (
                 <div
                   className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-amber-500/15 dark:bg-amber-950/60 border border-amber-500/40 text-amber-800 dark:text-amber-200 text-[9px] font-bold tracking-tight leading-none w-full max-w-[105px] truncate cursor-default animate-pulse"
-                  title={`Борт в воздухе: летит ${fromStr} в ${dep}${calcT ? ', расчетная посадка' + calcT : ''}`}
+                  title={`Борт в воздухе: летит ${fromStr} в ${dep}${calcT ? ', расчетная посадка' + calcT + ` (${timeMode})` : ''}`}
                 >
                   <span className="text-[10px]">✈️</span>
                   <span className="truncate">В пути к {dep}{calcT}</span>
@@ -466,7 +513,7 @@ export default function FlightRow({
             }
 
             if (status === 'other_flying') {
-              const calcT = flight.inbound_landing_calc ? ` (~${flight.inbound_landing_calc})` : '';
+              const calcT = displayTimes.inbound_landing_calc ? ` (~${displayTimes.inbound_landing_calc})` : '';
               const otherFl = flight.inbound_flight || '';
               const targetCity = flight.inbound_dep || '';
               return (
@@ -515,7 +562,7 @@ export default function FlightRow({
             </span>
             <input
               type="text"
-              value={flight.release_time || ''}
+              value={displayTimes.release_time || ''}
               onChange={handleReleaseTimeChange}
               onFocus={(e) => e.target.select()}
               onPointerDown={(e) => e.stopPropagation()}
@@ -527,7 +574,7 @@ export default function FlightRow({
                   ? 'text-rose-900 dark:text-rose-100 focus:ring-rose-500 font-black'
                   : 'text-emerald-700 dark:text-emerald-300 focus:ring-emerald-500'
               }`}
-              title={isOverdue ? 'ВНИМАНИЕ: Срок выпуска рейса истек! Выполните выпуск.' : 'Время выпуска (за 40 мин до вылета)'}
+              title={isOverdue ? 'ВНИМАНИЕ: Срок выпуска рейса истек! Выполните выпуск.' : `Время выпуска (-40 мин) [${timeMode}]`}
             />
           </div>
 
@@ -537,7 +584,7 @@ export default function FlightRow({
               <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase leading-none">ВЫЛ:</span>
               <input
                 type="text"
-                value={flight.time || ''}
+                value={displayTimes.time || ''}
                 onChange={handleDepartureTimeChange}
                 onBlur={handleDepartureTimeBlur}
                 onKeyDown={handleDepartureTimeKeyDown}
@@ -546,7 +593,7 @@ export default function FlightRow({
                 onMouseDown={(e) => e.stopPropagation()}
                 placeholder="00:00"
                 className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-amber-500 rounded px-0.5 text-center font-mono font-black text-[13px] text-amber-700 dark:text-amber-300 outline-none w-12 cursor-text ${getChangedStyle('time')}`}
-                title="Время вылета (МСК) — нажмите Enter или смените поле для авто-сортировки"
+                title={`Время вылета (${timeMode}) — нажмите Enter или смените поле для авто-сортировки`}
               />
             </div>
             <ChangeBadge change={unread.time} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'time')} />
@@ -556,8 +603,8 @@ export default function FlightRow({
           <div className="flex flex-col items-center justify-center w-full border-t border-slate-200 dark:border-slate-800 pt-0.5">
             <input
               type="text"
-              value={flight.flight_date || ''}
-              onChange={(e) => handleCellChange('flight_date', formatValidDayMonth(e.target.value))}
+              value={displayTimes.flight_date || ''}
+              onChange={(e) => handleFlightDateChange(e.target.value)}
               onBlur={() => onUpdateFlight(flight.id, {}, true)}
               onFocus={(e) => e.target.select()}
               onPointerDown={(e) => e.stopPropagation()}
@@ -571,7 +618,7 @@ export default function FlightRow({
               placeholder="25.08"
               maxLength={5}
               className={`bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 focus:bg-white dark:focus:bg-slate-800 border border-sky-200 dark:border-sky-800/80 focus:ring-1 focus:ring-sky-500 rounded px-0.5 text-center font-mono font-extrabold text-[11px] text-sky-800 dark:text-sky-300 outline-none w-12 cursor-text tracking-wide ${getChangedStyle('flight_date')}`}
-              title="Дата рейса (число.месяц)"
+              title={`Дата рейса (${timeMode})`}
             />
             <ChangeBadge change={unread.flight_date} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'flight_date')} />
           </div>
@@ -817,7 +864,7 @@ export default function FlightRow({
       </td>
 
       {/* 12. Груз */}
-      <td className={`py-1 px-0.5 text-center w-16 min-w-[60px] max-w-[70px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 text-center w-[84px] min-w-[80px] max-w-[92px] ${overdueBorderTopBottom}`}>
         <div className="flex flex-col items-center justify-center">
           <textarea
             rows={2}
@@ -926,7 +973,7 @@ export default function FlightRow({
       </td>
 
       {/* 17. ВРЕМЕНА В ASTRA (Строго для рейсов вылетающих из REN Оренбург) */}
-      <td className={`py-1 px-0.5 text-center whitespace-nowrap min-w-[62px] max-w-[70px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 text-center whitespace-nowrap w-12 min-w-[48px] max-w-[52px] ${overdueBorderTopBottom}`}>
         {isRen ? (
           <button
             type="button"
@@ -935,19 +982,19 @@ export default function FlightRow({
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             tabIndex={0}
-            className={`flex items-center justify-center gap-0.5 px-1 py-1 rounded border text-[11px] font-extrabold transition-all focus:outline-none focus:ring-1 focus:ring-teal-400 shadow-sm w-full ${
+            className={`flex items-center justify-center gap-0.5 px-0.5 py-1 rounded border text-[10px] font-extrabold transition-all focus:outline-none focus:ring-1 focus:ring-teal-400 shadow-sm w-full ${
               flight.astra_times_sent
                 ? 'bg-teal-600 text-white border-teal-700 dark:bg-teal-500/30 dark:text-teal-200 dark:border-teal-400'
                 : 'bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border-teal-400/60 dark:border-teal-600/50 hover:bg-teal-100/70 hover:border-teal-500 animate-pulse'
             }`}
             title="Для рейса из Оренбурга (REN) необходимо вручную проставить время движения и взлёта в Astra!"
           >
-            <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${
+            <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border shrink-0 ${
               flight.astra_times_sent ? 'bg-white text-teal-700 border-white' : 'border-teal-500 dark:border-teal-400 bg-white dark:bg-slate-900'
             }`}>
               {flight.astra_times_sent && <Check className="w-2.5 h-2.5 stroke-[3]" />}
             </div>
-            <span>Времена</span>
+            <span className="truncate tracking-tighter">Врем.</span>
           </button>
         ) : (
           <span className="text-slate-300 dark:text-slate-700 font-mono text-xs select-none">—</span>

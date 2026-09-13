@@ -12,8 +12,9 @@ import {
   normalizePlaneType,
   detectPlaneType
 } from '../utils/validators';
+import { convertUtcToMsk, shiftTimeByHours } from '../utils/timeZoneUtils';
 
-export default function NewFlightModal({ isOpen, onClose, onAdd }) {
+export default function NewFlightModal({ isOpen, onClose, onAdd, timeMode = 'MSK' }) {
   const [formData, setFormData] = useState({
     flight: '',
     flight_date: '',
@@ -118,10 +119,18 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
       return;
     }
 
+    let finalData = { ...formData };
+    if (timeMode === 'UTC' && formData.time) {
+      const msk = convertUtcToMsk(formData.time, formData.flight_date);
+      finalData.time = msk.time;
+      if (msk.date) finalData.flight_date = msk.date;
+      finalData.release_time = calcReleaseTime(msk.time, 40);
+    }
+
     const newFlight = {
       id: `fl_manual_${Date.now()}`,
       crew_manual: true,
-      ...formData
+      ...finalData
     };
 
     onAdd(newFlight);
@@ -138,34 +147,34 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
             <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
               <Plane className="w-4 h-4" />
             </div>
-            <span>Добавление рейса в смену</span>
+            <span>Добавить рейс вручную</span>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Compact Form */}
-        <form onSubmit={handleSubmit} className="space-y-2.5 text-xs">
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3 text-xs">
           
-          {/* Row 1: Рейс, Число, Город, DEP-ARR, Выпуск, Вылет */}
-          <div className="grid grid-cols-6 gap-2">
+          {/* Row 1: Рейс, Дата, Маршрут, Выпуск, Вылет */}
+          <div className="grid grid-cols-5 gap-2">
             <div>
-              <label className="block text-slate-700 dark:text-slate-300 font-bold mb-0.5">№ Рейса *</label>
+              <label className="block text-slate-600 dark:text-slate-400 mb-0.5 font-bold">№ Рейса *</label>
               <input
                 type="text"
+                required
                 value={formData.flight}
                 onChange={handleFlightInput}
-                placeholder="N41402"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-1 text-slate-900 dark:text-white font-mono font-bold text-sm focus:border-sky-500 focus:outline-none"
-                required
+                placeholder="N41442"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-1 text-slate-900 dark:text-white font-mono font-bold uppercase focus:border-sky-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-sky-600 dark:text-sky-400 font-bold mb-0.5">Дата (ДД.ММ)</label>
+              <label className="block text-slate-600 dark:text-slate-400 mb-0.5 font-bold">Дата</label>
               <input
                 type="text"
                 value={formData.flight_date}
@@ -176,17 +185,7 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
               />
             </div>
             <div>
-              <label className="block text-slate-600 dark:text-slate-400 mb-0.5 font-bold">Город</label>
-              <input
-                type="text"
-                value={formData.route_city}
-                onChange={(e) => setFormData(prev => ({ ...prev, route_city: e.target.value }))}
-                placeholder="Москва"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-1 text-slate-900 dark:text-white focus:border-sky-500 focus:outline-none font-semibold"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-600 dark:text-slate-400 mb-0.5 font-bold">DEP-ARR</label>
+              <label className="block text-slate-600 dark:text-slate-400 mb-0.5 font-bold">Маршрут</label>
               <input
                 type="text"
                 value={formData.route_airports}
@@ -206,7 +205,7 @@ export default function NewFlightModal({ isOpen, onClose, onAdd }) {
               />
             </div>
             <div>
-              <label className="block text-amber-600 dark:text-amber-400 font-bold mb-0.5">Вылет (МСК)</label>
+              <label className="block text-amber-600 dark:text-amber-400 font-bold mb-0.5">Вылет ({timeMode})</label>
               <input
                 type="text"
                 value={formData.time}
