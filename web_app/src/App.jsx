@@ -779,22 +779,25 @@ export default function App() {
     hasUserModifiedRef.current = true;
     const normalized = sortFlightsChronologically(loadedFlights.map(normalizeFlight));
     setFlights(normalized);
-    setDeletedFlightKeys([]);
+
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     setLastSyncTime(timeStr);
     lastSyncTimestampRef.current = Date.now();
 
+    const currentDeleted = Array.isArray(deletedFlightKeysRef.current) && deletedFlightKeysRef.current.length > 0
+      ? deletedFlightKeysRef.current
+      : (Array.isArray(deletedFlightKeys) ? deletedFlightKeys : (shiftInfo?.deleted_flights || []));
+
     const updatedShift = {
       ...(newShiftInfo ? { ...shiftInfo, ...newShiftInfo } : shiftInfo),
-      deleted_flights: []
+      deleted_flights: currentDeleted
     };
     setShiftInfo(updatedShift);
     try {
       localStorage.setItem(`${STORAGE_KEY}_flights`, JSON.stringify(normalized));
       localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(updatedShift));
       localStorage.setItem(`${STORAGE_KEY}_last_sync_time`, timeStr);
-      localStorage.removeItem(`${STORAGE_KEY}_deleted_flights`);
     } catch (e) {}
 
     // Мгновенное сохранение в базу данных
@@ -886,20 +889,51 @@ export default function App() {
   };
 
   // Передача смены
-  const handleHandoverSuccess = (newDispatcherName, archiveClosed, handoverData) => {
+  const handleHandoverSuccess = async (newDispatcherName, archiveClosed, handoverData) => {
     hasUserModifiedRef.current = true;
-    setDeletedFlightKeys([]);
-    localStorage.removeItem(`${STORAGE_KEY}_deleted_flights`);
-    setShiftInfo(prev => ({
-      ...prev,
+
+    // Собираем ключи закрытых рейсов для гарантированного исключения при повторной подгрузке
+    let currentDeleted = Array.isArray(deletedFlightKeysRef.current) && deletedFlightKeysRef.current.length > 0
+      ? [...deletedFlightKeysRef.current]
+      : (Array.isArray(deletedFlightKeys) ? [...deletedFlightKeys] : []);
+
+    let activeFlights = [...flights];
+
+    if (archiveClosed) {
+      const closedFlights = flights.filter(f => f.status === 'closed');
+      const closedKeys = [];
+      closedFlights.forEach(f => {
+        const variants = getFlightKeyVariants(f);
+        closedKeys.push(...variants);
+      });
+      currentDeleted = Array.from(new Set([...currentDeleted, ...closedKeys]));
+      activeFlights = flights.filter(f => f.status !== 'closed');
+    }
+
+    setDeletedFlightKeys(currentDeleted);
+    deletedFlightKeysRef.current = currentDeleted;
+    try {
+      localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify(currentDeleted));
+    } catch (e) {}
+
+    const updatedShift = {
+      ...shiftInfo,
       dispatcher: newDispatcherName,
-      handover: handoverData || prev.handover,
-      deleted_flights: []
-    }));
+      handover: handoverData || shiftInfo?.handover,
+      deleted_flights: currentDeleted
+    };
+
+    setShiftInfo(updatedShift);
+    setFlights(activeFlights);
     localStorage.removeItem(`${STORAGE_KEY}_dismissed_handover_note`);
     setIsHandoverNotesDismissed(false);
-    if (archiveClosed) {
-      setFlights(prev => prev.filter(f => f.status !== 'closed'));
+
+    try {
+      localStorage.setItem(`${STORAGE_KEY}_flights`, JSON.stringify(activeFlights));
+      localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(updatedShift));
+      await saveShift(updatedShift, activeFlights);
+    } catch (e) {
+      console.warn('Error saving shift after handover:', e);
     }
   };
 
@@ -1193,6 +1227,7 @@ export default function App() {
         onClose={() => setIsAviaBitModalOpen(false)}
         onScheduleLoaded={handleAviaBitScheduleLoaded}
         currentFlights={flights}
+        deletedFlightKeys={deletedFlightKeysRef.current || deletedFlightKeys}
         airports={departureAirports}
         onOpenAirportsModal={() => setIsAirportsModalOpen(true)}
       />

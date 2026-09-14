@@ -1428,14 +1428,49 @@ if ($route === '/shift/handover') {
         $notes
     ]);
 
-    $activeShift = $db->query("SELECT id, date_interval FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1")->fetch();
+    $activeShift = $db->query("SELECT id, date_interval, deleted_flights FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1")->fetch();
     $shiftId = null;
     $shiftDateInterval = date('d.m.Y');
+    $existingDeleted = [];
     if ($activeShift) {
         $shiftId = $activeShift['id'];
         $shiftDateInterval = $activeShift['date_interval'] ?: date('d.m.Y');
-        $upd = $db->prepare("UPDATE plan_shifts SET dispatcher_name = ? WHERE id = ?");
-        $upd->execute([$acceptedBy, $shiftId]);
+        if (!empty($activeShift['deleted_flights'])) {
+            $parsed = json_decode($activeShift['deleted_flights'], true);
+            if (is_array($parsed)) $existingDeleted = $parsed;
+        }
+    }
+
+    $closedFlightKeys = [];
+    if ($archiveClosed) {
+        foreach ($allFlights as $f) {
+            if (($f['status'] ?? '') === 'closed') {
+                $flNum = $f['flight_number'] ?? '';
+                $flDate = $f['flight_date'] ?? '';
+                if ($flNum) {
+                    $flClean = strtoupper(str_replace(['-', ' '], '', $flNum));
+                    $closedFlightKeys[] = $flClean;
+                    $digits = preg_replace('/\D/', '', $flClean);
+                    if ($digits) {
+                        $closedFlightKeys[] = "NUM_{$digits}";
+                        $closedFlightKeys[] = $digits;
+                    }
+                    if ($flDate) {
+                        $closedFlightKeys[] = "{$flClean}_{$flDate}";
+                        if ($digits) {
+                            $closedFlightKeys[] = "NUM_{$digits}_{$flDate}";
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    $mergedDeleted = array_values(array_unique(array_merge($existingDeleted, $closedFlightKeys)));
+
+    if ($shiftId) {
+        $upd = $db->prepare("UPDATE plan_shifts SET dispatcher_name = ?, deleted_flights = ? WHERE id = ?");
+        $upd->execute([$acceptedBy, json_encode($mergedDeleted, JSON_UNESCAPED_UNICODE), $shiftId]);
     }
 
     // Создаем архивный снимок до удаления закрытых рейсов
@@ -1478,7 +1513,9 @@ if ($route === '/shift/handover') {
         'success' => true,
         'message' => "Смена передана диспетчеру $acceptedBy",
         'active_flights_transferred' => count($activeFlights),
-        'handover_time' => date('d.m.Y H:i')
+        'handover_time' => date('d.m.Y H:i'),
+        'closed_flight_keys' => $closedFlightKeys,
+        'deleted_flights' => $mergedDeleted
     ]);
     exit;
 }

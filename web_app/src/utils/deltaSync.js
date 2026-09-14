@@ -66,11 +66,22 @@ export function normalizeFlightNumber(fl) {
 }
 
 /**
- * Нормализация даты рейса (приведение ДД.ММ или ДД.ММ.ГГГГ к ДД.ММ)
+ * Нормализация даты рейса (приведение ДД.ММ, ДД.ММ.ГГГГ или ГГГГ-ММ-ДД к ДД.ММ)
  */
 export function normalizeFlightDate(d) {
   if (!d) return '';
   const s = String(d).trim();
+  if (s.includes('-')) {
+    const parts = s.split('-');
+    if (parts[0].length === 4 && parts.length >= 3) {
+      // YYYY-MM-DD -> DD.MM
+      return `${parts[2].padStart(2, '0')}.${parts[1].padStart(2, '0')}`;
+    }
+    if (parts[2]?.length === 4) {
+      // DD-MM-YYYY -> DD.MM
+      return `${parts[0].padStart(2, '0')}.${parts[1].padStart(2, '0')}`;
+    }
+  }
   const parts = s.split('.');
   if (parts.length >= 2) {
     return `${parts[0].padStart(2, '0')}.${parts[1].padStart(2, '0')}`;
@@ -177,8 +188,11 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
 
   const existingMap = new Map();
   const existingByDigits = new Map();
+  const existingByFlightNum = new Map();
+  const existingFlightNumCounts = new Map();
 
   currentFlights.forEach(f => {
+    if (!f) return;
     const key = getFlightKey(f);
     if (key) existingMap.set(key, f);
     const flNum = normalizeFlightNumber(f.flight || f.flight_no || f.flight_number || '');
@@ -186,6 +200,10 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     const flDate = normalizeFlightDate(f.flight_date);
     if (digits && flDate) {
       existingByDigits.set(`${digits}_${flDate}`, f);
+    }
+    if (flNum) {
+      existingFlightNumCounts.set(flNum, (existingFlightNumCounts.get(flNum) || 0) + 1);
+      existingByFlightNum.set(flNum, f);
     }
   });
 
@@ -202,14 +220,23 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     const flDate = normalizeFlightDate(inc.flight_date);
 
     // Строгое сопоставление по номеру рейса и дате (исключает ошибочную склейку рейсов за разные даты)
-    const old = existingMap.get(key) || (digits && flDate ? existingByDigits.get(`${digits}_${flDate}`) : null);
+    let old = existingMap.get(key) || (digits && flDate ? existingByDigits.get(`${digits}_${flDate}`) : null);
+
+    // Если дата не была задана у одного из рейсов, но номер рейса уникален среди текущих
+    if (!old && flNum && existingFlightNumCounts.get(flNum) === 1) {
+      const candidate = existingByFlightNum.get(flNum);
+      const candDate = normalizeFlightDate(candidate?.flight_date);
+      if (!candDate || !flDate || candDate === flDate) {
+        old = candidate;
+      }
+    }
 
     if (!old) {
-      // Проверяем: был ли этот рейс удален диспетчером ранее в текущей смене?
+      // Проверяем: был ли этот рейс удален или закрыт в смене?
       const incVariants = getFlightKeyVariants(inc);
       const isDeleted = incVariants.some(v => deletedSet.has(v));
       if (isDeleted) {
-        // Пропускаем удаленный рейс — не добавляем его обратно при авто-подкачке
+        // Пропускаем удаленный или закрытый рейс — не добавляем его обратно при подкачке расписания
         continue;
       }
 

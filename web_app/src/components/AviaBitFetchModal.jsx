@@ -9,6 +9,7 @@ export default function AviaBitFetchModal({
   onClose,
   onScheduleLoaded,
   currentFlights = [],
+  deletedFlightKeys = [],
   airports = [],
   onOpenAirportsModal
 }) {
@@ -144,8 +145,9 @@ export default function AviaBitFetchModal({
       let newCount = 0;
 
       // Умное слияние с сохранением данных предыдущего диспетчера и детекцией изменений
-      if (useSmartMerge && currentFlights && currentFlights.length > 0) {
-        const mergeResult = smartMergeWithDelta(currentFlights, finalFlights, { deletedFlightKeys: [] });
+      if (useSmartMerge) {
+        const activeDeleted = Array.isArray(deletedFlightKeys) ? deletedFlightKeys : [];
+        const mergeResult = smartMergeWithDelta(currentFlights || [], finalFlights, { deletedFlightKeys: activeDeleted });
         finalFlights = mergeResult.mergedFlights;
         totalChanges = mergeResult.totalNewChanges;
         newCount = mergeResult.newFlightsCount;

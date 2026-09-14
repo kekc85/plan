@@ -1385,17 +1385,49 @@ def shift_handover(req: HandoverRequest, current_user: dict = Depends(get_curren
         )
     )
 
-    cursor.execute("SELECT id, date_interval FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1;")
+    closed_flight_keys = []
+    if req.archive_closed_flights:
+        for r in rows:
+            f = dict(r)
+            if f.get("status") == "closed":
+                fl_num = (f.get("flight_number") or "").strip()
+                fl_date = (f.get("flight_date") or "").strip()
+                if fl_num:
+                    fl_clean = re.sub(r'[-\s]', '', fl_num.upper())
+                    closed_flight_keys.append(fl_clean)
+                    digits = re.sub(r'\D', '', fl_clean)
+                    if digits:
+                        closed_flight_keys.append(f"NUM_{digits}")
+                        closed_flight_keys.append(digits)
+                    if fl_date:
+                        closed_flight_keys.append(f"{fl_clean}_{fl_date}")
+                        if digits:
+                            closed_flight_keys.append(f"NUM_{digits}_{fl_date}")
+
+    cursor.execute("SELECT id, date_interval, deleted_flights FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1;")
     active_shift = cursor.fetchone()
     shift_id = None
     shift_date_interval = ""
+    existing_deleted = []
     if active_shift:
         shift_dict = dict(active_shift)
         shift_id = shift_dict.get("id")
         shift_date_interval = shift_dict.get("date_interval", "")
+        raw_del = shift_dict.get("deleted_flights")
+        if raw_del:
+            try:
+                parsed_del = json.loads(raw_del)
+                if isinstance(parsed_del, list):
+                    existing_deleted = parsed_del
+            except Exception:
+                pass
+
+    merged_deleted = list(dict.fromkeys(existing_deleted + closed_flight_keys))
+
+    if shift_id:
         cursor.execute(
-            q("UPDATE plan_shifts SET dispatcher_name = %s WHERE id = %s;", engine),
-            (req.accepted_by.strip(), shift_id)
+            q("UPDATE plan_shifts SET dispatcher_name = %s, deleted_flights = %s WHERE id = %s;", engine),
+            (req.accepted_by.strip(), json.dumps(merged_deleted, ensure_ascii=False), shift_id)
         )
 
     if not shift_date_interval:
@@ -1448,7 +1480,9 @@ def shift_handover(req: HandoverRequest, current_user: dict = Depends(get_curren
         "success": True,
         "message": f"Смена успешно передана диспетчеру {req.accepted_by}",
         "active_flights_transferred": len(active_flights),
-        "handover_time": datetime.now(MSK_TZ).strftime("%d.%m.%Y %H:%M")
+        "handover_time": datetime.now(MSK_TZ).strftime("%d.%m.%Y %H:%M"),
+        "closed_flight_keys": closed_flight_keys,
+        "deleted_flights": merged_deleted
     }
 
 
