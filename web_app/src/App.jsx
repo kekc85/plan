@@ -146,6 +146,7 @@ export default function App() {
     const saved = getStoredWithMigration('dismissed_handover_note');
     return !!saved;
   });
+  const [isMobileMenuCollapsed, setIsMobileMenuCollapsed] = useState(false);
 
   const [departureAirports, setDepartureAirports] = useState(() => {
     try {
@@ -990,10 +991,13 @@ export default function App() {
         onAcknowledgeAll={handleAcknowledgeAll}
         timeMode={timeMode}
         onTimeModeChange={handleTimeModeChange}
+        flightsCount={flights.length}
+        isMobileMenuCollapsed={isMobileMenuCollapsed}
+        setIsMobileMenuCollapsed={setIsMobileMenuCollapsed}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 p-3 lg:p-4 max-w-[1920px] w-full mx-auto">
+      <main className="flex-1 p-1.5 sm:p-3 lg:p-4 max-w-[1920px] w-full mx-auto">
         
         {/* Printable Shift Title Header (visible only on print) */}
         <div className="hidden print-only mb-4 text-center">
@@ -1073,7 +1077,9 @@ export default function App() {
         )}
 
         {/* Summary Metric Tiles */}
-        <SummaryStats flights={flights} />
+        <div className={isMobileMenuCollapsed ? 'hidden sm:block' : ''}>
+          <SummaryStats flights={flights} />
+        </div>
 
         {/* Interactive Sortable Shift Table */}
         <ShiftTable
@@ -1088,6 +1094,8 @@ export default function App() {
           onOpenHistory={handleOpenFlightHistory}
           onAddFlight={() => setIsAddModalOpen(true)}
           timeMode={timeMode}
+          isMobileMenuCollapsed={isMobileMenuCollapsed}
+          onAutoCollapseMobileMenu={() => setIsMobileMenuCollapsed(true)}
         />
       </main>
 

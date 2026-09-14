@@ -25,7 +25,9 @@ export default function ShiftTable({
   onAcknowledgeFlight,
   onOpenHistory,
   onAddFlight,
-  timeMode = 'MSK'
+  timeMode = 'MSK',
+  isMobileMenuCollapsed = false,
+  onAutoCollapseMobileMenu
 }) {
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -50,7 +52,18 @@ export default function ShiftTable({
 
   return (
     <div className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl shadow-md dark:shadow-2xl backdrop-blur-md w-full">
-      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-175px)] w-full rounded-xl p-0.5 [scrollbar-gutter:stable]">
+      <div 
+        onScroll={(e) => {
+          if (window.innerWidth < 640 && !isMobileMenuCollapsed && e.currentTarget.scrollTop > 35) {
+            onAutoCollapseMobileMenu?.();
+          }
+        }}
+        className={`overflow-x-auto overflow-y-auto w-full rounded-xl p-0.5 [scrollbar-gutter:stable] ${
+          isMobileMenuCollapsed 
+            ? 'max-h-[calc(100dvh-55px)] sm:max-h-[calc(100vh-175px)]' 
+            : 'max-h-[calc(100vh-210px)] sm:max-h-[calc(100vh-175px)]'
+        }`}
+      >
         <table className="w-full text-left border-separate border-spacing-y-1 text-xs">
           {/* Table Header */}
           <thead className="sticky top-0 z-30 shadow-sm">
