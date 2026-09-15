@@ -144,10 +144,19 @@ export default function AviaBitFetchModal({
       let totalChanges = 0;
       let newCount = 0;
 
-      // Умное слияние с сохранением данных предыдущего диспетчера и детекцией изменений
+      // Умное слияние с сохранением данных предыдущего диспетчера и детекцией изменений.
+      // При загрузке по кнопке AviaBit загружаются полностью все рейсы за выбранный промежуток (ignoreDeleted: true)
       if (useSmartMerge) {
-        const activeDeleted = Array.isArray(deletedFlightKeys) ? deletedFlightKeys : [];
-        const mergeResult = smartMergeWithDelta(currentFlights || [], finalFlights, { deletedFlightKeys: activeDeleted });
+        const mergeResult = smartMergeWithDelta(currentFlights || [], finalFlights, {
+          deletedFlightKeys: [],
+          ignoreDeleted: true,
+          targetInterval: {
+            dateFrom: cleanFrom,
+            timeFrom: timeFrom,
+            dateTo: cleanTo,
+            timeTo: timeTo
+          }
+        });
         finalFlights = mergeResult.mergedFlights;
         totalChanges = mergeResult.totalNewChanges;
         newCount = mergeResult.newFlightsCount;

@@ -100,13 +100,99 @@ export function getFlightKey(flight) {
 }
 
 /**
+ * Генерация вариантов ключей ДЛЯ УДАЛЕНИЯ (строго с датой рейса)
+ * Чтобы удаление рейса N4-123 за 16.09 никогда не блокировало рейс N4-123 за 17.09
+ */
+export function getDeletionKeyVariants(flight) {
+  if (!flight) return [];
+  const rawFlight = flight.flight || flight.flight_no || flight.flight_number || '';
+  const normFlight = normalizeFlightNumber(rawFlight);
+  const normDate = normalizeFlightDate(flight.flight_date || flight.date);
+  const digitsOnly = normFlight.replace(/\D/g, '');
+
+  if (!normDate) {
+    return [];
+  }
+
+  const variants = new Set();
+  if (normFlight && normDate) {
+    variants.add(`${normFlight}_${normDate}`);
+  }
+  if (digitsOnly && normDate) {
+    variants.add(`NUM_${digitsOnly}_${normDate}`);
+    variants.add(`${digitsOnly}_${normDate}`);
+  }
+  if (rawFlight && normDate) {
+    const rawClean = String(rawFlight).replace(/[-\s]/g, '').toUpperCase();
+    variants.add(`${rawClean}_${normDate}`);
+  }
+
+  return Array.from(variants);
+}
+
+/**
+ * Проверка попадания рейса во временной интервал смены (по дате и времени вылета)
+ * @param {Object} flight - рейс с полями flight_date и time
+ * @param {string} dateFromStr - дата начала "ДД.ММ" или "ДД.ММ.ГГГГ"
+ * @param {string} timeFromStr - время начала "ЧЧ:ММ" (по умолчанию "08:00")
+ * @param {string} dateToStr - дата окончания "ДД.ММ" или "ДД.ММ.ГГГГ"
+ * @param {string} timeToStr - время окончания "ЧЧ:ММ" (по умолчанию "14:00")
+ * @returns {boolean} true если рейс попадает в диапазон
+ */
+export function isFlightInShiftInterval(flight, dateFromStr, timeFromStr = '08:00', dateToStr, timeToStr = '14:00') {
+  if (!flight) return false;
+  const flDate = normalizeFlightDate(flight.flight_date || flight.date);
+  const flTime = flight.time || '';
+  if (!flDate || !flTime || !flTime.includes(':')) return false;
+
+  const parseDateParts = (dStr) => {
+    if (!dStr) return null;
+    const parts = dStr.split('.');
+    if (parts.length < 2) return null;
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const year = parts[2] ? parseInt(parts[2], 10) : new Date().getFullYear();
+    if (isNaN(day) || isNaN(month)) return null;
+    return { day, month, year };
+  };
+
+  const parseTimeParts = (tStr) => {
+    if (!tStr || !tStr.includes(':')) return { h: 0, m: 0 };
+    const parts = tStr.split(':');
+    return { h: parseInt(parts[0], 10) || 0, m: parseInt(parts[1], 10) || 0 };
+  };
+
+  const pFrom = parseDateParts(dateFromStr);
+  const pTo = parseDateParts(dateToStr);
+  const pFl = parseDateParts(flDate);
+  if (!pFrom || !pTo || !pFl) return false;
+
+  const tFrom = parseTimeParts(timeFromStr);
+  const tTo = parseTimeParts(timeToStr);
+  const tFl = parseTimeParts(flTime);
+
+  const baseYear = pFrom.year || pTo.year || new Date().getFullYear();
+  let flYear = baseYear;
+  // Обработка перехода через Новый год: если смена декабрь-январь
+  if (pFrom.month === 12 && pTo.month === 1 && pFl.month === 1) {
+    flYear = baseYear + 1;
+  }
+
+  const startTs = new Date(pFrom.year, pFrom.month - 1, pFrom.day, tFrom.h, tFrom.m, 0, 0).getTime();
+  const endTs = new Date(pTo.year, pTo.month - 1, pTo.day, tTo.h, tTo.m, 59, 999).getTime();
+  const flTs = new Date(flYear, pFl.month - 1, pFl.day, tFl.h, tFl.m, 0, 0).getTime();
+
+  return flTs >= startTs && flTs <= endTs;
+}
+
+/**
  * Генерация всех возможных вариантов ключей рейса для гарантированного сопоставления
  */
 export function getFlightKeyVariants(flight) {
   if (!flight) return [];
   const rawFlight = flight.flight || flight.flight_no || flight.flight_number || '';
   const normFlight = normalizeFlightNumber(rawFlight);
-  const normDate = normalizeFlightDate(flight.flight_date);
+  const normDate = normalizeFlightDate(flight.flight_date || flight.date);
   const digitsOnly = normFlight.replace(/\D/g, '');
 
   const variants = new Set();
@@ -167,24 +253,37 @@ export function detectFlightChanges(oldFlight, incomingFlight) {
  * Умное слияние входящего расписания с текущим суточным планом
  * @param {Array} currentFlights - текущие рейсы в журнале диспетчера
  * @param {Array} incomingFlights - свежие рейсы из AviaBit
- * @param {Object} options - дополнительные опции слияния { deletedFlightKeys: [] }
+ * @param {Object} options - дополнительные опции слияния { deletedFlightKeys: [], ignoreDeleted: false, targetInterval: null }
  * @returns {{ mergedFlights: Array, totalNewChanges: number, newFlightsCount: number }}
  */
 export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], options = {}) {
-  const { deletedFlightKeys = [] } = options;
+  const { deletedFlightKeys = [], ignoreDeleted = false, targetInterval = null } = options;
   const deletedSet = new Set();
-  (Array.isArray(deletedFlightKeys) ? deletedFlightKeys : []).forEach(k => {
-    if (!k) return;
-    const strK = String(k).trim().toUpperCase();
-    deletedSet.add(strK);
-    deletedSet.add(strK.replace(/[-\s]/g, ''));
-    deletedSet.add(normalizeFlightNumber(strK));
-    const digits = strK.replace(/\D/g, '');
-    if (digits) {
-      deletedSet.add(`NUM_${digits}`);
-      deletedSet.add(digits);
-    }
-  });
+
+  if (!ignoreDeleted) {
+    (Array.isArray(deletedFlightKeys) ? deletedFlightKeys : []).forEach(k => {
+      if (!k) return;
+      const strK = String(k).trim().toUpperCase();
+      // Ключ удаления ОБЯЗАН содержать дату (разделитель '_'), чтобы не отсекать рейсы других суток
+      if (!strK.includes('_')) return;
+
+      deletedSet.add(strK);
+      deletedSet.add(strK.replace(/[-\s]/g, ''));
+      const parts = strK.split('_');
+      if (parts.length >= 2) {
+        const normNum = normalizeFlightNumber(parts[0]);
+        const normD = normalizeFlightDate(parts[1]);
+        if (normNum && normD) {
+          deletedSet.add(`${normNum}_${normD}`);
+        }
+        const digits = parts[0].replace(/\D/g, '');
+        if (digits && normD) {
+          deletedSet.add(`NUM_${digits}_${normD}`);
+          deletedSet.add(`${digits}_${normD}`);
+        }
+      }
+    });
+  }
 
   const existingMap = new Map();
   const existingByDigits = new Map();
@@ -232,12 +331,14 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     }
 
     if (!old) {
-      // Проверяем: был ли этот рейс удален или закрыт в смене?
-      const incVariants = getFlightKeyVariants(inc);
-      const isDeleted = incVariants.some(v => deletedSet.has(v));
-      if (isDeleted) {
-        // Пропускаем удаленный или закрытый рейс — не добавляем его обратно при подкачке расписания
-        continue;
+      // Проверяем: был ли этот рейс удален диспетчером в этой смене? (только если не ignoreDeleted)
+      if (!ignoreDeleted && deletedSet.size > 0) {
+        const incDeletionKeys = getDeletionKeyVariants(inc);
+        const isDeleted = incDeletionKeys.some(v => deletedSet.has(v));
+        if (isDeleted) {
+          // Пропускаем удаленный рейс — не подкачиваем его обратно при фоновой авто-сверке
+          continue;
+        }
       }
 
       // Совершенно новый рейс, добавленный в расписание AviaBit
@@ -281,11 +382,9 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
       'notes'
     ];
 
-    let hasManualWork = false;
     manualFields.forEach(field => {
       if (old[field] !== undefined && old[field] !== '') {
         merged[field] = old[field];
-        hasManualWork = true;
       }
     });
 
@@ -301,7 +400,7 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     if (old.ldm_sent !== undefined) merged.ldm_sent = old.ldm_sent;
     if (old.astra_times_sent !== undefined) merged.astra_times_sent = old.astra_times_sent;
 
-    // 4. Сохраняем статус рейса
+    // 4. Сохраняем статус рейса (включая closed)
     if (old.status) {
       merged.status = old.status;
     } else {
@@ -325,15 +424,32 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
   }
 
   // Сохраняем все рейсы из текущего плана, которых не было в новом ответе AviaBit
-  // (например, рейсы за предыдущую дату смены или добавленные вручную диспетчером)
+  // (например, добавленные вручную диспетчером или переходящие рейсы)
   currentFlights.forEach(f => {
     if (!f || !f.id) return;
     if (!matchedOldIds.has(f.id)) {
-      const fVariants = getFlightKeyVariants(f);
-      const isDeleted = fVariants.some(v => deletedSet.has(v));
-      if (!isDeleted) {
-        mergedFlights.push(f);
+      if (!ignoreDeleted && deletedSet.size > 0) {
+        const fDeletionKeys = getDeletionKeyVariants(f);
+        const isDeleted = fDeletionKeys.some(v => deletedSet.has(v));
+        if (isDeleted) return;
       }
+
+      // Если задан целевой интервал новой смены (targetInterval):
+      // не тянем закрытые рейсы предыдущей смены, не входящие в новый интервал
+      if (targetInterval && targetInterval.dateFrom && targetInterval.dateTo) {
+        const inInterval = isFlightInShiftInterval(
+          f,
+          targetInterval.dateFrom,
+          targetInterval.timeFrom || '08:00',
+          targetInterval.dateTo,
+          targetInterval.timeTo || '14:00'
+        );
+        if (!inInterval && f.status === 'closed') {
+          return;
+        }
+      }
+
+      mergedFlights.push(f);
     }
   });
 

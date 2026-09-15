@@ -1395,6 +1395,9 @@ if ($route === '/shift/handover') {
     $acceptedBy = trim($input['accepted_by'] ?? '');
     $notes = trim($input['notes'] ?? '');
     $archiveClosed = !empty($input['archive_closed_flights']);
+    $nextDateInterval = trim($input['next_date_interval'] ?? '');
+    $archivedFlightIds = $input['archived_flight_ids'] ?? [];
+    $transferredFlightIds = $input['transferred_flight_ids'] ?? [];
     $nowStr = date('Y-m-d H:i:s');
 
     $db = getDb();
@@ -1431,52 +1434,23 @@ if ($route === '/shift/handover') {
     $activeShift = $db->query("SELECT id, date_interval, deleted_flights FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1")->fetch();
     $shiftId = null;
     $shiftDateInterval = date('d.m.Y');
-    $existingDeleted = [];
     if ($activeShift) {
         $shiftId = $activeShift['id'];
         $shiftDateInterval = $activeShift['date_interval'] ?: date('d.m.Y');
-        if (!empty($activeShift['deleted_flights'])) {
-            $parsed = json_decode($activeShift['deleted_flights'], true);
-            if (is_array($parsed)) $existingDeleted = $parsed;
-        }
     }
 
-    $closedFlightKeys = [];
-    if ($archiveClosed) {
-        foreach ($allFlights as $f) {
-            if (($f['status'] ?? '') === 'closed') {
-                $flNum = $f['flight_number'] ?? '';
-                $flDate = $f['flight_date'] ?? '';
-                if ($flNum) {
-                    $flClean = strtoupper(str_replace(['-', ' '], '', $flNum));
-                    $closedFlightKeys[] = $flClean;
-                    $digits = preg_replace('/\D/', '', $flClean);
-                    if ($digits) {
-                        $closedFlightKeys[] = "NUM_{$digits}";
-                        $closedFlightKeys[] = $digits;
-                    }
-                    if ($flDate) {
-                        $closedFlightKeys[] = "{$flClean}_{$flDate}";
-                        if ($digits) {
-                            $closedFlightKeys[] = "NUM_{$digits}_{$flDate}";
-                        }
-                    }
-                }
-            }
-        }
-    }
+    $newInterval = $nextDateInterval ?: ($shiftDateInterval ?: date('d.m.Y'));
 
-    $mergedDeleted = array_values(array_unique(array_merge($existingDeleted, $closedFlightKeys)));
-
+    // Для новой смены список удаленных рейсов очищается
     if ($shiftId) {
-        $upd = $db->prepare("UPDATE plan_shifts SET dispatcher_name = ?, deleted_flights = ? WHERE id = ?");
-        $upd->execute([$acceptedBy, json_encode($mergedDeleted, JSON_UNESCAPED_UNICODE), $shiftId]);
+        $upd = $db->prepare("UPDATE plan_shifts SET dispatcher_name = ?, date_interval = ?, deleted_flights = '[]' WHERE id = ?");
+        $upd->execute([$acceptedBy, $newInterval, $shiftId]);
     }
 
     // Создаем архивный снимок до удаления закрытых рейсов
     createShiftSnapshot(
         $shiftId,
-        $shiftDateInterval,
+        $shiftDateInterval ?: $newInterval,
         $handedOverBy,
         'handover',
         $allFlights,
@@ -1489,8 +1463,19 @@ if ($route === '/shift/handover') {
         ]
     );
 
+    // Удаляем только закрытые рейсы предыдущей смены, не входящие в интервал новой смены
     if ($archiveClosed) {
-        $db->exec("DELETE FROM plan_flights WHERE status = 'closed'");
+        if (!empty($archivedFlightIds) && is_array($archivedFlightIds)) {
+            $placeholders = implode(',', array_fill(0, count($archivedFlightIds), '?'));
+            $delStmt = $db->prepare("DELETE FROM plan_flights WHERE id IN ($placeholders)");
+            $delStmt->execute(array_values($archivedFlightIds));
+        } elseif (!empty($transferredFlightIds) && is_array($transferredFlightIds)) {
+            $placeholders = implode(',', array_fill(0, count($transferredFlightIds), '?'));
+            $delStmt = $db->prepare("DELETE FROM plan_flights WHERE status = 'closed' AND id NOT IN ($placeholders)");
+            $delStmt->execute(array_values($transferredFlightIds));
+        } else {
+            $db->exec("DELETE FROM plan_flights WHERE status = 'closed'");
+        }
     }
 
     logSystemEvent(

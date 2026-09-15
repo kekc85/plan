@@ -196,6 +196,13 @@ class HandoverRequest(BaseModel):
     accepted_by: str
     notes: Optional[str] = ""
     archive_closed_flights: bool = False
+    next_date_from: Optional[str] = None
+    next_time_from: Optional[str] = "08:00"
+    next_date_to: Optional[str] = None
+    next_time_to: Optional[str] = "14:00"
+    next_date_interval: Optional[str] = None
+    transferred_flight_ids: Optional[List[str]] = None
+    archived_flight_ids: Optional[List[str]] = None
 
 
 class ClientErrorLogRequest(BaseModel):
@@ -1385,59 +1392,29 @@ def shift_handover(req: HandoverRequest, current_user: dict = Depends(get_curren
         )
     )
 
-    closed_flight_keys = []
-    if req.archive_closed_flights:
-        for r in rows:
-            f = dict(r)
-            if f.get("status") == "closed":
-                fl_num = (f.get("flight_number") or "").strip()
-                fl_date = (f.get("flight_date") or "").strip()
-                if fl_num:
-                    fl_clean = re.sub(r'[-\s]', '', fl_num.upper())
-                    closed_flight_keys.append(fl_clean)
-                    digits = re.sub(r'\D', '', fl_clean)
-                    if digits:
-                        closed_flight_keys.append(f"NUM_{digits}")
-                        closed_flight_keys.append(digits)
-                    if fl_date:
-                        closed_flight_keys.append(f"{fl_clean}_{fl_date}")
-                        if digits:
-                            closed_flight_keys.append(f"NUM_{digits}_{fl_date}")
-
     cursor.execute("SELECT id, date_interval, deleted_flights FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1;")
     active_shift = cursor.fetchone()
     shift_id = None
     shift_date_interval = ""
-    existing_deleted = []
     if active_shift:
         shift_dict = dict(active_shift)
         shift_id = shift_dict.get("id")
         shift_date_interval = shift_dict.get("date_interval", "")
-        raw_del = shift_dict.get("deleted_flights")
-        if raw_del:
-            try:
-                parsed_del = json.loads(raw_del)
-                if isinstance(parsed_del, list):
-                    existing_deleted = parsed_del
-            except Exception:
-                pass
 
-    merged_deleted = list(dict.fromkeys(existing_deleted + closed_flight_keys))
+    new_interval = req.next_date_interval or shift_date_interval or datetime.now(MSK_TZ).strftime("%d.%m.%Y")
 
+    # Для новой смены список удаленных рейсов очищается
     if shift_id:
         cursor.execute(
-            q("UPDATE plan_shifts SET dispatcher_name = %s, deleted_flights = %s WHERE id = %s;", engine),
-            (req.accepted_by.strip(), json.dumps(merged_deleted, ensure_ascii=False), shift_id)
+            q("UPDATE plan_shifts SET dispatcher_name = %s, date_interval = %s, deleted_flights = '[]' WHERE id = %s;", engine),
+            (req.accepted_by.strip(), new_interval, shift_id)
         )
-
-    if not shift_date_interval:
-        shift_date_interval = datetime.now(MSK_TZ).strftime("%d.%m.%Y")
 
     # Создаем полный снимок смены в архиве до очистки закрытых рейсов
     all_flights_dicts = [dict(r) for r in rows]
     create_shift_snapshot(
         shift_id=shift_id,
-        date_interval=shift_date_interval,
+        date_interval=shift_date_interval or new_interval,
         dispatcher_name=req.handed_over_by.strip(),
         reason="handover",
         flights=all_flights_dicts,
@@ -1450,8 +1427,22 @@ def shift_handover(req: HandoverRequest, current_user: dict = Depends(get_curren
         }
     )
 
+    # Удаляем только закрытые рейсы предыдущей смены, не входящие в интервал новой смены
     if req.archive_closed_flights:
-        cursor.execute("DELETE FROM plan_flights WHERE status = 'closed';")
+        if req.archived_flight_ids and len(req.archived_flight_ids) > 0:
+            placeholders = ", ".join(["%s" if engine == "mysql" else "?"] * len(req.archived_flight_ids))
+            cursor.execute(
+                q(f"DELETE FROM plan_flights WHERE id IN ({placeholders});", engine),
+                tuple(req.archived_flight_ids)
+            )
+        elif req.transferred_flight_ids and len(req.transferred_flight_ids) > 0:
+            placeholders = ", ".join(["%s" if engine == "mysql" else "?"] * len(req.transferred_flight_ids))
+            cursor.execute(
+                q(f"DELETE FROM plan_flights WHERE status = 'closed' AND id NOT IN ({placeholders});", engine),
+                tuple(req.transferred_flight_ids)
+            )
+        else:
+            cursor.execute("DELETE FROM plan_flights WHERE status = 'closed';")
 
     if engine == "sqlite":
         conn.commit()

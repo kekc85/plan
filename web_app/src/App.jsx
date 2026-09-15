@@ -39,6 +39,7 @@ import {
   smartMergeWithDelta,
   getFlightKey,
   getFlightKeyVariants,
+  getDeletionKeyVariants,
   acknowledgeFieldChange,
   acknowledgeFlightChanges,
   acknowledgeAllChanges,
@@ -251,13 +252,15 @@ export default function App() {
     return [];
   });
 
-  // Изоляция удаленных рейсов: список рейсов, удаленных диспетчером в текущей смене
+  // Изоляция удаленных рейсов: список рейсов, удаленных диспетчером в текущей смене (строго с датой!)
   const [deletedFlightKeys, setDeletedFlightKeys] = useState(() => {
     const saved = getStoredWithMigration('deleted_flights');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter(k => typeof k === 'string' && k.includes('_'));
+        }
       } catch (e) {}
     }
     return [];
@@ -289,9 +292,10 @@ export default function App() {
               return updated;
             });
             if (Array.isArray(data.shiftInfo.deleted_flights)) {
-              setDeletedFlightKeys(data.shiftInfo.deleted_flights);
+              const cleanDeleted = data.shiftInfo.deleted_flights.filter(k => typeof k === 'string' && k.includes('_'));
+              setDeletedFlightKeys(cleanDeleted);
               try {
-                localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify(data.shiftInfo.deleted_flights));
+                localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify(cleanDeleted));
               } catch (e) {}
             }
 
@@ -422,9 +426,10 @@ export default function App() {
                 setIsHandoverNotesDismissed(true);
               }
               if (Array.isArray(data.shiftInfo.deleted_flights)) {
-                setDeletedFlightKeys(data.shiftInfo.deleted_flights);
+                const cleanDeleted = data.shiftInfo.deleted_flights.filter(k => typeof k === 'string' && k.includes('_'));
+                setDeletedFlightKeys(cleanDeleted);
                 try {
-                  localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify(data.shiftInfo.deleted_flights));
+                  localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify(cleanDeleted));
                 } catch (e) {}
               }
             }
@@ -579,12 +584,12 @@ export default function App() {
     });
   };
 
-  // Удаление рейса
+  // Удаление рейса (с привязкой ключа строго к дате рейса)
   const handleDeleteFlight = (id) => {
     hasUserModifiedRef.current = true;
     const targetFlight = flights.find(f => f.id === id);
     if (targetFlight) {
-      const newKeys = getFlightKeyVariants(targetFlight);
+      const newKeys = getDeletionKeyVariants(targetFlight);
 
       setDeletedFlightKeys(prev => {
         const currentList = Array.isArray(prev) ? prev : [];
@@ -785,18 +790,19 @@ export default function App() {
     setLastSyncTime(timeStr);
     lastSyncTimestampRef.current = Date.now();
 
-    const currentDeleted = Array.isArray(deletedFlightKeysRef.current) && deletedFlightKeysRef.current.length > 0
-      ? deletedFlightKeysRef.current
-      : (Array.isArray(deletedFlightKeys) ? deletedFlightKeys : (shiftInfo?.deleted_flights || []));
+    // При ручной загрузке расписания по кнопке AviaBit список удаленных сбрасывается для новой смены
+    setDeletedFlightKeys([]);
+    deletedFlightKeysRef.current = [];
 
     const updatedShift = {
       ...(newShiftInfo ? { ...shiftInfo, ...newShiftInfo } : shiftInfo),
-      deleted_flights: currentDeleted
+      deleted_flights: []
     };
     setShiftInfo(updatedShift);
     try {
       localStorage.setItem(`${STORAGE_KEY}_flights`, JSON.stringify(normalized));
       localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(updatedShift));
+      localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify([]));
       localStorage.setItem(`${STORAGE_KEY}_last_sync_time`, timeStr);
     } catch (e) {}
 
@@ -892,35 +898,27 @@ export default function App() {
   const handleHandoverSuccess = async (newDispatcherName, archiveClosed, handoverData) => {
     hasUserModifiedRef.current = true;
 
-    // Собираем ключи закрытых рейсов для гарантированного исключения при повторной подгрузке
-    let currentDeleted = Array.isArray(deletedFlightKeysRef.current) && deletedFlightKeysRef.current.length > 0
-      ? [...deletedFlightKeysRef.current]
-      : (Array.isArray(deletedFlightKeys) ? [...deletedFlightKeys] : []);
+    // Переходящие рейсы (включая закрытые рейсы, попадающие в интервал принимаемой смены)
+    const activeFlights = (handoverData && Array.isArray(handoverData.transferredFlights))
+      ? handoverData.transferredFlights
+      : flights.filter(f => f.status !== 'closed');
 
-    let activeFlights = [...flights];
-
-    if (archiveClosed) {
-      const closedFlights = flights.filter(f => f.status === 'closed');
-      const closedKeys = [];
-      closedFlights.forEach(f => {
-        const variants = getFlightKeyVariants(f);
-        closedKeys.push(...variants);
-      });
-      currentDeleted = Array.from(new Set([...currentDeleted, ...closedKeys]));
-      activeFlights = flights.filter(f => f.status !== 'closed');
-    }
-
-    setDeletedFlightKeys(currentDeleted);
-    deletedFlightKeysRef.current = currentDeleted;
+    // Для новой смены список удаленных рейсов очищается
+    setDeletedFlightKeys([]);
+    deletedFlightKeysRef.current = [];
     try {
-      localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify(currentDeleted));
+      localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify([]));
     } catch (e) {}
+
+    const newInterval = handoverData?.next_date_interval || shiftInfo?.date_interval;
 
     const updatedShift = {
       ...shiftInfo,
       dispatcher: newDispatcherName,
+      date_interval: newInterval,
+      date: newInterval,
       handover: handoverData || shiftInfo?.handover,
-      deleted_flights: currentDeleted
+      deleted_flights: []
     };
 
     setShiftInfo(updatedShift);

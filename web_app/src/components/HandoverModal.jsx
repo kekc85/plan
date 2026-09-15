@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, ArrowRightLeft, ShieldCheck, CheckCircle2, AlertCircle, Clock, Plane, FileText, Check, ChevronDown, User } from 'lucide-react';
+import { X, ArrowRightLeft, ShieldCheck, CheckCircle2, AlertCircle, Clock, Plane, FileText, Check, ChevronDown, User, Calendar } from 'lucide-react';
 import { handoverShift, getActiveUsers } from '../utils/api';
+import { isFlightInShiftInterval } from '../utils/deltaSync';
 
 export default function HandoverModal({
   isOpen,
   onClose,
-  flights,
+  flights = [],
   shiftInfo,
   currentUser,
   onHandoverSuccess
@@ -21,9 +22,51 @@ export default function HandoverModal({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const pad = (n) => String(n).padStart(2, '0');
+  const formatD = (d) => `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+
+  const calculateNextShiftInterval = () => {
+    const rawInterval = shiftInfo?.date_interval || shiftInfo?.date || '';
+    const parts = rawInterval.split('—').map(s => s.trim());
+    if (parts.length >= 2) {
+      const p1Parts = parts[1].split('.');
+      if (p1Parts.length >= 2) {
+        const day = parseInt(p1Parts[0], 10);
+        const month = parseInt(p1Parts[1], 10);
+        const year = p1Parts[2] ? parseInt(p1Parts[2], 10) : new Date().getFullYear();
+        const dFrom = new Date(year, month - 1, day);
+        const dTo = new Date(dFrom);
+        dTo.setDate(dTo.getDate() + 1);
+        return {
+          dateFrom: formatD(dFrom),
+          dateTo: formatD(dTo)
+        };
+      }
+    }
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfter = new Date(tomorrow);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+    return {
+      dateFrom: formatD(tomorrow),
+      dateTo: formatD(dayAfter)
+    };
+  };
+
+  const [nextDateFrom, setNextDateFrom] = useState('');
+  const [nextTimeFrom, setNextTimeFrom] = useState('08:00');
+  const [nextDateTo, setNextDateTo] = useState('');
+  const [nextTimeTo, setNextTimeTo] = useState('14:00');
+
   useEffect(() => {
     if (isOpen) {
       loadDispatchers();
+      const calc = calculateNextShiftInterval();
+      setNextDateFrom(calc.dateFrom);
+      setNextDateTo(calc.dateTo);
+      setNextTimeFrom('08:00');
+      setNextTimeTo('14:00');
     }
   }, [isOpen]);
 
@@ -32,7 +75,6 @@ export default function HandoverModal({
       const res = await getActiveUsers();
       if (res && res.users && res.users.length > 0) {
         setActiveUsers(res.users);
-        // Выбираем первого сменщика (отличного от текущего)
         const others = res.users.filter(u => u.full_name !== currentDispatcher);
         if (others.length > 0) {
           setIncomingDispatcher(others[0].full_name);
@@ -45,11 +87,31 @@ export default function HandoverModal({
     }
   };
 
-  if (!isOpen) return null;
+  // Классификация рейсов:
+  // 1. Попадающие в интервал принимаемой смены (по дате и времени):
+  //    Передаются обязательно, даже если уже закрыты ("но те которые закрыты и попадают в промежуток следующей смены передавались, даже закрытые")
+  // 2. Вне интервала следующей смены:
+  //    - если закрыты — НЕ передаются (архивируются)
+  //    - если не закрыты (активные / задержанные) — передаются новому диспетчеру для контроля
+  const { transferredFlights, archivedFlights } = React.useMemo(() => {
+    const transferred = [];
+    const archived = [];
+    (flights || []).forEach(f => {
+      const inNextInterval = isFlightInShiftInterval(f, nextDateFrom, nextTimeFrom, nextDateTo, nextTimeTo);
+      if (inNextInterval) {
+        transferred.push({ ...f, _is_in_next_interval: true });
+      } else {
+        if (f.status === 'closed') {
+          archived.push(f);
+        } else {
+          transferred.push({ ...f, _is_in_next_interval: false });
+        }
+      }
+    });
+    return { transferredFlights: transferred, archivedFlights: archived };
+  }, [flights, nextDateFrom, nextTimeFrom, nextDateTo, nextTimeTo]);
 
-  // Фильтруем активные рейсы (в работе / подготовленные / переходящие на 09:00 - 13:30)
-  const activeFlights = flights.filter(f => f.status !== 'closed');
-  const closedFlights = flights.filter(f => f.status === 'closed');
+  if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,11 +125,19 @@ export default function HandoverModal({
     setErrorMsg('');
 
     try {
+      const nextIntervalStr = `${nextDateFrom} — ${nextDateTo}`;
       const res = await handoverShift({
         handed_over_by: currentDispatcher,
         accepted_by: finalIncoming.trim(),
         notes: notes.trim(),
-        archive_closed_flights: archiveClosed
+        archive_closed_flights: archiveClosed,
+        next_date_from: nextDateFrom,
+        next_time_from: nextTimeFrom,
+        next_date_to: nextDateTo,
+        next_time_to: nextTimeTo,
+        next_date_interval: nextIntervalStr,
+        transferred_flight_ids: transferredFlights.map(f => f.id),
+        archived_flight_ids: archivedFlights.map(f => f.id)
       });
 
       if (res && res.success) {
@@ -75,7 +145,10 @@ export default function HandoverModal({
           handed_over_by: currentDispatcher,
           accepted_by: finalIncoming.trim(),
           notes: notes.trim(),
-          handover_time: new Date().toISOString()
+          handover_time: new Date().toISOString(),
+          next_date_interval: nextIntervalStr,
+          transferredFlights,
+          archivedFlights
         });
         onClose();
       }
@@ -160,15 +233,70 @@ export default function HandoverModal({
             </div>
           </div>
 
+          {/* Настройка интервала принимаемой смены */}
+          <div className="bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800/80 rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+              <span className="text-xs font-extrabold text-sky-900 dark:text-sky-200 uppercase tracking-wide">
+                Интервал принимаемой смены
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Дата начала</label>
+                <input
+                  type="text"
+                  value={nextDateFrom}
+                  onChange={(e) => setNextDateFrom(e.target.value)}
+                  placeholder="ДД.ММ.ГГГГ"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 font-mono font-bold text-slate-900 dark:text-slate-100"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Время с</label>
+                <input
+                  type="text"
+                  value={nextTimeFrom}
+                  onChange={(e) => setNextTimeFrom(e.target.value)}
+                  placeholder="08:00"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 font-mono font-bold text-slate-900 dark:text-slate-100"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Дата окончания</label>
+                <input
+                  type="text"
+                  value={nextDateTo}
+                  onChange={(e) => setNextDateTo(e.target.value)}
+                  placeholder="ДД.ММ.ГГГГ"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 font-mono font-bold text-slate-900 dark:text-slate-100"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Время по</label>
+                <input
+                  type="text"
+                  value={nextTimeTo}
+                  onChange={(e) => setNextTimeTo(e.target.value)}
+                  placeholder="14:00"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 font-mono font-bold text-slate-900 dark:text-slate-100"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-sky-700 dark:text-sky-300 mt-2 font-medium">
+              Все рейсы этого интервала (включая закрытые утренние) передадутся новому диспетчеру. Закрытые рейсы предыдущей смены уходят в архив.
+            </p>
+          </div>
+
           {/* Сводка переходящих рейсов */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <Plane className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-                <span>Переходящие активные рейсы ({activeFlights.length})</span>
+                <span>Передаются в следующую смену ({transferredFlights.length})</span>
               </h4>
               <span className="text-[11px] text-slate-500 font-semibold">
-                Закрыто рейсов: {closedFlights.length}
+                В архив смены: {archivedFlights.length}
               </span>
             </div>
 
@@ -177,34 +305,38 @@ export default function HandoverModal({
                 <thead>
                   <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-extrabold uppercase">
                     <th className="py-2 px-2.5">Рейс</th>
-                    <th className="py-2 px-2">Маршрут</th>
+                    <th className="py-2 px-2">Дата</th>
                     <th className="py-2 px-2 text-center">Вылет</th>
                     <th className="py-2 px-2 text-center">Статус</th>
                     <th className="py-2 px-2">Пометки / Особые указания</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {activeFlights.length === 0 ? (
+                  {transferredFlights.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-4 text-center text-slate-400 text-xs">
-                        Нет активных переходящих рейсов
+                        Нет переходящих рейсов для следующей смены
                       </td>
                     </tr>
                   ) : (
-                    activeFlights.map(f => (
+                    transferredFlights.map(f => (
                       <tr key={f.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                         <td className="py-1.5 px-2.5 font-bold font-mono text-sky-600 dark:text-sky-400">
                           {f.flight}
                         </td>
-                        <td className="py-1.5 px-2 font-medium text-slate-700 dark:text-slate-300">
-                          {f.route_city}
+                        <td className="py-1.5 px-2 font-mono font-bold text-slate-600 dark:text-slate-400">
+                          {f.flight_date || '—'}
                         </td>
                         <td className="py-1.5 px-2 text-center font-mono font-bold text-amber-600 dark:text-amber-400">
                           {f.time || '—'}
                         </td>
                         <td className="py-1.5 px-2 text-center">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                            {f.status}
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            f.status === 'closed'
+                              ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                          }`}>
+                            {f.status === 'closed' ? '✓ Закрыт (в смене)' : f.status}
                           </span>
                         </td>
                         <td className="py-1.5 px-2 text-slate-500 dark:text-slate-400 text-[11px] truncate max-w-xs">
@@ -227,7 +359,7 @@ export default function HandoverModal({
               className="w-4 h-4 text-sky-600 rounded border-slate-300 dark:border-slate-600 focus:ring-sky-500"
             />
             <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
-              Архивировать выполненные рейсы (убрать из активного плана {closedFlights.length} закрытых рейсов)
+              Архивировать выполненные рейсы предыдущей смены (убрать из активного плана {archivedFlights.length} закрытых рейсов)
             </span>
           </label>
 
