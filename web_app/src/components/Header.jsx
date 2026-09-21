@@ -26,6 +26,22 @@ import {
 } from 'lucide-react';
 import { formatValidDateInterval } from '../utils/validators';
 
+// Статические форматтеры времени Европа/Москва (создаются один раз, предотвращая утечки памяти)
+const mskDateFormatter = new Intl.DateTimeFormat('ru-RU', {
+  timeZone: 'Europe/Moscow',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric'
+});
+
+const mskTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
+  timeZone: 'Europe/Moscow',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false
+});
+
 export default function Header({
   shiftInfo,
   setShiftInfo,
@@ -90,6 +106,9 @@ export default function Header({
   // Идущие часы UTC, МСК и текущая дата (каждую секунду)
   useEffect(() => {
     const updateClocks = () => {
+      // При свернутой вкладке пропускаем холостые перерисовки
+      if (document.visibilityState === 'hidden') return;
+
       const now = new Date();
 
       // UTC (ZULU)
@@ -105,21 +124,7 @@ export default function Header({
 
       // MSK (Europe/Moscow, UTC+3) Date & Time
       try {
-        const mskDateFormatter = new Intl.DateTimeFormat('ru-RU', {
-          timeZone: 'Europe/Moscow',
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        });
         setMskDateStr(mskDateFormatter.format(now));
-
-        const mskTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
-          timeZone: 'Europe/Moscow',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false
-        });
         setMskTime(mskTimeFormatter.format(now));
       } catch (e) {
         setMskTime(now.toLocaleTimeString('ru-RU'));
@@ -129,7 +134,18 @@ export default function Header({
 
     updateClocks();
     const interval = setInterval(updateClocks, 1000);
-    return () => clearInterval(interval);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateClocks();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const handleDateChange = (e) => {

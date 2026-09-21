@@ -26,6 +26,53 @@ export function initAudioUnlock() {
   window.addEventListener('touchstart', unlock, { once: true });
 }
 
+/**
+ * Запрос разрешения на показ системных уведомлений рабочего стола Windows (Desktop Notifications)
+ */
+export async function requestNotificationPermission() {
+  if (typeof window !== 'undefined' && 'Notification' in window) {
+    if (Notification.permission === 'default') {
+      try {
+        return await Notification.requestPermission();
+      } catch (err) {
+        console.warn('Notification permission request error:', err);
+      }
+    }
+    return Notification.permission;
+  }
+  return 'denied';
+}
+
+/**
+ * Показывает системное всплывающее уведомление Windows при наступлении времени выпуска
+ */
+export function showFlightReleaseNotification(flight, releaseTimeStr, takeoffTimeStr) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+
+  try {
+    const flightNum = flight.flight || 'Рейс';
+    const route = flight.route_city || flight.route_airports || '';
+    const title = `⚠️ Пора выпускать рейс ${flightNum}!`;
+    const body = `Выпуск: ${releaseTimeStr || flight.release_time || '—'} | Вылет: ${takeoffTimeStr || flight.time || '—'}${route ? `\n${route}` : ''}`;
+
+    const notif = new Notification(title, {
+      body,
+      icon: '/favicon.svg',
+      tag: `flight-release-${flight.id}`,
+      renotify: true,
+      requireInteraction: true
+    });
+
+    notif.onclick = () => {
+      window.focus();
+      notif.close();
+    };
+  } catch (err) {
+    console.warn('Show flight release notification error:', err);
+  }
+}
+
 function getAudioContext() {
   if (!audioCtx) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;

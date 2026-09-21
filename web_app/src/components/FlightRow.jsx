@@ -47,7 +47,7 @@ function ChangeBadge({ change, onAcknowledge }) {
   );
 }
 
-export default function FlightRow({
+function FlightRow({
   flight,
   index,
   onUpdateFlight,
@@ -1099,3 +1099,5 @@ export default function FlightRow({
     </tr>
   );
 }
+
+export default React.memo(FlightRow);

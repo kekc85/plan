@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import SummaryStats from './components/SummaryStats';
@@ -15,7 +15,12 @@ import FlightHistoryModal from './components/FlightHistoryModal';
 import { INITIAL_FLIGHTS } from './utils/mockData';
 import { exportShiftToExcel } from './utils/excelExport';
 import { parseExcelToFlights } from './utils/excelImport';
-import { playReleaseAlertSound, initAudioUnlock } from './utils/audioAlert';
+import { 
+  playReleaseAlertSound, 
+  initAudioUnlock, 
+  requestNotificationPermission, 
+  showFlightReleaseNotification 
+} from './utils/audioAlert';
 import { 
   sortFlightsChronologically, 
   isFlightReleaseOverdue, 
@@ -205,11 +210,45 @@ export default function App() {
     }
   });
   const playedAlertsRef = React.useRef({});
+  // Хранилище отложенных на 5 минут оповещений (flightId -> timestamp)
+  const snoozedAlertsRef = React.useRef({});
 
-  // Разблокировка Web Audio на первый клик пользователя
+  // Разблокировка Web Audio и запрос разрешений на системные уведомления Windows на первый клик пользователя
   useEffect(() => {
     initAudioUnlock();
+
+    const askNotificationPerm = () => {
+      requestNotificationPermission();
+      window.removeEventListener('click', askNotificationPerm);
+      window.removeEventListener('keydown', askNotificationPerm);
+    };
+    window.addEventListener('click', askNotificationPerm, { once: true });
+    window.addEventListener('keydown', askNotificationPerm, { once: true });
+    return () => {
+      window.removeEventListener('click', askNotificationPerm);
+      window.removeEventListener('keydown', askNotificationPerm);
+    };
   }, []);
+
+  // Мигание заголовка окна / вкладки на панели задач Windows при наступлении времени выпуска рейса
+  useEffect(() => {
+    if (!activeAlert) {
+      document.title = 'AeroPlan W&B - Журнал суточного плана';
+      return;
+    }
+
+    let isFlipped = false;
+    const flightNum = activeAlert.flight || 'Рейс';
+    const interval = setInterval(() => {
+      isFlipped = !isFlipped;
+      document.title = isFlipped ? `🔔 ВЫПУСК: ${flightNum}!` : `⚠️ ПОРА ВЫПУСКАТЬ ДОКУМЕНТЫ`;
+    }, 1200);
+
+    return () => {
+      clearInterval(interval);
+      document.title = 'AeroPlan W&B - Журнал суточного плана';
+    };
+  }, [activeAlert]);
 
   const isInitialServerSyncCompletedRef = React.useRef(false);
   const hasUserModifiedRef = React.useRef(false);
@@ -440,16 +479,29 @@ export default function App() {
       }
     };
 
-    const interval = setInterval(checkServerForRemoteUpdates, 15000);
+    let pollTimer = null;
+    const scheduleNextPoll = () => {
+      // При скрытой вкладке опрашиваем в 4 раза реже (раз в 60 сек вместо 15 сек) для снижения нагрузки на слабый ПК
+      const delay = document.visibilityState === 'hidden' ? 60000 : 15000;
+      pollTimer = setTimeout(async () => {
+        await checkServerForRemoteUpdates();
+        scheduleNextPoll();
+      }, delay);
+    };
+
+    scheduleNextPoll();
+
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
+        if (pollTimer) clearTimeout(pollTimer);
         checkServerForRemoteUpdates();
+        scheduleNextPoll();
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      clearInterval(interval);
+      if (pollTimer) clearTimeout(pollTimer);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [isSyncing]);
@@ -473,9 +525,11 @@ export default function App() {
     initialSuppressionDoneRef.current = true;
   }, [flights]);
 
-  // Таймер проверки рейсов на выпуск (-40 минут)
+  // Непрерывный таймер проверки рейсов на выпуск (-40 минут)
   useEffect(() => {
     const checkAlerts = () => {
+      const nowTs = Date.now();
+
       for (const f of flights) {
         if (f.status === 'released' || f.status === 'closed' || f.szv_sent || f.ldm_sent) {
           continue;
@@ -485,10 +539,21 @@ export default function App() {
           continue;
         }
 
+        // Проверка откладывания оповещения («Напомнить через 5 минут»)
+        const snoozedUntil = snoozedAlertsRef.current[f.id];
+        if (snoozedUntil && nowTs < snoozedUntil) {
+          continue;
+        }
+
         if (isFlightInAlertWindow(f)) {
           if (!playedAlertsRef.current[f.id]) {
             playedAlertsRef.current[f.id] = true;
             playReleaseAlertSound();
+
+            // Всплывающее системное уведомление Windows прямо на рабочий стол
+            const rTime = timeMode === 'UTC' ? shiftTimeByHours(f.release_time, -3) : f.release_time;
+            const tTime = timeMode === 'UTC' ? shiftTimeByHours(f.time, -3) : f.time;
+            showFlightReleaseNotification(f, rTime, tTime);
           }
           setActiveAlert(f);
           break;
@@ -499,10 +564,19 @@ export default function App() {
     checkAlerts();
     const interval = setInterval(checkAlerts, 10000);
     return () => clearInterval(interval);
-  }, [flights, dismissedAlerts]);
+  }, [flights, dismissedAlerts, timeMode]);
 
-  // Закрыть всплывающее оповещение
-  const handleDismissAlert = (flight) => {
+  // Отложить всплывающее оповещение ровно на 5 минут (300 000 мс)
+  const handleSnoozeAlert = useCallback((flight) => {
+    if (!flight) return;
+    snoozedAlertsRef.current[flight.id] = Date.now() + 5 * 60 * 1000;
+    // Сбрасываем флаг, чтобы через 5 минут повторно проиграл звук и появилось уведомление
+    delete playedAlertsRef.current[flight.id];
+    setActiveAlert(null);
+  }, []);
+
+  // Окончательно скрыть всплывающее оповещение для текущей сессии
+  const handleDismissAlert = useCallback((flight) => {
     if (!flight) return;
     setDismissedAlerts(prev => {
       const updated = { ...prev, [flight.id]: true };
@@ -512,10 +586,10 @@ export default function App() {
       return updated;
     });
     setActiveAlert(null);
-  };
+  }, []);
 
   // Быстрый выпуск рейса из всплывающего окна
-  const handleQuickRelease = (flightId) => {
+  const handleQuickRelease = useCallback((flightId) => {
     hasUserModifiedRef.current = true;
     setFlights(prev =>
       prev.map(f => {
@@ -529,18 +603,11 @@ export default function App() {
         return f;
       })
     );
-    setDismissedAlerts(prev => {
-      const updated = { ...prev, [flightId]: true };
-      try {
-        sessionStorage.setItem(`${STORAGE_KEY}_dismissed_alerts`, JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
-    setActiveAlert(null);
-  };
+    handleDismissAlert({ id: flightId });
+  }, [handleDismissAlert]);
 
-  // Drag and Drop: перестановка строк
-  const handleReorderFlights = (activeId, overId) => {
+  // Drag and Drop: перестановка строк (мемоизировано)
+  const handleReorderFlights = useCallback((activeId, overId) => {
     hasUserModifiedRef.current = true;
     setFlights((items) => {
       const oldIndex = items.findIndex((item) => item.id === activeId);
@@ -550,24 +617,26 @@ export default function App() {
       }
       return items;
     });
-  };
+  }, []);
 
-  // Перемещение вверх стрелочкой
-  const handleMoveUp = (index) => {
+  // Перемещение вверх стрелочкой (мемоизировано)
+  const handleMoveUp = useCallback((index) => {
     if (index <= 0) return;
     hasUserModifiedRef.current = true;
     setFlights((items) => arrayMove(items, index, index - 1));
-  };
+  }, []);
 
-  // Перемещение вниз стрелочкой
-  const handleMoveDown = (index) => {
-    if (index >= flights.length - 1) return;
+  // Перемещение вниз стрелочкой (мемоизировано)
+  const handleMoveDown = useCallback((index) => {
     hasUserModifiedRef.current = true;
-    setFlights((items) => arrayMove(items, index, index + 1));
-  };
+    setFlights((items) => {
+      if (index >= items.length - 1) return items;
+      return arrayMove(items, index, index + 1);
+    });
+  }, []);
 
-  // Обновление отдельного поля рейса (с поддержкой авто-сортировки при смене времени/даты)
-  const handleUpdateFlight = (id, updatedFields = {}, shouldSort = false) => {
+  // Обновление отдельного поля рейса (мемоизировано)
+  const handleUpdateFlight = useCallback((id, updatedFields = {}, shouldSort = false) => {
     hasUserModifiedRef.current = true;
     setFlights(prev => {
       const updatedList = prev.map(f => {
@@ -582,40 +651,42 @@ export default function App() {
       }
       return updatedList;
     });
-  };
+  }, []);
 
-  // Удаление рейса (с привязкой ключа строго к дате рейса)
-  const handleDeleteFlight = (id) => {
+  // Удаление рейса (мемоизировано)
+  const handleDeleteFlight = useCallback((id) => {
     hasUserModifiedRef.current = true;
-    const targetFlight = flights.find(f => f.id === id);
-    if (targetFlight) {
-      const newKeys = getDeletionKeyVariants(targetFlight);
+    setFlights(prev => {
+      const targetFlight = prev.find(f => f.id === id);
+      if (targetFlight) {
+        const newKeys = getDeletionKeyVariants(targetFlight);
 
-      setDeletedFlightKeys(prev => {
-        const currentList = Array.isArray(prev) ? prev : [];
-        const updated = Array.from(new Set([...currentList, ...newKeys]));
-        deletedFlightKeysRef.current = updated;
-        try {
-          localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify(updated));
-        } catch (e) {}
-        return updated;
-      });
+        setDeletedFlightKeys(prevKeys => {
+          const currentList = Array.isArray(prevKeys) ? prevKeys : [];
+          const updated = Array.from(new Set([...currentList, ...newKeys]));
+          deletedFlightKeysRef.current = updated;
+          try {
+            localStorage.setItem(`${STORAGE_KEY}_deleted_flights`, JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
 
-      setShiftInfo(prev => {
-        const currentDeleted = Array.isArray(prev?.deleted_flights) ? prev.deleted_flights : [];
-        const nextDeleted = Array.from(new Set([...currentDeleted, ...newKeys]));
-        const updatedShift = {
-          ...prev,
-          deleted_flights: nextDeleted
-        };
-        try {
-          localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(updatedShift));
-        } catch (e) {}
-        return updatedShift;
-      });
-    }
-    setFlights(prev => prev.filter(f => f.id !== id));
-  };
+        setShiftInfo(prevShift => {
+          const currentDeleted = Array.isArray(prevShift?.deleted_flights) ? prevShift.deleted_flights : [];
+          const nextDeleted = Array.from(new Set([...currentDeleted, ...newKeys]));
+          const updatedShift = {
+            ...prevShift,
+            deleted_flights: nextDeleted
+          };
+          try {
+            localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(updatedShift));
+          } catch (e) {}
+          return updatedShift;
+        });
+      }
+      return prev.filter(f => f.id !== id);
+    });
+  }, []);
 
   // Добавление нового рейса
   const handleAddFlight = (newFlightData) => {
@@ -627,23 +698,23 @@ export default function App() {
     setFlights(prev => sortFlightsChronologically([...prev, newFlight]));
   };
 
-  // Подтверждение ознакомления с отдельным измененным параметром
-  const handleAcknowledgeField = (flightId, fieldName) => {
+  // Подтверждение ознакомления с отдельным измененным параметром (мемоизировано)
+  const handleAcknowledgeField = useCallback((flightId, fieldName) => {
     hasUserModifiedRef.current = true;
     setFlights(prev => prev.map(f => f.id === flightId ? acknowledgeFieldChange(f, fieldName) : f));
-  };
+  }, []);
 
-  // Подтверждение ознакомления со всеми изменениями конкретного рейса
-  const handleAcknowledgeFlight = (flightId) => {
+  // Подтверждение ознакомления со всеми изменениями конкретного рейса (мемоизировано)
+  const handleAcknowledgeFlight = useCallback((flightId) => {
     hasUserModifiedRef.current = true;
     setFlights(prev => prev.map(f => f.id === flightId ? acknowledgeFlightChanges(f) : f));
-  };
+  }, []);
 
   // Подтверждение ознакомления со всеми изменениями суточного плана
-  const handleAcknowledgeAll = () => {
+  const handleAcknowledgeAll = useCallback(() => {
     hasUserModifiedRef.current = true;
     setFlights(prev => acknowledgeAllChanges(prev));
-  };
+  }, []);
 
   // Переключение тумблера авто-подкачки
   const handleToggleAutoSync = () => {
@@ -981,11 +1052,11 @@ export default function App() {
     );
   }
 
-  // Открытие истории изменений рейса (Flight Audit Trail)
-  const handleOpenFlightHistory = (flight) => {
+  // Открытие истории изменений рейса (Flight Audit Trail, мемоизировано)
+  const handleOpenFlightHistory = useCallback((flight) => {
     setSelectedHistoryFlight(flight);
     setIsHistoryModalOpen(true);
-  };
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col transition-colors duration-200">
@@ -1172,10 +1243,12 @@ export default function App() {
 
             <div className="flex items-center justify-end gap-2 pt-1">
               <button
-                onClick={() => handleDismissAlert(activeAlert)}
-                className="px-3 py-1 rounded-lg text-xs font-semibold text-amber-900 dark:text-slate-300 hover:bg-amber-400 dark:hover:bg-slate-800"
+                type="button"
+                onClick={() => handleSnoozeAlert(activeAlert)}
+                className="px-3 py-1 rounded-lg text-xs font-semibold text-amber-950 dark:text-slate-200 hover:bg-amber-400 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Отложить звуковой сигнал и оповещение ровно на 5 минут"
               >
-                Напомнить позже
+                ⏰ Напомнить через 5 мин
               </button>
               <button
                 onClick={() => handleQuickRelease(activeAlert.id)}
