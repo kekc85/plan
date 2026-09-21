@@ -701,13 +701,13 @@ export default function App() {
   // Подтверждение ознакомления с отдельным измененным параметром (мемоизировано)
   const handleAcknowledgeField = useCallback((flightId, fieldName) => {
     hasUserModifiedRef.current = true;
-    setFlights(prev => prev.map(f => f.id === flightId ? acknowledgeFieldChange(f, fieldName) : f));
+    setFlights(prev => prev.map(f => String(f.id) === String(flightId) ? acknowledgeFieldChange(f, fieldName) : f));
   }, []);
 
   // Подтверждение ознакомления со всеми изменениями конкретного рейса (мемоизировано)
   const handleAcknowledgeFlight = useCallback((flightId) => {
     hasUserModifiedRef.current = true;
-    setFlights(prev => prev.map(f => f.id === flightId ? acknowledgeFlightChanges(f) : f));
+    setFlights(prev => prev.map(f => String(f.id) === String(flightId) ? acknowledgeFlightChanges(f) : f));
   }, []);
 
   // Подтверждение ознакомления со всеми изменениями суточного плана

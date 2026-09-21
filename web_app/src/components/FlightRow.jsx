@@ -38,6 +38,8 @@ function ChangeBadge({ change, onAcknowledge }) {
         e.stopPropagation();
         onAcknowledge?.();
       }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
       className="inline-flex items-center justify-center gap-0.5 max-w-full bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900/90 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-600/70 font-mono text-[8px] font-black px-1 py-0.2 rounded shadow-xs transition-transform active:scale-95 cursor-pointer shrink-0 mt-0.5 overflow-hidden"
       title={`Изменено в AviaBit!\nБыло: ${oldVal} → Стало: ${change.new}\nНажмите, чтобы подтвердить ознакомление`}
     >
@@ -422,6 +424,8 @@ function FlightRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
               className="inline-flex items-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black uppercase px-1 py-0.5 rounded shadow-xs animate-pulse cursor-pointer shrink-0 max-w-[60px] truncate"
               title="Новый рейс из AviaBit! Нажмите для подтверждения"
             >
@@ -1042,6 +1046,8 @@ function FlightRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
               className="flex items-center justify-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[8px] font-black px-1 py-0.5 rounded shadow-xs transition-all active:scale-95 animate-pulse shrink-0 cursor-pointer"
               title="Подтвердить ознакомление со всеми изменениями в этом рейсе"
             >
