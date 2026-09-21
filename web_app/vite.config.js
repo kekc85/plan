@@ -12,9 +12,13 @@ try {
   commitCount = 1
 }
 
-const now = new Date()
-const pad = (n) => String(n).padStart(2, '0')
-const formattedDate = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()}`
+// Дата сборки строго по Московскому времени (Europe/Moscow, UTC+3)
+const formattedDate = new Intl.DateTimeFormat('ru-RU', {
+  timeZone: 'Europe/Moscow',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric'
+}).format(new Date())
 const appVersion = `v1.0.${commitCount}`
 
 export default defineConfig({
