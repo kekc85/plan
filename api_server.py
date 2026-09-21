@@ -73,7 +73,7 @@ init_db()
 app = FastAPI(
     title="AeroPlan W&B API (MySQL Beget)",
     description="API сервер для электронного журнала смены диспетчера центровки",
-    version="1.0.15"
+    version="1.0.16"
 )
 
 # Ограничение частоты неудачных попыток входа (Rate Limiting)
@@ -284,7 +284,7 @@ def health_check():
         "status": "ok",
         "service": "AeroPlan W&B Backend",
         "database_engine": engine,
-        "version": "1.0.14",
+        "version": "1.0.16",
         "time_utc": datetime.now(timezone.utc).isoformat(),
         "time_msk": datetime.now(MSK_TZ).strftime("%H:%M:%S")
     }

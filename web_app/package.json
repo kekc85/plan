@@ -1,7 +1,7 @@
 {
   "name": "aviabit-shift-log",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.168",
   "type": "module",
   "scripts": {
     "dev": "vite",
