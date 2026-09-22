@@ -1024,6 +1024,12 @@ export default function App() {
     setCurrentUser(null);
   };
 
+  // Открытие истории изменений рейса (Flight Audit Trail, мемоизировано)
+  const handleOpenFlightHistory = useCallback((flight) => {
+    setSelectedHistoryFlight(flight);
+    setIsHistoryModalOpen(true);
+  }, []);
+
   // Filter flights by search query
   const filteredFlights = flights.filter(f => {
     if (!searchQuery.trim()) return true;
@@ -1051,12 +1057,6 @@ export default function App() {
       </div>
     );
   }
-
-  // Открытие истории изменений рейса (Flight Audit Trail, мемоизировано)
-  const handleOpenFlightHistory = useCallback((flight) => {
-    setSelectedHistoryFlight(flight);
-    setIsHistoryModalOpen(true);
-  }, []);
 
   return (
     <div className="min-h-screen flex flex-col transition-colors duration-200">
