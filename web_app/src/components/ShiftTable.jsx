@@ -81,7 +81,7 @@ export default function ShiftTable({
               </th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-10 min-w-[38px] max-w-[42px] shadow-sm">Комп.</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-11 min-w-[42px] max-w-[46px] shadow-sm">PAX</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 min-w-[54px] max-w-[60px] shadow-sm">Экипаж<br/><span className="text-[9px] font-medium text-slate-500">Л/Б/И/П</span></th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[72px] min-w-[68px] max-w-[76px] shadow-sm">Экипаж<br/><span className="text-[9px] font-medium text-slate-500">Л/Б/И/П</span></th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[158px] min-w-[158px] max-w-[158px] text-sky-800 dark:text-sky-300 shadow-sm">Топливо и Веса<br/><span className="text-[9px] font-medium text-slate-500">Block / Trip / Taxi / DOW / DOI / Кухня</span></th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 min-w-[54px] max-w-[58px] shadow-sm">MTOW</th>
               <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-11 min-w-[42px] max-w-[46px] text-indigo-700 dark:text-indigo-300 shadow-sm">LIR</th>

@@ -8,6 +8,7 @@ import {
   formatValidAcNum, 
   formatValidAcConfig,
   formatValidMtow,
+  formatValidDoi,
   formatValidDayMonth,
   normalizePlaneType,
   detectPlaneType
@@ -322,7 +323,8 @@ export default function NewFlightModal({ isOpen, onClose, onAdd, timeMode = 'MSK
                 <input
                   type="text"
                   value={formData.doi}
-                  onChange={(e) => setFormData(prev => ({ ...prev, doi: e.target.value }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, doi: formatValidDoi(e.target.value) }))}
+                  maxLength={6}
                   placeholder="48.2"
                   className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-indigo-700 dark:text-indigo-200 font-mono text-center focus:border-indigo-400 focus:outline-none text-xs"
                 />

@@ -88,15 +88,21 @@ export function formatValidDayMonth(raw) {
   return `${dayStr}.${monthStr}`;
 }
 
-// Авто-маска экипажа (Л/Б/И/П)
+// Маска экипажа (Л/Б/И/П): до 4 сегментов, разделенных слэшем (например 2/4/0/0 или 8/14/1/0)
 export function formatValidCrew(raw) {
   if (!raw) return '';
-  const digits = raw.replace(/\D/g, '').slice(0, 4);
-  if (digits.length === 0) return '';
-  if (digits.length === 1) return digits[0];
-  if (digits.length === 2) return `${digits[0]}/${digits[1]}`;
-  if (digits.length === 3) return `${digits[0]}/${digits[1]}/${digits[2]}`;
-  return `${digits[0]}/${digits[1]}/${digits[2]}/${digits[3]}`;
+  // Если введены ровно 4 цифры без слэшей (быстрый ввод: 2400 -> 2/4/0/0)
+  if (/^\d{4}$/.test(raw.trim())) {
+    return raw.trim().split('').join('/');
+  }
+  // Разрешаем только цифры и слэши
+  let cleaned = raw.replace(/[^0-9\/]/g, '');
+  // Ограничиваем не более чем 4 сегментами (Л/Б/И/П)
+  const parts = cleaned.split('/');
+  if (parts.length > 4) {
+    cleaned = parts.slice(0, 4).join('/');
+  }
+  return cleaned.slice(0, 12);
 }
 
 // Номер рейса: буквы префикса (N4, EO и т.д.) + до 5 цифр + до 1 буквы в конце
@@ -129,10 +135,10 @@ export function formatValidDow(raw) {
   return raw.replace(/[^0-9.,]/g, '').slice(0, 6);
 }
 
-// DOI: не более 5 символов (цифры, точка, запятая, минус)
+// DOI: не более 6 символов (цифры, точка, запятая, минус)
 export function formatValidDoi(raw) {
   if (!raw) return '';
-  return raw.replace(/[^0-9.,\-]/g, '').slice(0, 5);
+  return raw.replace(/[^0-9.,\-]/g, '').slice(0, 6);
 }
 
 // Топливо (BLOCK, TRIP, TAXI): не более 5 цифр/символов

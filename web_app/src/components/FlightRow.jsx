@@ -705,7 +705,7 @@ function FlightRow({
       </td>
 
       {/* 8. Экипаж */}
-      <td className={`py-1 px-0.5 font-mono text-xs text-slate-900 dark:text-slate-200 whitespace-nowrap text-center w-14 min-w-[54px] max-w-[60px] ${overdueBorderTopBottom}`}>
+      <td className={`py-1 px-0.5 font-mono text-xs text-slate-900 dark:text-slate-200 whitespace-nowrap text-center w-[72px] min-w-[68px] max-w-[76px] ${overdueBorderTopBottom}`}>
         <div className="flex flex-col items-center justify-center max-w-full">
           <input
             type="text"
@@ -716,7 +716,7 @@ function FlightRow({
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="2/4/0/0"
-            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-14 text-center font-mono font-extrabold text-xs text-slate-900 dark:text-slate-100 outline-none cursor-text ${getChangedStyle('crew')}`}
+            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-full text-center font-mono font-extrabold text-[11px] text-slate-900 dark:text-slate-100 outline-none cursor-text tracking-tight ${getChangedStyle('crew')}`}
           />
           <ChangeBadge change={unread.crew} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'crew')} />
         </div>
@@ -800,7 +800,7 @@ function FlightRow({
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 placeholder="—"
-                maxLength={5}
+                maxLength={6}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-[11px] font-extrabold text-indigo-800 dark:text-indigo-200 text-center outline-none cursor-text tracking-tight"
               />
             </div>
