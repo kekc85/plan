@@ -144,6 +144,10 @@ export async function adminDeleteUser(userId) {
 
 // --- СИНХРОНИЗАЦИЯ СМЕНЫ И РЕЙСОВ ---
 
+export async function fetchShiftVersion() {
+  return request('/shift/version');
+}
+
 export async function fetchCurrentShift() {
   return request('/shift/current');
 }

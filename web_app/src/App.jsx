@@ -34,6 +34,7 @@ import {
   getStoredUser, 
   authGetMe, 
   authLogout, 
+  fetchShiftVersion,
   fetchCurrentShift, 
   saveShift, 
   smartMergeSchedules,
@@ -254,6 +255,7 @@ export default function App() {
   const hasUserModifiedRef = React.useRef(false);
   const isSavingToServerRef = React.useRef(false);
   const lastServerDataHashRef = React.useRef('');
+  const lastServerVersionRef = React.useRef('');
 
   // Shift metadata (интервал 24-часовой смены 09:00 - 09:00)
   const [shiftInfo, setShiftInfo] = useState(() => {
@@ -441,7 +443,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [flights, shiftInfo]);
 
-  // Фоновая синхронизация с сервером между вкладками / устройствами (Live Polling каждые 15 сек)
+  // Фоновая синхронизация с сервером между вкладками / устройствами (Smart Version Polling каждые 15 сек)
   useEffect(() => {
     const checkServerForRemoteUpdates = async () => {
       if (!isInitialServerSyncCompletedRef.current || isSavingToServerRef.current || hasUserModifiedRef.current || isSyncing) {
@@ -449,8 +451,21 @@ export default function App() {
       }
 
       try {
+        // Сначала запрашиваем ультра-легковесную версию (<100 байт), не нагружая память и процессор
+        const verData = await fetchShiftVersion();
+        if (verData && verData.version) {
+          if (lastServerVersionRef.current && verData.version === lastServerVersionRef.current) {
+            // Версия на сервере не изменилась — выходим сразу (0% нагрузки на CPU и RAM)
+            return;
+          }
+        }
+
+        // Если версия изменилась (или первичная проверка), загружаем полный суточный план
         const data = await fetchCurrentShift();
         if (data && Array.isArray(data.flights)) {
+          if (verData && verData.version) {
+            lastServerVersionRef.current = verData.version;
+          }
           const remoteHash = JSON.stringify({
             s: data.shiftInfo || null,
             f: data.flights.map(f => ({ id: f.id, status: f.status, time: f.time, fuel: f.fuel_block, notes: f.notes, ac: f.ac_num, pax: f.pax, unread: f.unread_changes }))

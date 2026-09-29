@@ -14,6 +14,7 @@ import json
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import gc
 import requests
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -769,7 +770,9 @@ def process_flights(
     telegrams = {}
     if missing_pf_ids:
         print(f"[*] Загрузка оперативной информации (пассажиры, продажи, телеграммы UWS) для {len(missing_pf_ids)} рейсов...")
-        with ThreadPoolExecutor(max_workers=30) as executor:
+        # Балансируем нагрузку на слабый процессор: 4-6 параллельных потоков вместо агрессивных 30
+        cpu_workers = max(2, min(6, (os.cpu_count() or 2) * 2))
+        with ThreadPoolExecutor(max_workers=cpu_workers) as executor:
             future_to_prelim = {
                 executor.submit(client.fetch_flight_preliminary, pf_id): pf_id
                 for pf_id, client in missing_pf_ids
@@ -1239,6 +1242,12 @@ def export_to_excel(
                 continue
 
     print(f"[+] Файл успешно сохранен: {os.path.abspath(actual_path)}")
+    # Принудительно освобождаем память от тяжелого объекта openpyxl
+    try:
+        del wb
+        gc.collect()
+    except Exception:
+        pass
     return actual_path
 
 

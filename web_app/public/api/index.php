@@ -945,6 +945,35 @@ if ($route === '/users/active') {
 }
 
 // ----------------------------------------------------
+// ЭНДПОИНТ: /shift/version (Быстрая проверка версии для Smart Polling)
+// ----------------------------------------------------
+if ($route === '/shift/version') {
+    $db = getDb();
+    $stmt = $db->query("SELECT id FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1");
+    $shift = $stmt->fetch();
+    $shiftId = $shift ? (int)$shift['id'] : null;
+
+    $stat = $db->query("SELECT COUNT(*) as cnt, MAX(updated_at) as max_upd FROM plan_flights")->fetch();
+    $cnt = $stat ? (int)($stat['cnt'] ?? 0) : 0;
+    $maxUpd = $stat ? (string)($stat['max_upd'] ?? '') : '';
+
+    $lastHandover = $db->query("SELECT id, is_read, handover_time FROM plan_handover_logs ORDER BY id DESC LIMIT 1")->fetch();
+    $hId = $lastHandover ? ($lastHandover['id'] ?? 0) : 0;
+    $hRead = $lastHandover ? ($lastHandover['is_read'] ?? 0) : 0;
+    $hTime = $lastHandover ? ($lastHandover['handover_time'] ?? '') : '';
+    $hSig = "{$hId}_{$hRead}_{$hTime}";
+
+    $versionSig = "s{$shiftId}_c{$cnt}_u{$maxUpd}_h{$hSig}";
+    echo json_encode([
+        'shift_id' => $shiftId,
+        'flights_count' => $cnt,
+        'updated_at' => $maxUpd,
+        'version' => $versionSig
+    ]);
+    exit;
+}
+
+// ----------------------------------------------------
 // ЭНДПОИНТ: /shift/current
 // ----------------------------------------------------
 if ($route === '/shift/current') {

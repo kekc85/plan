@@ -1106,4 +1106,13 @@ function FlightRow({
   );
 }
 
-export default React.memo(FlightRow);
+function areFlightRowsEqual(prevProps, nextProps) {
+  if (prevProps.flight !== nextProps.flight) return false;
+  if (prevProps.index !== nextProps.index) return false;
+  if (prevProps.isFirst !== nextProps.isFirst) return false;
+  if (prevProps.isLast !== nextProps.isLast) return false;
+  if (prevProps.timeMode !== nextProps.timeMode) return false;
+  return true;
+}
+
+export default React.memo(FlightRow, areFlightRowsEqual);

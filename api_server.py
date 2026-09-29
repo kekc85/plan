@@ -67,6 +67,19 @@ from parser import (
     detect_plane_type
 )
 
+def _set_process_below_normal_priority():
+    """Снижает приоритет процесса в Windows (Below Normal), чтобы фоновый парсинг не подвешивал систему и офис"""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            # BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
+            handle = ctypes.windll.kernel32.GetCurrentProcess()
+            ctypes.windll.kernel32.SetPriorityClass(handle, 0x00004000)
+        except Exception:
+            pass
+
+_set_process_below_normal_priority()
+
 # Инициализируем таблицы БД при запуске
 init_db()
 
@@ -909,6 +922,42 @@ def delete_archive(archive_id: int, admin: dict = Depends(require_admin)):
 
 
 # --- 3. СИНХРОНИЗАЦИЯ СМЕНЫ И РЕЙСОВ В БАЗЕ ДАННЫХ ---
+
+@app.get("/api/shift/version")
+def get_shift_version():
+    """Быстрый легковесный эндпоинт для Smart Polling (возвращает только метаданные версии смены)"""
+    conn, engine = DatabaseConnection.get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id, status FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1;")
+    shift = cursor.fetchone()
+    shift_id = dict(shift)["id"] if shift else None
+
+    # Быстрый подсчет количества рейсов и максимального updated_at
+    cursor.execute("SELECT COUNT(*) as cnt, MAX(updated_at) as max_upd FROM plan_flights;")
+    stat_row = cursor.fetchone()
+    stat_dict = dict(stat_row) if stat_row else {}
+
+    cnt = stat_dict.get("cnt") or 0
+    max_upd = stat_dict.get("max_upd") or ""
+
+    # Проверяем последнее замечание сдачи-приемки смены
+    cursor.execute("SELECT id, is_read, handover_time FROM plan_handover_logs ORDER BY id DESC LIMIT 1;")
+    h_row = cursor.fetchone()
+    h_dict = dict(h_row) if h_row else {}
+    h_sig = f"{h_dict.get('id', 0)}_{h_dict.get('is_read', 0)}_{h_dict.get('handover_time', '')}"
+
+    conn.close()
+
+    # Формируем компактную сигнатуру версии смены
+    version_sig = f"s{shift_id}_c{cnt}_u{max_upd}_h{h_sig}"
+    return {
+        "shift_id": shift_id,
+        "flights_count": cnt,
+        "updated_at": max_upd,
+        "version": version_sig
+    }
+
 
 @app.get("/api/shift/current")
 def get_current_shift():
