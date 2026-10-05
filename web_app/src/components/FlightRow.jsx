@@ -104,30 +104,54 @@ function FlightRow({
   };
 
   // Изменение времени вылета -> авто-расчет времени выпуска (-40 мин)
+  // При переходе через полночь (напр. с 23:xx на 00:xx) автоматически сдвигаем дату рейса
   const handleDepartureTimeChange = (e) => {
     const rawVal = e.target.value;
     const formatted = formatValidTime(rawVal);
     let mskTime = formatted;
     let mskRelTime = '';
+    // Новая дата рейса если переход через полночь (null = не меняем)
+    let newMskDate = null;
 
     if (timeMode === 'UTC') {
       if (formatted.length === 5 && formatted.includes(':')) {
+        // convertUtcToMsk возвращает { time, date } — date сдвинута если UTC >= 21:00 (переходит за 00:00 MSK)
         const converted = convertUtcToMsk(formatted, flight.flight_date);
         mskTime = converted.time;
         mskRelTime = calcReleaseTime(mskTime);
+        // Если дата изменилась при конвертации, запоминаем новую
+        if (converted.date && converted.date !== flight.flight_date) {
+          newMskDate = converted.date;
+        }
       } else {
         mskTime = formatted;
       }
     } else {
       if (formatted.length === 5 && formatted.includes(':')) {
         mskRelTime = calcReleaseTime(formatted);
+        // В MSK-режиме: детектируем переход через полночь по разнице часов
+        if (
+          flight.flight_date && flight.flight_date.length >= 4 &&
+          flight.time && flight.time.length === 5 && flight.time.includes(':')
+        ) {
+          const oldH = parseInt(flight.time.split(':')[0], 10);
+          const newH = parseInt(formatted.split(':')[0], 10);
+          // Переход через полночь вперёд: было >=20:00, стало <=05:59
+          if (oldH >= 20 && newH <= 5) {
+            newMskDate = shiftDateByDays(flight.flight_date, 1);
+          }
+          // Переход через полночь назад: было <=05:59, стало >=20:00
+          else if (oldH <= 5 && newH >= 20) {
+            newMskDate = shiftDateByDays(flight.flight_date, -1);
+          }
+        }
       }
     }
 
     const updates = { time: mskTime };
-    if (mskRelTime) {
-      updates.release_time = mskRelTime;
-    }
+    if (mskRelTime) updates.release_time = mskRelTime;
+    if (newMskDate) updates.flight_date = newMskDate;
+
     if (unread['time'] && onAcknowledgeField) {
       onAcknowledgeField(flight.id, 'time');
     }
