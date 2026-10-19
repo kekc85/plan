@@ -35,6 +35,11 @@ def main():
         runner = pythonw_candidate if os.path.exists(pythonw_candidate) else python_exe
 
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        # BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
+        # Запускаем фоновый сервер с пониженным приоритетом, чтобы не отнимать CPU у офисных программ
+        if sys.platform == "win32":
+            flags |= 0x00004000
+
         subprocess.Popen(
             [runner, "api_server.py"],
             cwd=root_dir,

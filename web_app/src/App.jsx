@@ -256,6 +256,13 @@ export default function App() {
   const isSavingToServerRef = React.useRef(false);
   const lastServerDataHashRef = React.useRef('');
   const lastServerVersionRef = React.useRef('');
+  // Режим активности окна: 'focused' | 'visible' | 'hidden'
+  // focused  — браузер в фокусе (пользователь работает в программе)
+  // visible  — вкладка видна, но фокус в другой программе (Excel, 1С на другом мониторе)
+  // hidden   — вкладка полностью скрыта (другая вкладка браузера или окно свёрнуто)
+  const windowModeRef = React.useRef(
+    document.hidden ? 'hidden' : (document.hasFocus() ? 'focused' : 'visible')
+  );
 
   // Shift metadata (интервал 24-часовой смены 09:00 - 09:00)
   const [shiftInfo, setShiftInfo] = useState(() => {
@@ -438,12 +445,14 @@ export default function App() {
       } finally {
         isSavingToServerRef.current = false;
       }
-    }, 1200);
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [flights, shiftInfo]);
 
-  // Фоновая синхронизация с сервером между вкладками / устройствами (Smart Version Polling каждые 15 сек)
+  // Фоновая синхронизация с сервером между вкладками / устройствами (Smart Version Polling)
+  // Использует requestIdleCallback — браузер запускает опрос ТОЛЬКО в моменты своего простоя:
+  // нет рендеринга, нет анимаций, нет ввода пользователя. Если браузер занят — ждём.
   useEffect(() => {
     const checkServerForRemoteUpdates = async () => {
       if (!isInitialServerSyncCompletedRef.current || isSavingToServerRef.current || hasUserModifiedRef.current || isSyncing) {
@@ -495,29 +504,83 @@ export default function App() {
     };
 
     let pollTimer = null;
+    let idleCbHandle = null;
+
+    // Трёхрежимный планировщик опроса версии:
+    // 'focused'  — окно в фокусе:                   30 сек + requestIdleCallback (только в простой браузера)
+    // 'visible'  — видно но фокус в другом приложении: 120 сек через setTimeout (минимальная нагрузка)
+    // 'hidden'   — вкладка скрыта:                   полная пауза, 0 запросов
     const scheduleNextPoll = () => {
-      // При скрытой вкладке опрашиваем в 4 раза реже (раз в 60 сек вместо 15 сек) для снижения нагрузки на слабый ПК
-      const delay = document.visibilityState === 'hidden' ? 60000 : 15000;
-      pollTimer = setTimeout(async () => {
-        await checkServerForRemoteUpdates();
-        scheduleNextPoll();
+      const mode = windowModeRef.current;
+      if (mode === 'hidden') return; // полная пауза
+
+      const delay = mode === 'focused' ? 30000 : 120000;
+
+      pollTimer = setTimeout(() => {
+        const currentMode = windowModeRef.current;
+        if (currentMode === 'hidden') { scheduleNextPoll(); return; }
+
+        if (currentMode === 'focused' && typeof requestIdleCallback !== 'undefined') {
+          // Режим фокуса: запускаем только в момент простоя браузера
+          idleCbHandle = requestIdleCallback(async () => {
+            await checkServerForRemoteUpdates();
+            scheduleNextPoll();
+          }, { timeout: 5000 });
+        } else {
+          // Режим "видно без фокуса" или fallback: просто запускаем
+          checkServerForRemoteUpdates().then(scheduleNextPoll);
+        }
       }, delay);
     };
 
     scheduleNextPoll();
 
+    // Обновляем windowModeRef при изменении видимости вкладки
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.hidden) {
+        windowModeRef.current = 'hidden';
         if (pollTimer) clearTimeout(pollTimer);
+        if (idleCbHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(idleCbHandle);
+        pollTimer = null; idleCbHandle = null;
+      } else {
+        windowModeRef.current = document.hasFocus() ? 'focused' : 'visible';
+        if (pollTimer) clearTimeout(pollTimer);
+        if (idleCbHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(idleCbHandle);
         checkServerForRemoteUpdates();
         scheduleNextPoll();
       }
     };
+
+    // Обновляем windowModeRef при получении/потере фокуса окна (3 монитора!)
+    const handleFocus = () => {
+      if (!document.hidden) {
+        windowModeRef.current = 'focused';
+        // При получении фокуса перезапускаем с более частым интервалом
+        if (pollTimer) clearTimeout(pollTimer);
+        if (idleCbHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(idleCbHandle);
+        scheduleNextPoll();
+      }
+    };
+    const handleBlur = () => {
+      if (!document.hidden) {
+        windowModeRef.current = 'visible';
+        // При потере фокуса перезапускаем с редким интервалом (экономим CPU)
+        if (pollTimer) clearTimeout(pollTimer);
+        if (idleCbHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(idleCbHandle);
+        scheduleNextPoll();
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
 
     return () => {
       if (pollTimer) clearTimeout(pollTimer);
+      if (idleCbHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(idleCbHandle);
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
     };
   }, [isSyncing]);
 
@@ -576,9 +639,80 @@ export default function App() {
       }
     };
 
+    // Запускаем первую проверку немедленно
     checkAlerts();
-    const interval = setInterval(checkAlerts, 10000);
-    return () => clearInterval(interval);
+
+    // Трёхрежимный планировщик проверки оповещений (таймер выпуска за 40 мин):
+    // 'focused' — 30 сек + requestIdleCallback (только в простой браузера)
+    // 'visible' — 60 сек (оповещения важны, даже без фокуса нельзя сильно замедлять)
+    // 'hidden'  — пауза (оповещение сработает при следующем показе вкладки)
+    let alertTimerId = null;
+    let alertIdleHandle = null;
+
+    const scheduleAlertCheck = () => {
+      const mode = windowModeRef.current;
+      if (mode === 'hidden') return;
+
+      const delay = mode === 'focused' ? 30000 : 60000;
+
+      alertTimerId = setTimeout(() => {
+        const currentMode = windowModeRef.current;
+        if (currentMode === 'hidden') { scheduleAlertCheck(); return; }
+
+        if (currentMode === 'focused' && typeof requestIdleCallback !== 'undefined') {
+          alertIdleHandle = requestIdleCallback(() => {
+            checkAlerts();
+            scheduleAlertCheck();
+          }, { timeout: 3000 });
+        } else {
+          checkAlerts();
+          scheduleAlertCheck();
+        }
+      }, delay);
+    };
+    scheduleAlertCheck();
+
+    const onAlertVisChange = () => {
+      if (document.hidden) {
+        windowModeRef.current = 'hidden';
+        if (alertTimerId) clearTimeout(alertTimerId);
+        if (alertIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(alertIdleHandle);
+        alertTimerId = null; alertIdleHandle = null;
+      } else {
+        windowModeRef.current = document.hasFocus() ? 'focused' : 'visible';
+        if (alertTimerId) clearTimeout(alertTimerId);
+        if (alertIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(alertIdleHandle);
+        checkAlerts();
+        scheduleAlertCheck();
+      }
+    };
+    const onAlertFocus = () => {
+      if (!document.hidden) {
+        windowModeRef.current = 'focused';
+        if (alertTimerId) clearTimeout(alertTimerId);
+        if (alertIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(alertIdleHandle);
+        scheduleAlertCheck();
+      }
+    };
+    const onAlertBlur = () => {
+      if (!document.hidden) {
+        windowModeRef.current = 'visible';
+        if (alertTimerId) clearTimeout(alertTimerId);
+        if (alertIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(alertIdleHandle);
+        scheduleAlertCheck();
+      }
+    };
+    document.addEventListener('visibilitychange', onAlertVisChange);
+    window.addEventListener('focus', onAlertFocus);
+    window.addEventListener('blur', onAlertBlur);
+
+    return () => {
+      if (alertTimerId) clearTimeout(alertTimerId);
+      if (alertIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(alertIdleHandle);
+      document.removeEventListener('visibilitychange', onAlertVisChange);
+      window.removeEventListener('focus', onAlertFocus);
+      window.removeEventListener('blur', onAlertBlur);
+    };
   }, [flights, dismissedAlerts, timeMode]);
 
   // Отложить всплывающее оповещение ровно на 5 минут (300 000 мс)
@@ -833,6 +967,7 @@ export default function App() {
   isSyncingRef.current = isSyncing;
 
   // Надежный фоновый таймер авто-подкачки AviaBit (сверка по астрономическому времени)
+  // Работает через requestIdleCallback — не мешает браузеру рендерить и обрабатывать ввод
   useEffect(() => {
     if (!autoSyncEnabled) return;
 
@@ -848,20 +983,77 @@ export default function App() {
       }
     };
 
-    // Периодическая проверка каждые 10 секунд (не сбрасывается при наборе текста или кликах)
-    const intervalId = setInterval(checkAndTrigger, 10000);
+    // Трёхрежимный планировщик таймера автосинхронизации AviaBit:
+    // 'focused' — 30 сек + requestIdleCallback
+    // 'visible' — 120 сек (автосверка не критична по времени, сильно экономим CPU)
+    // 'hidden'  — пауза
+    let syncTimerId = null;
+    let syncIdleHandle = null;
+
+    const scheduleSyncCheck = () => {
+      const mode = windowModeRef.current;
+      if (mode === 'hidden') return;
+
+      const delay = mode === 'focused' ? 30000 : 120000;
+
+      syncTimerId = setTimeout(() => {
+        const currentMode = windowModeRef.current;
+        if (currentMode === 'hidden') { scheduleSyncCheck(); return; }
+
+        if (currentMode === 'focused' && typeof requestIdleCallback !== 'undefined') {
+          syncIdleHandle = requestIdleCallback(() => {
+            checkAndTrigger();
+            scheduleSyncCheck();
+          }, { timeout: 5000 });
+        } else {
+          checkAndTrigger();
+          scheduleSyncCheck();
+        }
+      }, delay);
+    };
+    scheduleSyncCheck();
 
     // Мгновенная проверка при возвращении пользователя на вкладку браузера
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.hidden) {
+        windowModeRef.current = 'hidden';
+        if (syncTimerId) clearTimeout(syncTimerId);
+        if (syncIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(syncIdleHandle);
+        syncTimerId = null; syncIdleHandle = null;
+      } else {
+        windowModeRef.current = document.hasFocus() ? 'focused' : 'visible';
+        if (syncTimerId) clearTimeout(syncTimerId);
+        if (syncIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(syncIdleHandle);
         checkAndTrigger();
+        scheduleSyncCheck();
+      }
+    };
+    const onSyncFocus = () => {
+      if (!document.hidden) {
+        windowModeRef.current = 'focused';
+        if (syncTimerId) clearTimeout(syncTimerId);
+        if (syncIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(syncIdleHandle);
+        scheduleSyncCheck();
+      }
+    };
+    const onSyncBlur = () => {
+      if (!document.hidden) {
+        windowModeRef.current = 'visible';
+        if (syncTimerId) clearTimeout(syncTimerId);
+        if (syncIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(syncIdleHandle);
+        scheduleSyncCheck();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', onSyncFocus);
+    window.addEventListener('blur', onSyncBlur);
 
     return () => {
-      clearInterval(intervalId);
+      if (syncTimerId) clearTimeout(syncTimerId);
+      if (syncIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(syncIdleHandle);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', onSyncFocus);
+      window.removeEventListener('blur', onSyncBlur);
     };
   }, [autoSyncEnabled, autoSyncInterval]);
 

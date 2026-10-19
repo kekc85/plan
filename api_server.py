@@ -67,18 +67,36 @@ from parser import (
     detect_plane_type
 )
 
-def _set_process_below_normal_priority():
-    """Снижает приоритет процесса в Windows (Below Normal), чтобы фоновый парсинг не подвешивал систему и офис"""
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            # BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
-            handle = ctypes.windll.kernel32.GetCurrentProcess()
-            ctypes.windll.kernel32.SetPriorityClass(handle, 0x00004000)
-        except Exception:
-            pass
+def _set_process_idle_priority():
+    """
+    Устанавливает минимальный приоритет для Python-процесса и его потоков в Windows.
+    IDLE_PRIORITY_CLASS (0x40): Windows отдаёт CPU этому процессу только когда
+    все остальные процессы простаивают — Excel, браузер и т.д. никогда не тормозят.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        import os as _os
+        kernel32 = ctypes.windll.kernel32
+        pid = _os.getpid()
 
-_set_process_below_normal_priority()
+        # Открываем реальный handle процесса (GetCurrentProcess возвращает псевдо-handle)
+        PROCESS_ALL_ACCESS = 0x1F0FFF
+        proc_handle = kernel32.OpenProcess(PROCESS_ALL_ACCESS, False, pid)
+        if proc_handle:
+            # IDLE_PRIORITY_CLASS = 0x00000040 — самый низкий приоритет CPU
+            kernel32.SetPriorityClass(proc_handle, 0x00000040)
+            kernel32.CloseHandle(proc_handle)
+
+        # Понижаем приоритет текущего потока (главный поток uvicorn)
+        # THREAD_PRIORITY_IDLE = -15
+        thread_handle = kernel32.GetCurrentThread()
+        kernel32.SetThreadPriority(thread_handle, -15)
+    except Exception:
+        pass
+
+_set_process_idle_priority()
 
 # Инициализируем таблицы БД при запуске
 init_db()
@@ -1216,73 +1234,78 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
                             "user_id": u_id
                         })
 
-    # Синхронизируем рейсы
+    # Синхронизируем рейсы: формируем пакетную транзакцию (Batch Insert)
+    # для исключения многократных сбросов дискового кэша в Windows
     cursor.execute("DELETE FROM plan_flights;")
+    
+    insert_sql = q("""
+    INSERT INTO plan_flights (
+        id, shift_id, flight_number, flight_date, route_city, route_airports,
+        departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
+        fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow, crew_manual,
+        lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
+        status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
+        inbound_landing_calc, inbound_landing_time, outbound_takeoff_time,
+        plane_status, unread_changes, sort_order, updated_at
+    ) VALUES (
+        %s, %s, %s, %s, %s, %s,
+        %s, %s, %s, %s, %s, %s, %s,
+        %s, %s, %s, %s, %s, %s, %s, %s,
+        %s, %s, %s, %s, %s, %s, %s,
+        %s, %s, %s, %s, %s,
+        %s, %s, %s,
+        %s, %s, %s, %s
+    );
+    """, engine)
+
+    records_to_insert = []
     for index, f in enumerate(req.flights):
         unread_json = json.dumps(f.get("unread_changes")) if f.get("unread_changes") else None
-        cursor.execute(
-            q("""
-            INSERT INTO plan_flights (
-                id, shift_id, flight_number, flight_date, route_city, route_airports,
-                departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
-                fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow, crew_manual,
-                lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
-                status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
-                inbound_landing_calc, inbound_landing_time, outbound_takeoff_time,
-                plane_status, unread_changes, sort_order, updated_at
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s,
-                %s, %s, %s,
-                %s, %s, %s, %s
-            );
-            """, engine),
-            (
-                str(f.get("id")),
-                shift_id,
-                f.get("flight") or "",
-                f.get("flight_date") or "",
-                f.get("route_city") or "",
-                f.get("route_airports") or "",
-                f.get("time") or "",
-                f.get("release_time") or "",
-                f.get("ac_num") or "",
-                f.get("ac_type") or "",
-                f.get("ac_config") or "",
-                str(f.get("pax") or ""),
-                f.get("crew") or "",
-                str(f.get("fuel_block") or ""),
-                str(f.get("fuel_trip") or ""),
-                str(f.get("fuel_taxi") or ""),
-                str(f.get("dow") or ""),
-                str(f.get("doi") or ""),
-                str(f.get("galley") or "D"),
-                str(f.get("mtow") or ""),
-                1 if f.get("crew_manual") else 0,
-                1 if f.get("lir_sent") else 0,
-                str(f.get("cargo") or ""),
-                str(f.get("mail") or ""),
-                str(f.get("baggage") or ""),
-                1 if f.get("szv_sent") else 0,
-                1 if f.get("ldm_sent") else 0,
-                1 if f.get("astra_times_sent") else 0,
-                f.get("status") or "pending",
-                f.get("notes") or "",
-                f.get("inbound_flight") or "",
-                f.get("inbound_dep") or "",
-                f.get("inbound_takeoff_time") or "",
-                f.get("inbound_landing_calc") or "",
-                f.get("inbound_landing_time") or "",
-                f.get("outbound_takeoff_time") or "",
-                f.get("plane_status") or "",
-                unread_json,
-                index,
-                now_str
-            )
-        )
+        records_to_insert.append((
+            str(f.get("id")),
+            shift_id,
+            f.get("flight") or "",
+            f.get("flight_date") or "",
+            f.get("route_city") or "",
+            f.get("route_airports") or "",
+            f.get("time") or "",
+            f.get("release_time") or "",
+            f.get("ac_num") or "",
+            f.get("ac_type") or "",
+            f.get("ac_config") or "",
+            str(f.get("pax") or ""),
+            f.get("crew") or "",
+            str(f.get("fuel_block") or ""),
+            str(f.get("fuel_trip") or ""),
+            str(f.get("fuel_taxi") or ""),
+            str(f.get("dow") or ""),
+            str(f.get("doi") or ""),
+            str(f.get("galley") or "D"),
+            str(f.get("mtow") or ""),
+            1 if f.get("crew_manual") else 0,
+            1 if f.get("lir_sent") else 0,
+            str(f.get("cargo") or ""),
+            str(f.get("mail") or ""),
+            str(f.get("baggage") or ""),
+            1 if f.get("szv_sent") else 0,
+            1 if f.get("ldm_sent") else 0,
+            1 if f.get("astra_times_sent") else 0,
+            f.get("status") or "pending",
+            f.get("notes") or "",
+            f.get("inbound_flight") or "",
+            f.get("inbound_dep") or "",
+            f.get("inbound_takeoff_time") or "",
+            f.get("inbound_landing_calc") or "",
+            f.get("inbound_landing_time") or "",
+            f.get("outbound_takeoff_time") or "",
+            f.get("plane_status") or "",
+            unread_json,
+            index,
+            now_str
+        ))
+
+    if records_to_insert:
+        cursor.executemany(insert_sql, records_to_insert)
 
     if engine == "sqlite":
         conn.commit()

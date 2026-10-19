@@ -60,6 +60,9 @@ class DatabaseConnection:
         conn = sqlite3.connect(sqlite_file)
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA temp_store=MEMORY;")
+        conn.execute("PRAGMA cache_size=-4000;")
+        conn.execute("PRAGMA mmap_size=33554432;")
         conn.row_factory = sqlite3.Row
         return conn, "sqlite"
 

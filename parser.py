@@ -770,19 +770,19 @@ def process_flights(
     telegrams = {}
     if missing_pf_ids:
         print(f"[*] Загрузка оперативной информации (пассажиры, продажи, телеграммы UWS) для {len(missing_pf_ids)} рейсов...")
-        # Балансируем нагрузку на слабый процессор: 4-6 параллельных потоков вместо агрессивных 30
-        cpu_workers = max(2, min(6, (os.cpu_count() or 2) * 2))
+        # Ограничиваем нагрузку на слабый офисный процессор: максимум 2-3 потока
+        # чтобы браузер, Excel и другие программы пользователя не зависали
+        cpu_workers = max(1, min(3, os.cpu_count() or 2))
         with ThreadPoolExecutor(max_workers=cpu_workers) as executor:
-            future_to_prelim = {
-                executor.submit(client.fetch_flight_preliminary, pf_id): pf_id
-                for pf_id, client in missing_pf_ids
-                if client is not None
-            }
-            future_to_telex = {
-                executor.submit(client.fetch_flight_telex, pf_id): pf_id
-                for pf_id, client in missing_pf_ids
-                if client is not None
-            }
+            future_to_prelim = {}
+            future_to_telex = {}
+            for pf_id, client in missing_pf_ids:
+                if client is not None:
+                    future_to_prelim[executor.submit(client.fetch_flight_preliminary, pf_id)] = pf_id
+                    future_to_telex[executor.submit(client.fetch_flight_telex, pf_id)] = pf_id
+                    # Микро-квантование для освобождения CPU/IO другим приложениям Windows
+                    import time
+                    time.sleep(0.015)
             for future in as_completed(future_to_prelim):
                 pf_id = future_to_prelim[future]
                 try:
