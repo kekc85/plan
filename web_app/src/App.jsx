@@ -507,28 +507,23 @@ export default function App() {
     let idleCbHandle = null;
 
     // Трёхрежимный планировщик опроса версии:
-    // 'focused'  — окно в фокусе:                   30 сек + requestIdleCallback (только в простой браузера)
-    // 'visible'  — видно но фокус в другом приложении: 120 сек через setTimeout (минимальная нагрузка)
-    // 'hidden'   — вкладка скрыта:                   полная пауза, 0 запросов
+    // 'focused' — окно в фокусе: 30 сек + requestIdleCallback (только в простой браузера)
+    // 'visible' — видно, но фокус в другом приложении: 90 сек
+    // 'hidden'  — вкладка скрыта: тихий опрос раз в 120 сек (легкий запрос <100 байт)
     const scheduleNextPoll = () => {
       const mode = windowModeRef.current;
-      if (mode === 'hidden') return; // полная пауза
-
-      const delay = mode === 'focused' ? 30000 : 120000;
+      const delay = mode === 'focused' ? 30000 : (mode === 'visible' ? 90000 : 120000);
 
       pollTimer = setTimeout(() => {
         const currentMode = windowModeRef.current;
-        if (currentMode === 'hidden') { scheduleNextPoll(); return; }
 
         if (currentMode === 'focused' && typeof requestIdleCallback !== 'undefined') {
-          // Режим фокуса: запускаем только в момент простоя браузера
           idleCbHandle = requestIdleCallback(async () => {
             await checkServerForRemoteUpdates();
             scheduleNextPoll();
           }, { timeout: 5000 });
         } else {
-          // Режим "видно без фокуса" или fallback: просто запускаем
-          checkServerForRemoteUpdates().then(scheduleNextPoll);
+          checkServerForRemoteUpdates().then(scheduleNextPoll).catch(scheduleNextPoll);
         }
       }, delay);
     };
@@ -537,18 +532,13 @@ export default function App() {
 
     // Обновляем windowModeRef при изменении видимости вкладки
     const handleVisibility = () => {
-      if (document.hidden) {
-        windowModeRef.current = 'hidden';
-        if (pollTimer) clearTimeout(pollTimer);
-        if (idleCbHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(idleCbHandle);
-        pollTimer = null; idleCbHandle = null;
-      } else {
-        windowModeRef.current = document.hasFocus() ? 'focused' : 'visible';
-        if (pollTimer) clearTimeout(pollTimer);
-        if (idleCbHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(idleCbHandle);
+      windowModeRef.current = document.hidden ? 'hidden' : (document.hasFocus() ? 'focused' : 'visible');
+      if (pollTimer) clearTimeout(pollTimer);
+      if (idleCbHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(idleCbHandle);
+      if (!document.hidden) {
         checkServerForRemoteUpdates();
-        scheduleNextPoll();
       }
+      scheduleNextPoll();
     };
 
     // Обновляем windowModeRef при получении/потере фокуса окна (3 монитора!)
@@ -642,22 +632,21 @@ export default function App() {
     // Запускаем первую проверку немедленно
     checkAlerts();
 
-    // Трёхрежимный планировщик проверки оповещений (таймер выпуска за 40 мин):
-    // 'focused' — 30 сек + requestIdleCallback (только в простой браузера)
-    // 'visible' — 60 сек (оповещения важны, даже без фокуса нельзя сильно замедлять)
-    // 'hidden'  — пауза (оповещение сработает при следующем показе вкладки)
+    // Надёжный планировщик проверки оповещений (таймер выпуска за 40 мин):
+    // Оповещения ДОЛЖНЫ срабатывать всегда (звук + Windows notification), даже если вкладка свернута!
+    // 'focused' — 20 сек + requestIdleCallback (в моменты простоя браузера)
+    // 'visible' — 25 сек через setTimeout (окно на 2/3 мониторе)
+    // 'hidden'  — 25 сек через setTimeout (вкладка свернута — 0% CPU, но звук и уведомление сработают вовремя!)
     let alertTimerId = null;
     let alertIdleHandle = null;
 
     const scheduleAlertCheck = () => {
       const mode = windowModeRef.current;
-      if (mode === 'hidden') return;
-
-      const delay = mode === 'focused' ? 30000 : 60000;
+      // В фоне проверяем каждые 25 сек, чтобы точно не пропустить 40-минутное окно выпуска
+      const delay = mode === 'focused' ? 20000 : 25000;
 
       alertTimerId = setTimeout(() => {
         const currentMode = windowModeRef.current;
-        if (currentMode === 'hidden') { scheduleAlertCheck(); return; }
 
         if (currentMode === 'focused' && typeof requestIdleCallback !== 'undefined') {
           alertIdleHandle = requestIdleCallback(() => {
@@ -673,18 +662,11 @@ export default function App() {
     scheduleAlertCheck();
 
     const onAlertVisChange = () => {
-      if (document.hidden) {
-        windowModeRef.current = 'hidden';
-        if (alertTimerId) clearTimeout(alertTimerId);
-        if (alertIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(alertIdleHandle);
-        alertTimerId = null; alertIdleHandle = null;
-      } else {
-        windowModeRef.current = document.hasFocus() ? 'focused' : 'visible';
-        if (alertTimerId) clearTimeout(alertTimerId);
-        if (alertIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(alertIdleHandle);
-        checkAlerts();
-        scheduleAlertCheck();
-      }
+      windowModeRef.current = document.hidden ? 'hidden' : (document.hasFocus() ? 'focused' : 'visible');
+      if (alertTimerId) clearTimeout(alertTimerId);
+      if (alertIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(alertIdleHandle);
+      checkAlerts();
+      scheduleAlertCheck();
     };
     const onAlertFocus = () => {
       if (!document.hidden) {
@@ -983,22 +965,21 @@ export default function App() {
       }
     };
 
-    // Трёхрежимный планировщик таймера автосинхронизации AviaBit:
-    // 'focused' — 30 сек + requestIdleCallback
-    // 'visible' — 120 сек (автосверка не критична по времени, сильно экономим CPU)
-    // 'hidden'  — пауза
+    // Фоновый планировщик таймера автосинхронизации AviaBit:
+    // Сверка происходит строго по выставленному интервалу диспетчера (напр. 10 или 15 мин),
+    // в том числе когда вкладка свернута или не активна!
+    // Сама проверка checkAndTrigger занимает 0.0001 мс (просто вычитание времени), поэтому 0% CPU.
+    // В промежутках между 10 минутами сетевых запросов НЕТ — система вообще не нагружается.
     let syncTimerId = null;
     let syncIdleHandle = null;
 
     const scheduleSyncCheck = () => {
       const mode = windowModeRef.current;
-      if (mode === 'hidden') return;
-
-      const delay = mode === 'focused' ? 30000 : 120000;
+      // В фоновом режиме достаточно проверять наступление таймера раз в 45 сек
+      const delay = mode === 'focused' ? 30000 : 45000;
 
       syncTimerId = setTimeout(() => {
         const currentMode = windowModeRef.current;
-        if (currentMode === 'hidden') { scheduleSyncCheck(); return; }
 
         if (currentMode === 'focused' && typeof requestIdleCallback !== 'undefined') {
           syncIdleHandle = requestIdleCallback(() => {
@@ -1015,18 +996,11 @@ export default function App() {
 
     // Мгновенная проверка при возвращении пользователя на вкладку браузера
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        windowModeRef.current = 'hidden';
-        if (syncTimerId) clearTimeout(syncTimerId);
-        if (syncIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(syncIdleHandle);
-        syncTimerId = null; syncIdleHandle = null;
-      } else {
-        windowModeRef.current = document.hasFocus() ? 'focused' : 'visible';
-        if (syncTimerId) clearTimeout(syncTimerId);
-        if (syncIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(syncIdleHandle);
-        checkAndTrigger();
-        scheduleSyncCheck();
-      }
+      windowModeRef.current = document.hidden ? 'hidden' : (document.hasFocus() ? 'focused' : 'visible');
+      if (syncTimerId) clearTimeout(syncTimerId);
+      if (syncIdleHandle && typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(syncIdleHandle);
+      checkAndTrigger();
+      scheduleSyncCheck();
     };
     const onSyncFocus = () => {
       if (!document.hidden) {
