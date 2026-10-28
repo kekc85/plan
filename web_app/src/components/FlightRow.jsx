@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Check, Bell, History } from 'lucide-react';
+import { Trash2, Check, Bell, History, Luggage } from 'lucide-react';
 import { 
   formatValidTime, 
   calcReleaseTime, 
@@ -250,6 +250,61 @@ function FlightRow({
     onUpdateFlight(flight.id, updates);
   };
 
+  
+  // Переход в калькулятор веса коммерческой загрузки AeroBag Predictor
+  const handleOpenAeroBag = () => {
+    const flightNum = (flight.flight || flight.flight_no || flight.flight_number || '').trim();
+    if (!flightNum) return;
+
+    let from = '';
+    let to = '';
+    const routeAirports = flight.route_airports || '';
+    if (routeAirports.includes('-')) {
+      const parts = routeAirports.split('-');
+      from = parts[0].trim().toUpperCase();
+      to = parts[1].trim().toUpperCase();
+    } else if (flight.route_city && flight.route_city.includes('-')) {
+      const parts = flight.route_city.split('-');
+      from = parts[0].trim().toUpperCase();
+      to = parts[1].trim().toUpperCase();
+    }
+
+    const acNum = (flight.ac_num || '').trim();
+    const depTime = (displayTimes?.time || flight.time || flight.departure_time || '').trim();
+    const pax = flight.pax ? String(flight.pax).trim() : '';
+
+    let date = flight.flight_date || '';
+    if (date && date.includes('.')) {
+      const p = date.split('.');
+      if (p.length === 2) {
+        const year = new Date().getFullYear();
+        date = `${year}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+      } else if (p.length === 3) {
+        date = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+      }
+    }
+
+    const isTest = window.location.href.includes('plan_test') || 
+                   window.location.hostname === 'localhost' || 
+                   window.location.hostname === '127.0.0.1';
+    
+    const targetAeroBagUrl = isTest 
+      ? 'https://boostandgo.ru/aerobag-test/' 
+      : 'https://boostandgo.ru/aerobag/';
+
+    const params = new URLSearchParams();
+    params.set('flight', flightNum);
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    if (date) params.set('date', date);
+    if (pax) params.set('pax', pax);
+    if (acNum) params.set('ac_num', acNum);
+    if (depTime) params.set('dep_time', depTime);
+    params.set('return_url', window.location.href);
+
+    window.open(`${targetAeroBagUrl}?${params.toString()}`, '_blank');
+  };
+
   // Чекбокс LIR -> синхронизация
   const handleToggleLir = (e) => {
     if (e) e.stopPropagation();
@@ -430,6 +485,20 @@ function FlightRow({
               <Check className="w-2.5 h-2.5 stroke-[3] text-amber-700 dark:text-amber-400 shrink-0" />
             </button>
           )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenAeroBag();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="inline-flex items-center justify-center gap-1 bg-sky-500/10 hover:bg-sky-500/20 dark:bg-sky-950/60 dark:hover:bg-sky-900/80 text-sky-700 dark:text-sky-300 border border-sky-400/50 hover:border-sky-400 font-mono text-[9px] font-black px-1 py-0.5 rounded shadow-2xs hover:shadow-xs transition-all active:scale-95 cursor-pointer shrink-0 w-[58px]"
+            title="Открыть расчет коммерческой загрузки в AeroBag Predictor"
+          >
+            <Luggage className="w-2.5 h-2.5 text-sky-600 dark:text-sky-400 shrink-0" />
+            <span className="tracking-tighter">AeroBag</span>
+          </button>
         </div>
       </td>
 
