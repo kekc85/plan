@@ -254,8 +254,12 @@ function FlightRow({
   // Переход в калькулятор веса коммерческой загрузки AeroBag Predictor
   const handleOpenAeroBag = () => {
     const rawFlight = (flight.flight || flight.flight_no || flight.flight_number || '').trim();
-    // В AeroBag передаётся только числовой номер рейса без префиксов авиакомпаний (N4, EO, KAR и т.д.)
-    const flightNum = rawFlight.replace(/\D/g, '') || rawFlight;
+    // Полное удаление буквенно-цифровых префиксов авиакомпаний (N4, EO, NWS, KAR, U6 и т.д.)
+    let cleanFlt = rawFlight.toUpperCase();
+    cleanFlt = cleanFlt.replace(/^(N4|EO|NWS|KAR|NW|WZ|S7|SU|DP|UT|A4|U6|FV|5N|7R|KL|КЛ|Н4|ЕО)[-\s]?/i, '');
+    cleanFlt = cleanFlt.replace(/^[A-ZА-Я][A-ZА-Я0-9]{0,2}[-\s]?/i, '');
+    const fltMatch = cleanFlt.match(/\d+/);
+    const flightNum = fltMatch ? fltMatch[0] : cleanFlt.replace(/\D/g, '');
     if (!flightNum) return;
 
     let from = '';
