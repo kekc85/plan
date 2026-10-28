@@ -366,10 +366,11 @@ class AviaBitClient:
             pass
         return {}
 
-    def fetch_flight_best_telegram(self, pf_record_id: int) -> dict:
+    def fetch_flight_telegrams(self, pf_record_id: int) -> dict:
         """
-        Получает список телеграмм рейса, выбирает наиболее информативную по приоритету:
-        FBL -> FFM -> UWS -> LDM и возвращает её текст и код.
+        Получает список телеграмм рейса и загружает:
+        1. Грузовую телеграмму (FBL -> FFM -> UWS -> LDM) для Cargo и Mail
+        2. CFP телеграмму (CFP / OFP) для Block, Trip, Taxi топлива
         """
         t_data = self.fetch_flight_telex_list(pf_record_id)
         if not t_data or not isinstance(t_data, dict):
@@ -383,33 +384,85 @@ class AviaBitClient:
         if not all_telegrams:
             return {}
 
-        # Строгий приоритет: FBL -> FFM -> UWS -> LDM
-        best_t = None
+        # 1. Поиск лучшей грузовой телеграммы (FBL -> FFM -> UWS -> LDM)
+        best_load_t = None
         for target_name in ("FBL", "FFM", "UWS", "LDM"):
             for t in all_telegrams:
                 t_name = (t.get("name") or t.get("telexCode") or "").upper()
                 if t_name == target_name:
-                    best_t = t
+                    best_load_t = t
                     break
-            if best_t:
+            if best_load_t:
                 break
 
-        if not best_t:
-            return {}
+        # 2. Поиск CFP телеграммы для топлива
+        best_cfp_t = None
+        for t in reversed(all_telegrams):
+            t_name = (t.get("name") or t.get("telexCode") or "").upper()
+            if "CFP" in t_name or "OFP" in t_name:
+                best_cfp_t = t
+                break
 
-        t_id = best_t.get("id") or best_t.get("telexID")
-        t_name = best_t.get("name") or best_t.get("telexCode")
-        telex_res = self.fetch_flight_telex_message(t_id)
-        if telex_res and isinstance(telex_res, dict):
-            telex_res["target_name"] = t_name
-            return telex_res
-        return {}
+        result = {}
+
+        if best_load_t:
+            t_id = best_load_t.get("id") or best_load_t.get("telexID")
+            t_name = best_load_t.get("name") or best_load_t.get("telexCode")
+            msg = self.fetch_flight_telex_message(t_id)
+            if msg and isinstance(msg, dict):
+                result["load_text"] = msg.get("text", "")
+                result["load_code"] = t_name
+                result["target_name"] = t_name
+                result["text"] = msg.get("text", "")
+
+        if best_cfp_t:
+            cfp_id = best_cfp_t.get("id") or best_cfp_t.get("telexID")
+            cfp_msg = self.fetch_flight_telex_message(cfp_id)
+            if cfp_msg and isinstance(cfp_msg, dict):
+                result["cfp_text"] = cfp_msg.get("text", "")
+
+        return result
+
+    def fetch_flight_best_telegram(self, pf_record_id: int) -> dict:
+        """
+        Запрос телеграмм по рейсу (грузовые и CFP).
+        """
+        return self.fetch_flight_telegrams(pf_record_id)
 
     def fetch_flight_telex(self, pf_record_id: int) -> dict:
         """
         Запрос телеграммы по рейсу.
         """
-        return self.fetch_flight_best_telegram(pf_record_id)
+        return self.fetch_flight_telegrams(pf_record_id)
+
+
+def parse_telegram_cfp(text: str) -> dict:
+    """
+    Парсинг телеграммы CFP (Computerized Flight Plan) для автоматического извлечения топлива:
+    - TAXI / TAXI/APU   -> fuel_taxi (например 200)
+    - TRIP FUEL         -> fuel_trip (например 9000)
+    - TOTAL FUEL/BLOCK  -> fuel_block (например 12600)
+    """
+    res = {'fuel_taxi': '', 'fuel_trip': '', 'fuel_block': ''}
+    if not text:
+        return res
+
+    # 1. TAXI / TAXI/APU (берем последнее число на строке — вес топлива в кг)
+    m_taxi = re.search(r'^\s*TAXI(?:/APU)?\s+(?:[\d.:]+\s+)?(\d+)', text, re.MULTILINE | re.IGNORECASE)
+    if m_taxi:
+        res['fuel_taxi'] = m_taxi.group(1)
+
+    # 2. TRIP FUEL
+    m_trip = re.search(r'^\s*TRIP(?:\s+FUEL)?\s+(?:[\d.:]+\s+)?(\d+)', text, re.MULTILINE | re.IGNORECASE)
+    if m_trip:
+        res['fuel_trip'] = m_trip.group(1)
+
+    # 3. TOTAL FUEL / BLOCK FUEL
+    m_block = re.search(r'^\s*(?:TOTAL|BLOCK)(?:\s+FUEL)?\s+(?:[\d.:]+\s+)?(\d+)', text, re.MULTILINE | re.IGNORECASE)
+    if m_block:
+        res['fuel_block'] = m_block.group(1)
+
+    return res
 
 
 def parse_telegram_load(text: str, code: str = "") -> dict:
@@ -866,12 +919,19 @@ def process_flights(
 
         # Парсинг телеграмм (FBL / FFM / UWS) для извлечения Груза (Cargo) и Почты (Mail)
         telex_data = telegrams.get(pf_id, {})
-        telex_text = telex_data.get("text", "") if isinstance(telex_data, dict) else ""
-        telex_code = telex_data.get("target_name") or telex_data.get("code") or ""
+        telex_text = (telex_data.get("load_text") or telex_data.get("text", "")) if isinstance(telex_data, dict) else ""
+        telex_code = telex_data.get("load_code") or telex_data.get("target_name") or telex_data.get("code") or ""
         tlg_load = parse_telegram_load(telex_text, telex_code)
 
         cargo_val = tlg_load.get("cargo", "")
         mail_val = tlg_load.get("mail", "")
+
+        # Парсинг телеграммы CFP для автоматического извлечения топлива (Block, Trip, Taxi)
+        cfp_text = telex_data.get("cfp_text", "") if isinstance(telex_data, dict) else ""
+        tlg_fuel = parse_telegram_cfp(cfp_text)
+        fuel_block = tlg_fuel.get("fuel_block", "")
+        fuel_trip = tlg_fuel.get("fuel_trip", "")
+        fuel_taxi = tlg_fuel.get("fuel_taxi", "")
 
         # Если в телеграмме нет, проверяем блок load в preliminary
         if not cargo_val and load_list and isinstance(load_list, list) and len(load_list) > 0:
@@ -996,7 +1056,11 @@ def process_flights(
             "layout": layout,
             "pax_notes": pax_notes,
             "crew": crew_str,
-            "fuel": "",  # Ячейка топлива остается пустой для ручного ввода
+            "fuel": fuel_block,
+            "fuel_block": fuel_block,
+            "fuel_trip": fuel_trip,
+            "fuel_taxi": fuel_taxi,
+            "fuel_confirmed": False,
             "cargo": cargo_val,
             "mail": mail_val,
             "dep": dep,

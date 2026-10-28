@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS `plan_flights` (
     `fuel_block` VARCHAR(32) NULL,
     `fuel_trip` VARCHAR(32) NULL,
     `fuel_taxi` VARCHAR(32) NULL,
+    `fuel_confirmed` TINYINT(1) DEFAULT 0,
     `dow` VARCHAR(32) NULL,
     `doi` VARCHAR(32) NULL,
     `galley` VARCHAR(16) DEFAULT 'D',

@@ -1059,6 +1059,7 @@ def get_current_shift():
             "fuel_block": str(r.get("fuel_block") or ""),
             "fuel_trip": str(r.get("fuel_trip") or ""),
             "fuel_taxi": str(r.get("fuel_taxi") or ""),
+            "fuel_confirmed": bool(r.get("fuel_confirmed")),
             "dow": str(r.get("dow") or ""),
             "doi": str(r.get("doi") or ""),
             "galley": str(r.get("galley") or "D"),
@@ -1178,6 +1179,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
         ("fuel_block", "fuel_block"),
         ("fuel_trip", "fuel_trip"),
         ("fuel_taxi", "fuel_taxi"),
+        ("fuel_confirmed", "fuel_confirmed"),
         ("dow", "dow"),
         ("doi", "doi"),
         ("galley", "galley"),
@@ -1205,7 +1207,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
                 old_v = old_f.get(db_key)
 
                 # Булевы чекбоксы
-                if req_key in ("lir_sent", "szv_sent", "ldm_sent", "astra_times_sent"):
+                if req_key in ("lir_sent", "szv_sent", "ldm_sent", "astra_times_sent", "fuel_confirmed"):
                     b_new = bool(new_v)
                     b_old = bool(old_v)
                     if b_new != b_old:
@@ -1242,7 +1244,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
     INSERT INTO plan_flights (
         id, shift_id, flight_number, flight_date, route_city, route_airports,
         departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
-        fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow, crew_manual,
+        fuel_block, fuel_trip, fuel_taxi, fuel_confirmed, dow, doi, galley, mtow, crew_manual,
         lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
         status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
         inbound_landing_calc, inbound_landing_time, outbound_takeoff_time,
@@ -1250,7 +1252,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
     ) VALUES (
         %s, %s, %s, %s, %s, %s,
         %s, %s, %s, %s, %s, %s, %s,
-        %s, %s, %s, %s, %s, %s, %s, %s,
+        %s, %s, %s, %s, %s, %s, %s, %s, %s,
         %s, %s, %s, %s, %s, %s, %s,
         %s, %s, %s, %s, %s,
         %s, %s, %s,
@@ -1278,6 +1280,7 @@ def save_shift_state(req: SaveShiftRequest, current_user: Optional[dict] = Depen
             str(f.get("fuel_block") or ""),
             str(f.get("fuel_trip") or ""),
             str(f.get("fuel_taxi") or ""),
+            1 if f.get("fuel_confirmed") else 0,
             str(f.get("dow") or ""),
             str(f.get("doi") or ""),
             str(f.get("galley") or "D"),
@@ -1675,6 +1678,7 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
             "fuel_block": str(row.get("fuel_block") or ""),
             "fuel_trip": str(row.get("fuel_trip") or ""),
             "fuel_taxi": str(row.get("fuel_taxi") or ""),
+            "fuel_confirmed": False,
             "dow": "",
             "doi": "",
             "galley": "D",

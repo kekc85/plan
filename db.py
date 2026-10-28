@@ -137,6 +137,7 @@ def init_db():
             fuel_block VARCHAR(32) NULL,
             fuel_trip VARCHAR(32) NULL,
             fuel_taxi VARCHAR(32) NULL,
+            fuel_confirmed TINYINT(1) DEFAULT 0,
             dow VARCHAR(32) NULL,
             doi VARCHAR(32) NULL,
             galley VARCHAR(16) DEFAULT 'D',
@@ -329,6 +330,13 @@ def init_db():
         except Exception:
             pass
 
+        # Автомиграция: добавление колонки fuel_confirmed в plan_flights
+        try:
+            cursor.execute("ALTER TABLE plan_flights ADD COLUMN fuel_confirmed TINYINT(1) DEFAULT 0;")
+            conn.commit()
+        except Exception:
+            pass
+
         # Автомиграция: добавление колонок статуса прочтения в plan_handover_logs
         for col, col_def in [
             ("is_read", "TINYINT(1) DEFAULT 0"),
@@ -387,6 +395,7 @@ def init_db():
             fuel_block TEXT,
             fuel_trip TEXT,
             fuel_taxi TEXT,
+            fuel_confirmed INTEGER DEFAULT 0,
             dow TEXT,
             doi TEXT,
             galley TEXT DEFAULT 'D',
@@ -553,7 +562,7 @@ def init_db():
         conn.commit()
 
         # Автомиграция: добавление колонок если их еще нет
-        for col in ["ac_type", "unread_changes", "crew_manual", "inbound_flight", "inbound_dep", "inbound_takeoff_time", "inbound_landing_calc", "inbound_landing_time", "outbound_takeoff_time", "plane_status"]:
+        for col in ["ac_type", "unread_changes", "crew_manual", "fuel_confirmed", "inbound_flight", "inbound_dep", "inbound_takeoff_time", "inbound_landing_calc", "inbound_landing_time", "outbound_takeoff_time", "plane_status"]:
             try:
                 cursor.execute(f"ALTER TABLE plan_flights ADD COLUMN {col} TEXT;")
                 conn.commit()

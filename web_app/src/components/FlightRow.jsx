@@ -720,106 +720,168 @@ function FlightRow({
       </td>
 
       {/* 9. ТОПЛИВО И ВЕСА */}
-      <td className={`py-0.5 px-0.5 w-[158px] min-w-[158px] max-w-[158px] ${overdueBorderTopBottom}`}>
-        <div className="bg-white dark:bg-slate-900/95 border border-slate-300 dark:border-slate-700 rounded-lg p-1 flex flex-col gap-1 w-[158px] shadow-sm">
-          <div className="grid grid-cols-3 gap-0.5 text-xs">
-            <div>
-              <span className="text-sky-700 dark:text-sky-400 text-[10px] font-extrabold block leading-none mb-0.5">BLOCK</span>
-              <input
-                type="text"
-                value={flight.fuel_block || ''}
-                onChange={(e) => handleCellChange('fuel_block', formatValidFuel(e.target.value))}
-                onFocus={(e) => e.target.select()}
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                placeholder="—"
-                maxLength={5}
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-sky-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-xs font-extrabold text-sky-800 dark:text-sky-200 text-center outline-none cursor-text"
-              />
+      <td className={`py-0.5 px-0.5 w-[174px] min-w-[174px] max-w-[174px] ${overdueBorderTopBottom}`}>
+        <div className="flex items-center gap-1 w-full">
+          <div className={`flex-1 min-w-0 border rounded-lg p-1 flex flex-col gap-1 shadow-sm transition-colors duration-150 ${
+            flight.fuel_confirmed
+              ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-500/80 dark:border-emerald-500/70'
+              : 'bg-white dark:bg-slate-900/95 border-slate-300 dark:border-slate-700'
+          }`}>
+            <div className="grid grid-cols-3 gap-0.5 text-xs">
+              <div>
+                <span className={`text-[10px] font-extrabold block leading-none mb-0.5 ${
+                  flight.fuel_confirmed ? 'text-emerald-800 dark:text-emerald-300' : 'text-sky-700 dark:text-sky-400'
+                }`}>BLOCK</span>
+                <input
+                  type="text"
+                  value={flight.fuel_block || ''}
+                  onChange={(e) => handleCellChange('fuel_block', formatValidFuel(e.target.value))}
+                  onFocus={(e) => e.target.select()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="—"
+                  maxLength={5}
+                  className={`w-full border rounded px-0.5 py-0.5 font-mono text-xs font-extrabold text-center outline-none cursor-text ${
+                    flight.fuel_confirmed
+                      ? 'bg-emerald-100/50 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700/60 text-emerald-900 dark:text-emerald-100 focus:bg-white'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-sky-800 dark:text-sky-200 focus:border-sky-500 focus:bg-white'
+                  }`}
+                />
+              </div>
+              <div>
+                <span className={`text-[10px] font-bold block leading-none mb-0.5 ${
+                  flight.fuel_confirmed ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-400'
+                }`}>TRIP</span>
+                <input
+                  type="text"
+                  value={flight.fuel_trip || ''}
+                  onChange={(e) => handleCellChange('fuel_trip', formatValidFuel(e.target.value))}
+                  onFocus={(e) => e.target.select()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="—"
+                  maxLength={5}
+                  className={`w-full border rounded px-0.5 py-0.5 font-mono text-xs font-bold text-center outline-none cursor-text ${
+                    flight.fuel_confirmed
+                      ? 'bg-emerald-100/50 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700/60 text-emerald-900 dark:text-emerald-100 focus:bg-white'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:border-sky-500 focus:bg-white'
+                  }`}
+                />
+              </div>
+              <div>
+                <span className={`text-[10px] font-bold block leading-none mb-0.5 ${
+                  flight.fuel_confirmed ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-400'
+                }`}>TAXI</span>
+                <input
+                  type="text"
+                  value={flight.fuel_taxi || ''}
+                  onChange={(e) => handleCellChange('fuel_taxi', formatValidFuel(e.target.value))}
+                  onFocus={(e) => e.target.select()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="—"
+                  maxLength={5}
+                  className={`w-full border rounded px-0.5 py-0.5 font-mono text-xs font-bold text-center outline-none cursor-text ${
+                    flight.fuel_confirmed
+                      ? 'bg-emerald-100/50 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700/60 text-emerald-900 dark:text-emerald-100 focus:bg-white'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:border-sky-500 focus:bg-white'
+                  }`}
+                />
+              </div>
             </div>
-            <div>
-              <span className="text-slate-600 dark:text-slate-400 text-[10px] font-bold block leading-none mb-0.5">TRIP</span>
-              <input
-                type="text"
-                value={flight.fuel_trip || ''}
-                onChange={(e) => handleCellChange('fuel_trip', formatValidFuel(e.target.value))}
-                onFocus={(e) => e.target.select()}
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                placeholder="—"
-                maxLength={5}
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-sky-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-xs font-bold text-slate-800 dark:text-slate-200 text-center outline-none cursor-text"
-              />
-            </div>
-            <div>
-              <span className="text-slate-600 dark:text-slate-400 text-[10px] font-bold block leading-none mb-0.5">TAXI</span>
-              <input
-                type="text"
-                value={flight.fuel_taxi || ''}
-                onChange={(e) => handleCellChange('fuel_taxi', formatValidFuel(e.target.value))}
-                onFocus={(e) => e.target.select()}
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                placeholder="—"
-                maxLength={5}
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-sky-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-xs font-bold text-slate-800 dark:text-slate-200 text-center outline-none cursor-text"
-              />
+
+            <div className={`grid grid-cols-[1.15fr_1.15fr_0.7fr] gap-0.5 text-xs pt-0.5 border-t items-center ${
+              flight.fuel_confirmed ? 'border-emerald-200 dark:border-emerald-800/60' : 'border-slate-200 dark:border-slate-800'
+            }`}>
+              <div>
+                <span className={`text-[10px] font-extrabold block leading-none mb-0.5 ${
+                  flight.fuel_confirmed ? 'text-emerald-800 dark:text-emerald-300' : 'text-indigo-700 dark:text-indigo-400'
+                }`}>DOW</span>
+                <input
+                  type="text"
+                  value={flight.dow || ''}
+                  onChange={(e) => handleCellChange('dow', formatValidDow(e.target.value))}
+                  onFocus={(e) => e.target.select()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="—"
+                  maxLength={6}
+                  className={`w-full border rounded px-0.5 py-0.5 font-mono text-[11px] font-extrabold text-center outline-none cursor-text tracking-tight ${
+                    flight.fuel_confirmed
+                      ? 'bg-emerald-100/50 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700/60 text-emerald-900 dark:text-emerald-100 focus:bg-white'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-indigo-800 dark:text-indigo-200 focus:border-indigo-500 focus:bg-white'
+                  }`}
+                />
+              </div>
+              <div>
+                <span className={`text-[10px] font-extrabold block leading-none mb-0.5 ${
+                  flight.fuel_confirmed ? 'text-emerald-800 dark:text-emerald-300' : 'text-indigo-700 dark:text-indigo-400'
+                }`}>DOI</span>
+                <input
+                  type="text"
+                  value={flight.doi || ''}
+                  onChange={(e) => handleCellChange('doi', formatValidDoi(e.target.value))}
+                  onFocus={(e) => e.target.select()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="—"
+                  maxLength={6}
+                  className={`w-full border rounded px-0.5 py-0.5 font-mono text-[11px] font-extrabold text-center outline-none cursor-text tracking-tight ${
+                    flight.fuel_confirmed
+                      ? 'bg-emerald-100/50 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700/60 text-emerald-900 dark:text-emerald-100 focus:bg-white'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-indigo-800 dark:text-indigo-200 focus:border-indigo-500 focus:bg-white'
+                  }`}
+                />
+              </div>
+              <div>
+                <span className={`text-[10px] font-extrabold block leading-none mb-0.5 ${
+                  flight.fuel_confirmed ? 'text-emerald-800 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-400'
+                }`}>КУХНЯ</span>
+                <select
+                  value={flight.galley || 'D'}
+                  onChange={(e) => handleCellChange('galley', e.target.value)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  className={`w-full border rounded px-0.5 py-0.5 font-mono text-xs text-center font-extrabold outline-none cursor-pointer ${
+                    flight.fuel_confirmed
+                      ? 'bg-emerald-100/50 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700/60 text-emerald-900 dark:text-emerald-100 focus:border-emerald-500'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-amber-800 dark:text-amber-300 focus:border-amber-500'
+                  }`}
+                >
+                  <option value="">—</option>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="D">D</option>
+                  <option value="F">F</option>
+                  <option value="E">E</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-[1.15fr_1.15fr_0.7fr] gap-0.5 text-xs pt-0.5 border-t border-slate-200 dark:border-slate-800 items-center">
-            <div>
-              <span className="text-indigo-700 dark:text-indigo-400 text-[10px] font-extrabold block leading-none mb-0.5">DOW</span>
-              <input
-                type="text"
-                value={flight.dow || ''}
-                onChange={(e) => handleCellChange('dow', formatValidDow(e.target.value))}
-                onFocus={(e) => e.target.select()}
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                placeholder="—"
-                maxLength={6}
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-[11px] font-extrabold text-indigo-800 dark:text-indigo-200 text-center outline-none cursor-text tracking-tight"
-              />
-            </div>
-            <div>
-              <span className="text-indigo-700 dark:text-indigo-400 text-[10px] font-extrabold block leading-none mb-0.5">DOI</span>
-              <input
-                type="text"
-                value={flight.doi || ''}
-                onChange={(e) => handleCellChange('doi', formatValidDoi(e.target.value))}
-                onFocus={(e) => e.target.select()}
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                placeholder="—"
-                maxLength={6}
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:bg-white rounded px-0.5 py-0.5 font-mono text-[11px] font-extrabold text-indigo-800 dark:text-indigo-200 text-center outline-none cursor-text tracking-tight"
-              />
-            </div>
-            <div>
-              <span className="text-amber-700 dark:text-amber-400 text-[10px] font-extrabold block leading-none mb-0.5">КУХНЯ</span>
-              <select
-                value={flight.galley || 'D'}
-                onChange={(e) => handleCellChange('galley', e.target.value)}
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:border-amber-500 rounded px-0.5 py-0.5 font-mono text-xs text-amber-800 dark:text-amber-300 text-center font-extrabold outline-none cursor-pointer"
-              >
-                <option value="">—</option>
-                <option value="A">A</option>
-                <option value="B">B</option>
-                <option value="D">D</option>
-                <option value="F">F</option>
-                <option value="E">E</option>
-              </select>
-            </div>
-          </div>
+          {/* Чекбокс подтверждения окончательного топлива */}
+          <button
+            type="button"
+            onClick={() => handleCellChange('fuel_confirmed', !flight.fuel_confirmed)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            title={flight.fuel_confirmed ? "Топливо подтверждено (окончательное)" : "Подтвердить окончательное топливо"}
+            className={`w-5 h-5 rounded flex items-center justify-center transition-all cursor-pointer border shrink-0 ${
+              flight.fuel_confirmed
+                ? 'bg-emerald-600 hover:bg-emerald-700 border-emerald-600 text-white shadow-sm ring-1 ring-emerald-400'
+                : 'bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 text-transparent'
+            }`}
+          >
+            <svg className={`w-3.5 h-3.5 ${flight.fuel_confirmed ? 'opacity-100 text-white' : 'opacity-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
         </div>
       </td>
 

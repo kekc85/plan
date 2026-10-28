@@ -31,6 +31,7 @@ export default function NewFlightModal({ isOpen, onClose, onAdd, timeMode = 'MSK
     fuel_block: '',
     fuel_trip: '',
     fuel_taxi: '',
+    fuel_confirmed: false,
     dow: '',
     doi: '',
     galley: 'D',

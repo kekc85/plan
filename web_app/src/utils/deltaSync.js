@@ -426,11 +426,29 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     // 1. Сохраняем идентификатор
     merged.id = old.id || inc.id || `flight_${flNum || 'fl'}_${flDate || ''}_${(inc.time || '').replace(':', '')}_${Math.random().toString(36).substr(2, 6)}`;
 
-    // 2. Строго сохраняем ручные поля диспетчера центровки
+    // 2. Топливо: если подтверждено диспетчером — строго блокируем от перезаписи
+    if (old.fuel_confirmed !== undefined) {
+      merged.fuel_confirmed = old.fuel_confirmed;
+    }
+    if (old.fuel_confirmed) {
+      merged.fuel_block = old.fuel_block || '';
+      merged.fuel_trip = old.fuel_trip || '';
+      merged.fuel_taxi = old.fuel_taxi || '';
+    } else {
+      // Если не подтверждено, но пришло из CFP — подтягиваем CFP, либо сохраняем прежнее
+      if (inc.fuel_block || inc.fuel_trip || inc.fuel_taxi) {
+        merged.fuel_block = inc.fuel_block || old.fuel_block || '';
+        merged.fuel_trip = inc.fuel_trip || old.fuel_trip || '';
+        merged.fuel_taxi = inc.fuel_taxi || old.fuel_taxi || '';
+      } else {
+        merged.fuel_block = old.fuel_block || '';
+        merged.fuel_trip = old.fuel_trip || '';
+        merged.fuel_taxi = old.fuel_taxi || '';
+      }
+    }
+
+    // 2.1 Строго сохраняем остальные ручные поля диспетчера центровки
     const manualFields = [
-      'fuel_block',
-      'fuel_trip',
-      'fuel_taxi',
       'dow',
       'doi',
       'galley',
@@ -502,7 +520,7 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
 
       if (alreadyMovedFlight) {
         // Рейс уже перенесен на новые сутки! Переносим любые ручные данные диспетчера, если они не были заполнены
-        const manualFieldsToKeep = ['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'baggage', 'notes'];
+        const manualFieldsToKeep = ['fuel_block', 'fuel_trip', 'fuel_taxi', 'fuel_confirmed', 'dow', 'doi', 'galley', 'mtow', 'baggage', 'notes'];
         manualFieldsToKeep.forEach(mf => {
           if (f[mf] !== undefined && f[mf] !== '' && (alreadyMovedFlight[mf] === undefined || alreadyMovedFlight[mf] === '')) {
             alreadyMovedFlight[mf] = f[mf];
