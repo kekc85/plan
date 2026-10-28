@@ -23,7 +23,7 @@ export default function ShiftTable({
             onAutoCollapseMobileMenu?.();
           }
         }}
-        className={`overflow-x-auto overflow-y-auto overscroll-contain w-full rounded-xl p-0.5 [scrollbar-gutter:stable] ${
+        className={`overflow-x-auto overflow-y-auto w-full rounded-xl p-0.5 [scrollbar-gutter:stable] ${
           isMobileMenuCollapsed 
             ? 'max-h-[calc(100dvh-55px)] sm:max-h-[calc(100vh-230px)]' 
             : 'max-h-[calc(100vh-210px)] sm:max-h-[calc(100vh-260px)]'

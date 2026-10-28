@@ -119,12 +119,12 @@ function FlightRow({
         ) {
           const oldH = parseInt(flight.time.split(':')[0], 10);
           const newH = parseInt(formatted.split(':')[0], 10);
-          // Переход через полночь вперёд: было >=20:00, стало <=05:59
-          if (oldH >= 20 && newH <= 5) {
+          // Переход через полночь вперёд: было день/вечер (>=12:00), стало утро (<=08:00)
+          if (oldH >= 12 && newH <= 8) {
             newMskDate = shiftDateByDays(flight.flight_date, 1);
           }
-          // Переход через полночь назад: было <=05:59, стало >=20:00
-          else if (oldH <= 5 && newH >= 20) {
+          // Переход через полночь назад: было утро (<=08:00), стало день/вечер (>=12:00)
+          else if (oldH <= 8 && newH >= 12) {
             newMskDate = shiftDateByDays(flight.flight_date, -1);
           }
         }

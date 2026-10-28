@@ -256,6 +256,26 @@ export function detectFlightChanges(oldFlight, incomingFlight) {
  * @param {Object} options - дополнительные опции слияния { deletedFlightKeys: [], ignoreDeleted: false, targetInterval: null }
  * @returns {{ mergedFlights: Array, totalNewChanges: number, newFlightsCount: number }}
  */
+/**
+ * Проверка, являются ли даты смежными (±1-2 дня, например при переносе через полночь 00:00)
+ */
+export function areDatesAdjacentOrWithinShift(d1, d2) {
+  if (!d1 || !d2) return true;
+  const norm1 = normalizeFlightDate(d1);
+  const norm2 = normalizeFlightDate(d2);
+  if (norm1 === norm2) return true;
+  const p1 = norm1.split('.').map(Number);
+  const p2 = norm2.split('.').map(Number);
+  if (p1.length < 2 || p2.length < 2) return true;
+  const [day1, month1] = p1;
+  const [day2, month2] = p2;
+  const curYear = new Date().getFullYear();
+  const dt1 = new Date(curYear, month1 - 1, day1);
+  const dt2 = new Date(curYear, month2 - 1, day2);
+  const diffDays = Math.abs(Math.round((dt2.getTime() - dt1.getTime()) / (1000 * 60 * 60 * 24)));
+  return diffDays <= 2;
+}
+
 export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], options = {}) {
   const { deletedFlightKeys = [], ignoreDeleted = false, targetInterval = null } = options;
   const deletedSet = new Set();
@@ -321,12 +341,49 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     // Строгое сопоставление по номеру рейса и дате (исключает ошибочную склейку рейсов за разные даты)
     let old = existingMap.get(key) || (digits && flDate ? existingByDigits.get(`${digits}_${flDate}`) : null);
 
-    // Если дата не была задана у одного из рейсов, но номер рейса уникален среди текущих
-    if (!old && flNum && existingFlightNumCounts.get(flNum) === 1) {
-      const candidate = existingByFlightNum.get(flNum);
-      const candDate = normalizeFlightDate(candidate?.flight_date);
-      if (!candDate || !flDate || candDate === flDate) {
-        old = candidate;
+    // 2. Если по точной дате рейс не найден, проверяем перенос рейса через полночь (00:00)
+    // Либо если дата не была задана, либо рейс перенесен на следующие сутки
+    if (!old && flNum) {
+      const candidates = currentFlights.filter(f => {
+        if (!f || matchedOldIds.has(f.id)) return false;
+        const cNum = normalizeFlightNumber(f.flight || f.flight_no || f.flight_number || '');
+        if (cNum !== flNum) {
+          const cDigits = cNum.replace(/\D/g, '');
+          if (!cDigits || cDigits !== digits) return false;
+        }
+        return true;
+      });
+
+      if (candidates.length === 1) {
+        const candidate = candidates[0];
+        const candDate = normalizeFlightDate(candidate?.flight_date);
+        // Если дата совпадает, не задана или даты смежные (перенос через полночь 00:00)
+        if (!candDate || !flDate || candDate === flDate || areDatesAdjacentOrWithinShift(candDate, flDate)) {
+          const candAirports = normalizeVal(candidate.route_airports || candidate.airports);
+          const incAirports = normalizeVal(inc.route_airports || inc.airports);
+          const candCity = normalizeVal(candidate.route_city || candidate.city);
+          const incCity = normalizeVal(inc.route_city || inc.city);
+
+          const airportsMatch = !candAirports || !incAirports || candAirports === incAirports;
+          const cityMatch = !candCity || !incCity || candCity === incCity;
+
+          if (airportsMatch || cityMatch) {
+            old = candidate;
+          }
+        }
+      } else if (candidates.length > 1) {
+        // Если кандидатов несколько, выбираем того, у кого совпадает маршрут
+        const matchedByRoute = candidates.find(c => {
+          const candAirports = normalizeVal(c.route_airports || c.airports);
+          const incAirports = normalizeVal(inc.route_airports || inc.airports);
+          const candCity = normalizeVal(c.route_city || c.city);
+          const incCity = normalizeVal(inc.route_city || inc.city);
+          return (candAirports && incAirports && candAirports === incAirports) ||
+                 (candCity && incCity && candCity === incCity);
+        });
+        if (matchedByRoute) {
+          old = matchedByRoute;
+        }
       }
     }
 
@@ -423,11 +480,41 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     mergedFlights.push(merged);
   }
 
-  // Сохраняем все рейсы из текущего плана, которых не было в новом ответе AviaBit
-  // (например, добавленные вручную диспетчером или переходящие рейсы)
+  // Сохраняем рейсы из текущего плана, которых не было в новом ответе AviaBit
+  // (например, добавленные вручную диспетчером или переходящие рейсы).
+  // Но если этот рейс уже перенесен через 00:00 в новые сутки, старую запись не дублируем!
   currentFlights.forEach(f => {
     if (!f || !f.id) return;
     if (!matchedOldIds.has(f.id)) {
+      const fNum = normalizeFlightNumber(f.flight || f.flight_no || f.flight_number || '');
+      
+      // Проверяем: не перенесен ли этот рейс через 00:00 и уже присутствует в mergedFlights?
+      const alreadyMovedFlight = mergedFlights.find(m => {
+        const mNum = normalizeFlightNumber(m.flight || m.flight_no || m.flight_number || '');
+        if (mNum !== fNum) return false;
+        const fAirports = normalizeVal(f.route_airports || f.airports);
+        const mAirports = normalizeVal(m.route_airports || m.airports);
+        const fCity = normalizeVal(f.route_city || f.city);
+        const mCity = normalizeVal(m.route_city || m.city);
+        return (!fAirports || !mAirports || fAirports === mAirports) &&
+               (!fCity || !mCity || fCity === mCity);
+      });
+
+      if (alreadyMovedFlight) {
+        // Рейс уже перенесен на новые сутки! Переносим любые ручные данные диспетчера, если они не были заполнены
+        const manualFieldsToKeep = ['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'baggage', 'notes'];
+        manualFieldsToKeep.forEach(mf => {
+          if (f[mf] !== undefined && f[mf] !== '' && (alreadyMovedFlight[mf] === undefined || alreadyMovedFlight[mf] === '')) {
+            alreadyMovedFlight[mf] = f[mf];
+          }
+        });
+        if (f.crew_manual && !alreadyMovedFlight.crew_manual) {
+          alreadyMovedFlight.crew = f.crew;
+          alreadyMovedFlight.crew_manual = true;
+        }
+        // Старую строчку в предыдущих сутках НЕ добавляем — она перенесена!
+        return;
+      }
       if (!ignoreDeleted && deletedSet.size > 0) {
         const fDeletionKeys = getDeletionKeyVariants(f);
         const isDeleted = fDeletionKeys.some(v => deletedSet.has(v));
