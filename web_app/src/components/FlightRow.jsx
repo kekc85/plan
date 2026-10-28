@@ -397,7 +397,7 @@ function FlightRow({
     >
       {/* 1. Номер строки */}
       <td
-        className={`sticky left-0 z-20 py-1 px-0.5 text-center whitespace-nowrap no-print w-7 min-w-[28px] max-w-[28px] ${activeStickyBg} transition-colors shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155] rounded-l-2xl border-l-4 ${leftStatusBorderColor} ${
+        className={`sticky left-0 z-10 py-1 px-0.5 text-center whitespace-nowrap no-print w-7 min-w-[28px] max-w-[28px] ${activeStickyBg} transition-colors shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155] rounded-l-2xl border-l-4 ${leftStatusBorderColor} ${
           isOverdue ? 'border-t-2 border-b-2 border-rose-500' : 'border-t border-b border-slate-200/80 dark:border-slate-800/80'
         }`}
       >
@@ -405,7 +405,7 @@ function FlightRow({
       </td>
 
       {/* 2. № Рейса */}
-      <td className={`sticky left-[28px] z-20 py-1 px-0.5 font-mono font-extrabold text-sm text-sky-700 dark:text-sky-400 whitespace-nowrap w-[68px] min-w-[64px] max-w-[72px] text-center ${activeStickyBg} transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${overdueBorderTopBottom}`}>
+      <td className={`sticky left-[28px] z-10 py-1 px-0.5 font-mono font-extrabold text-sm text-sky-700 dark:text-sky-400 whitespace-nowrap w-[68px] min-w-[64px] max-w-[72px] text-center ${activeStickyBg} transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] ${overdueBorderTopBottom}`}>
         <div className="flex flex-col items-center justify-center gap-0.5">
           <input
             type="text"

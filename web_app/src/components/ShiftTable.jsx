@@ -23,42 +23,42 @@ export default function ShiftTable({
             onAutoCollapseMobileMenu?.();
           }
         }}
-        className={`overflow-x-auto overflow-y-auto w-full rounded-xl p-0.5 [scrollbar-gutter:stable] ${
+        className={`overflow-x-auto overflow-y-auto overscroll-contain w-full rounded-xl p-0.5 [scrollbar-gutter:stable] ${
           isMobileMenuCollapsed 
-            ? 'max-h-[calc(100dvh-55px)] sm:max-h-[calc(100vh-175px)]' 
-            : 'max-h-[calc(100vh-210px)] sm:max-h-[calc(100vh-175px)]'
+            ? 'max-h-[calc(100dvh-55px)] sm:max-h-[calc(100vh-230px)]' 
+            : 'max-h-[calc(100vh-210px)] sm:max-h-[calc(100vh-260px)]'
         }`}
       >
         <table className="w-full text-left border-separate border-spacing-y-1 text-xs">
           {/* Table Header */}
-          <thead className="sticky top-0 z-30 shadow-sm">
+          <thead className="sticky top-0 z-20 shadow-sm">
             <tr className="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-b border-slate-300 dark:border-slate-700 select-none text-xs">
-              <th className="sticky top-0 left-0 z-40 bg-slate-100 dark:bg-slate-900 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-7 min-w-[28px] max-w-[28px] no-print shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155]">#</th>
-              <th className="sticky top-0 left-[28px] z-40 bg-slate-100 dark:bg-slate-900 py-2 px-0.5 font-extrabold tracking-wider uppercase w-[68px] min-w-[64px] max-w-[72px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] text-center">№ Рейса</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 font-extrabold tracking-wider uppercase w-[104px] min-w-[98px] max-w-[112px] shadow-sm text-center">Маршрут</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[84px] min-w-[80px] max-w-[88px] text-amber-700 dark:text-amber-300 shadow-sm">
+              <th className="sticky top-0 left-0 z-30 bg-slate-100 dark:bg-slate-900 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-7 min-w-[28px] max-w-[28px] no-print shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155]">#</th>
+              <th className="sticky top-0 left-[28px] z-30 bg-slate-100 dark:bg-slate-900 py-2 px-0.5 font-extrabold tracking-wider uppercase w-[68px] min-w-[64px] max-w-[72px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] text-center">№ Рейса</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 font-extrabold tracking-wider uppercase w-[104px] min-w-[98px] max-w-[112px] shadow-sm text-center">Маршрут</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[84px] min-w-[80px] max-w-[88px] text-amber-700 dark:text-amber-300 shadow-sm">
                 Время ({timeMode})<br/>
                 <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">Вып (-40)</span> / <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400">Вылет</span>
               </th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 min-w-[54px] max-w-[58px] shadow-sm">
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 min-w-[54px] max-w-[58px] shadow-sm">
                 Номер ВС<br/>
                 <span className="text-[9px] font-semibold text-slate-500 dark:text-slate-400">Тип ВС</span>
               </th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-10 min-w-[38px] max-w-[42px] shadow-sm">Комп.</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-11 min-w-[42px] max-w-[46px] shadow-sm">PAX</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[72px] min-w-[68px] max-w-[76px] shadow-sm">Экипаж<br/><span className="text-[9px] font-medium text-slate-500">Л/Б/И/П</span></th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[158px] min-w-[158px] max-w-[158px] text-sky-800 dark:text-sky-300 shadow-sm">Топливо и Веса<br/><span className="text-[9px] font-medium text-slate-500">Block / Trip / Taxi / DOW / DOI / Кухня</span></th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 min-w-[54px] max-w-[58px] shadow-sm">MTOW</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-11 min-w-[42px] max-w-[46px] text-indigo-700 dark:text-indigo-300 shadow-sm">LIR</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[120px] min-w-[110px] max-w-[135px] shadow-sm">Груз</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[46px] max-w-[50px] shadow-sm">Почта</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 font-extrabold tracking-wider uppercase w-16 min-w-[60px] max-w-[70px] shadow-sm">Багаж</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-amber-700 dark:text-amber-300 shadow-sm">СЗВ</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-emerald-700 dark:text-emerald-300 shadow-sm">LDM</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-teal-700 dark:text-teal-300 shadow-sm">Астра<br/><span className="text-[9px] font-medium text-slate-500">Времена</span></th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[100px] min-w-[96px] max-w-[104px] shadow-sm">Статус</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 font-extrabold tracking-wider uppercase w-[95px] min-w-[90px] max-w-[105px] shadow-sm">Примечания</th>
-              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-30 py-2 px-0.5 pr-2 text-center font-extrabold tracking-wider uppercase w-[120px] min-w-[115px] max-w-[125px] no-print shadow-sm">Действия</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-10 min-w-[38px] max-w-[42px] shadow-sm">Комп.</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-11 min-w-[42px] max-w-[46px] shadow-sm">PAX</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[72px] min-w-[68px] max-w-[76px] shadow-sm">Экипаж<br/><span className="text-[9px] font-medium text-slate-500">Л/Б/И/П</span></th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[158px] min-w-[158px] max-w-[158px] text-sky-800 dark:text-sky-300 shadow-sm">Топливо и Веса<br/><span className="text-[9px] font-medium text-slate-500">Block / Trip / Taxi / DOW / DOI / Кухня</span></th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-14 min-w-[54px] max-w-[58px] shadow-sm">MTOW</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-11 min-w-[42px] max-w-[46px] text-indigo-700 dark:text-indigo-300 shadow-sm">LIR</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[120px] min-w-[110px] max-w-[135px] shadow-sm">Груз</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[46px] max-w-[50px] shadow-sm">Почта</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 font-extrabold tracking-wider uppercase w-16 min-w-[60px] max-w-[70px] shadow-sm">Багаж</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-amber-700 dark:text-amber-300 shadow-sm">СЗВ</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-emerald-700 dark:text-emerald-300 shadow-sm">LDM</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-12 min-w-[48px] max-w-[52px] text-teal-700 dark:text-teal-300 shadow-sm">Астра<br/><span className="text-[9px] font-medium text-slate-500">Времена</span></th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 text-center font-extrabold tracking-wider uppercase w-[100px] min-w-[96px] max-w-[104px] shadow-sm">Статус</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 font-extrabold tracking-wider uppercase w-[95px] min-w-[90px] max-w-[105px] shadow-sm">Примечания</th>
+              <th className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-20 py-2 px-0.5 pr-2 text-center font-extrabold tracking-wider uppercase w-[120px] min-w-[115px] max-w-[125px] no-print shadow-sm">Действия</th>
             </tr>
           </thead>
 

@@ -336,7 +336,7 @@ export default function Header({
   };
 
   return (
-    <header className={`bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 px-2 sm:px-4 lg:px-6 ${isMobileMenuCollapsed ? 'py-1' : 'py-1.5 sm:py-2'} no-print shadow-sm transition-all`}>
+    <header className={`bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 px-2 sm:px-4 lg:px-6 ${isMobileMenuCollapsed ? 'py-1' : 'py-1.5 sm:py-2'} no-print shadow-sm transition-all`}>
       {/* 1. Мобильная компактная полоса (когда меню свернуто диспетчером) */}
       {isMobileMenuCollapsed && (
         <div className="flex items-center justify-between gap-1.5 py-0.5 sm:hidden">
