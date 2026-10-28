@@ -1,26 +1,11 @@
 import React from 'react';
-import {
-  DndContext,
-  closestCenter,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
 import FlightRow from './FlightRow';
 import { Plus, PlaneTakeoff } from 'lucide-react';
 
 export default function ShiftTable({
   flights,
-  onReorderFlights,
   onUpdateFlight,
   onDeleteFlight,
-  onMoveUp,
-  onMoveDown,
   onAcknowledgeField,
   onAcknowledgeFlight,
   onOpenHistory,
@@ -29,29 +14,9 @@ export default function ShiftTable({
   isMobileMenuCollapsed = false,
   onAutoCollapseMobileMenu
 }) {
-  const sensors = useSensors(
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 8, // Для мыши (ПК/ноутбук): мгновенное перетаскивание при сдвиге на 8px
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 200, // Для пальца на смартфоне/планшете: удержание 200мс (позволяет свободно скроллить и перетаскивать при удержании)
-        tolerance: 6, // Допуск микро-сдвига пальца при зажатии
-      },
-    })
-  );
-
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      onReorderFlights(active.id, over.id);
-    }
-  };
 
   return (
-    <div className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl shadow-md dark:shadow-2xl backdrop-blur-md w-full">
+    <div className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl shadow-md dark:shadow-2xl w-full">
       <div 
         onScroll={(e) => {
           if (window.innerWidth < 640 && !isMobileMenuCollapsed && e.currentTarget.scrollTop > 35) {
@@ -98,15 +63,6 @@ export default function ShiftTable({
           </thead>
 
           {/* Table Body with Drag and Drop */}
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={flights.map(f => f.id)}
-              strategy={verticalListSortingStrategy}
-            >
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-sans">
                 {flights.length > 0 ? (
                   flights.map((flight, index) => (
@@ -116,13 +72,9 @@ export default function ShiftTable({
                       index={index}
                       onUpdateFlight={onUpdateFlight}
                       onDeleteFlight={onDeleteFlight}
-                      onMoveUp={onMoveUp}
-                      onMoveDown={onMoveDown}
                       onAcknowledgeField={onAcknowledgeField}
                       onAcknowledgeFlight={onAcknowledgeFlight}
                       onOpenHistory={onOpenHistory}
-                      isFirst={index === 0}
-                      isLast={index === flights.length - 1}
                       timeMode={timeMode}
                     />
                   ))
@@ -130,7 +82,7 @@ export default function ShiftTable({
                   <tr>
                     <td colSpan="20" className="text-center py-16 text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-3">
-                        <PlaneTakeoff className="w-10 h-10 text-slate-400 dark:text-slate-600 animate-pulse" />
+                        <PlaneTakeoff className="w-10 h-10 text-slate-400 dark:text-slate-600" />
                         <p className="text-sm font-bold text-slate-700 dark:text-slate-300">В журнале смены пока нет рейсов</p>
                         <button
                           onClick={onAddFlight}
@@ -143,8 +95,6 @@ export default function ShiftTable({
                   </tr>
                 )}
               </tbody>
-            </SortableContext>
-          </DndContext>
         </table>
       </div>
 
@@ -152,8 +102,7 @@ export default function ShiftTable({
       <div className="bg-slate-50 dark:bg-slate-950 border-t border-slate-300 dark:border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between text-xs text-slate-600 dark:text-slate-400 no-print">
         <div className="flex items-center gap-2.5">
           <span>Всего рейсов в суточном плане: <strong className="text-slate-950 dark:text-white font-mono text-sm font-extrabold">{flights.length}</strong></span>
-          <span className="text-slate-400 dark:text-slate-600">•</span>
-          <span className="text-slate-500">Зажимайте и перетаскивайте любую строку мышкой</span>
+
         </div>
         <button
           onClick={onAddFlight}

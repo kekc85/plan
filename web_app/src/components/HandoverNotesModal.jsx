@@ -25,7 +25,7 @@ export default function HandoverNotesModal({ isOpen, onClose, handoverData }) {
     : null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-3 animate-in fade-in duration-200">
       <div 
         className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl max-w-lg w-full p-5 shadow-2xl animate-in zoom-in-95 duration-150 text-slate-900 dark:text-white relative"
         onClick={(e) => e.stopPropagation()}

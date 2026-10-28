@@ -36,7 +36,7 @@ export default function LoginModal({ isOpen, isFullScreen = false, onClose, onLo
 
   const containerClasses = isFullScreen
     ? "w-full max-w-md"
-    : "fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4";
+    : "fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4";
 
   return (
     <div className={containerClasses}>
@@ -44,7 +44,7 @@ export default function LoginModal({ isOpen, isFullScreen = false, onClose, onLo
         
         {/* Header */}
         <div className="bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-700 p-7 text-white text-center relative shadow-md">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/15 border border-white/30 backdrop-blur-md mb-3 shadow-inner">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/15 border border-white/30 mb-3 shadow-inner">
             <Plane className="w-7 h-7 rotate-45 text-white" />
           </div>
           <h2 className="text-2xl font-black tracking-tight">AEROPLAN W&B</h2>

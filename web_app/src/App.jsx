@@ -52,7 +52,6 @@ import {
   countUnreadChanges,
   getSafeUnreadChanges
 } from './utils/deltaSync';
-import { arrayMove } from '@dnd-kit/sortable';
 import { Bell, CheckCircle2, X, Volume2, MessageSquare } from 'lucide-react';
 
 const STORAGE_KEY = 'aeroplan_shift_journal_active';
@@ -737,34 +736,6 @@ export default function App() {
     handleDismissAlert({ id: flightId });
   }, [handleDismissAlert]);
 
-  // Drag and Drop: перестановка строк (мемоизировано)
-  const handleReorderFlights = useCallback((activeId, overId) => {
-    hasUserModifiedRef.current = true;
-    setFlights((items) => {
-      const oldIndex = items.findIndex((item) => item.id === activeId);
-      const newIndex = items.findIndex((item) => item.id === overId);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        return arrayMove(items, oldIndex, newIndex);
-      }
-      return items;
-    });
-  }, []);
-
-  // Перемещение вверх стрелочкой (мемоизировано)
-  const handleMoveUp = useCallback((index) => {
-    if (index <= 0) return;
-    hasUserModifiedRef.current = true;
-    setFlights((items) => arrayMove(items, index, index - 1));
-  }, []);
-
-  // Перемещение вниз стрелочкой (мемоизировано)
-  const handleMoveDown = useCallback((index) => {
-    hasUserModifiedRef.current = true;
-    setFlights((items) => {
-      if (index >= items.length - 1) return items;
-      return arrayMove(items, index, index + 1);
-    });
-  }, []);
 
   // Обновление отдельного поля рейса (мемоизировано)
   const handleUpdateFlight = useCallback((id, updatedFields = {}, shouldSort = false) => {
@@ -1368,11 +1339,8 @@ export default function App() {
         {/* Interactive Sortable Shift Table */}
         <ShiftTable
           flights={filteredFlights}
-          onReorderFlights={handleReorderFlights}
           onUpdateFlight={handleUpdateFlight}
           onDeleteFlight={handleDeleteFlight}
-          onMoveUp={handleMoveUp}
-          onMoveDown={handleMoveDown}
           onAcknowledgeField={handleAcknowledgeField}
           onAcknowledgeFlight={handleAcknowledgeFlight}
           onOpenHistory={handleOpenFlightHistory}

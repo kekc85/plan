@@ -1,7 +1,5 @@
 import React from 'react';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, ArrowUp, ArrowDown, Check, Bell, History } from 'lucide-react';
+import { Trash2, Check, Bell, History } from 'lucide-react';
 import { 
   formatValidTime, 
   calcReleaseTime, 
@@ -54,23 +52,11 @@ function FlightRow({
   index,
   onUpdateFlight,
   onDeleteFlight,
-  onMoveUp,
-  onMoveDown,
   onAcknowledgeField,
   onAcknowledgeFlight,
   onOpenHistory,
-  isFirst,
-  isLast,
   timeMode = 'MSK'
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id: flight.id });
 
   // Временные поля рейса с учетом активного часового пояса (МСК или UTC)
   const displayTimes = getDisplayFlightTimes(flight, timeMode);
@@ -86,10 +72,7 @@ function FlightRow({
     ? 'ring-2 ring-amber-500 bg-amber-100/90 dark:bg-amber-950/80 text-amber-950 dark:text-amber-100 font-bold'
     : '';
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+
 
   const handleCellChange = (field, value) => {
     const updates = { [field]: value };
@@ -410,25 +393,15 @@ function FlightRow({
 
   return (
     <tr
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className={`group transition-all duration-150 ${activeRowTheme} cursor-grab active:cursor-grabbing rounded-2xl ${
-        isDragging ? 'shadow-2xl ring-2 ring-sky-400 z-50 opacity-90' : ''
-      }`}
+      className={`group transition-colors duration-100 ${activeRowTheme} rounded-2xl`}
     >
-      {/* 1. Drag Handle & Index */}
+      {/* 1. Номер строки */}
       <td
         className={`sticky left-0 z-20 py-1 px-0.5 text-center whitespace-nowrap no-print w-7 min-w-[28px] max-w-[28px] ${activeStickyBg} transition-colors shadow-[1px_0_0_0_#cbd5e1] dark:shadow-[1px_0_0_0_#334155] rounded-l-2xl border-l-4 ${leftStatusBorderColor} ${
           isOverdue ? 'border-t-2 border-b-2 border-rose-500' : 'border-t border-b border-slate-200/80 dark:border-slate-800/80'
         }`}
-        title="Хватайте и перетаскивайте в любое место"
       >
-        <div className="flex items-center justify-center gap-0.5">
-          <GripVertical className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 group-hover:text-sky-500" />
-          <span className="font-mono text-xs font-bold text-slate-500 dark:text-slate-400">{index + 1}</span>
-        </div>
+        <span className="font-mono text-xs font-bold text-slate-500 dark:text-slate-400">{index + 1}</span>
       </td>
 
       {/* 2. № Рейса */}
@@ -450,7 +423,7 @@ function FlightRow({
               onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black uppercase px-1 py-0.5 rounded shadow-xs animate-pulse cursor-pointer shrink-0 max-w-[60px] truncate"
+              className="inline-flex items-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[9px] font-black uppercase px-1 py-0.5 rounded shadow-xs cursor-pointer shrink-0 max-w-[60px] truncate"
               title="Новый рейс из AviaBit! Нажмите для подтверждения"
             >
               <span className="truncate">НОВЫЙ</span>
@@ -531,7 +504,7 @@ function FlightRow({
               const fromStr = flight.inbound_dep ? `из ${flight.inbound_dep}` : '';
               return (
                 <div
-                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-amber-500/15 dark:bg-amber-950/60 border border-amber-500/40 text-amber-800 dark:text-amber-200 text-[9px] font-bold tracking-tight leading-none w-full max-w-full truncate cursor-default animate-pulse"
+                  className="inline-flex items-center justify-center gap-0.5 px-1 py-0.5 mt-0.5 rounded bg-amber-500/15 dark:bg-amber-950/60 border border-amber-500/40 text-amber-800 dark:text-amber-200 text-[9px] font-bold tracking-tight leading-none w-full max-w-full truncate cursor-default"
                   title={`Борт в воздухе: летит ${fromStr} в ${dep}${calcT ? ', расчетная посадка' + calcT + ` (${timeMode})` : ''}`}
                 >
                   <span className="text-[10px]">✈️</span>
@@ -584,7 +557,7 @@ function FlightRow({
           {/* 1. Время выпуска (-40 мин) */}
           <div className="flex items-center justify-center gap-0.5 w-full">
             <span className={`text-[9px] font-extrabold uppercase leading-none ${
-              isOverdue ? 'text-rose-700 dark:text-rose-300 font-black animate-pulse' : 'text-emerald-600 dark:text-emerald-400'
+              isOverdue ? 'text-rose-700 dark:text-rose-300 font-black' : 'text-emerald-600 dark:text-emerald-400'
             }`}>
               ВЫП:
             </span>
@@ -1013,7 +986,7 @@ function FlightRow({
             className={`flex items-center justify-center gap-0.5 px-0.5 py-1 rounded border text-[10px] font-extrabold transition-all focus:outline-none focus:ring-1 focus:ring-teal-400 shadow-sm w-full ${
               flight.astra_times_sent
                 ? 'bg-teal-600 text-white border-teal-700 dark:bg-teal-500/30 dark:text-teal-200 dark:border-teal-400'
-                : 'bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border-teal-400/60 dark:border-teal-600/50 hover:bg-teal-100/70 hover:border-teal-500 animate-pulse'
+                : 'bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border-teal-400/60 dark:border-teal-600/50 hover:bg-teal-100/70 hover:border-teal-500'
             }`}
             title="Для рейса из Оренбурга (REN) необходимо вручную проставить время движения и взлёта в Astra!"
           >
@@ -1072,7 +1045,7 @@ function FlightRow({
               onClick={(e) => { e.stopPropagation(); onAcknowledgeFlight?.(flight.id); }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              className="flex items-center justify-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[8px] font-black px-1 py-0.5 rounded shadow-xs transition-all active:scale-95 animate-pulse shrink-0 cursor-pointer"
+              className="flex items-center justify-center gap-0.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/90 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-400 dark:border-amber-500/80 text-[8px] font-black px-1 py-0.5 rounded shadow-xs transition-all active:scale-95 shrink-0 cursor-pointer"
               title="Подтвердить ознакомление со всеми изменениями в этом рейсе"
             >
               <Check className="w-2 h-2 stroke-[3] text-amber-700 dark:text-amber-400" />
@@ -1080,45 +1053,23 @@ function FlightRow({
             </button>
           )}
 
-          <div className="flex items-center justify-center gap-0.5 opacity-80 group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity shrink-0">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onOpenHistory?.(flight); }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 rounded hover:bg-sky-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+              className="p-1.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 rounded-lg hover:bg-sky-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
               title="История изменений рейса (Flight Audit Trail)"
             >
               <History className="w-3.5 h-3.5" />
             </button>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onMoveUp(index); }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              disabled={isFirst}
-              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
-              title="Переместить вверх"
-            >
-              <ArrowUp className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onMoveDown(index); }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              disabled={isLast}
-              className="p-1 text-slate-500 hover:text-sky-600 dark:hover:text-sky-300 disabled:opacity-20 rounded hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
-              title="Переместить вниз"
-            >
-              <ArrowDown className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
               onClick={(e) => { e.stopPropagation(); onDeleteFlight(flight.id); }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              className="p-1 text-rose-500 hover:text-rose-700 dark:hover:text-rose-300 rounded hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors shrink-0 cursor-pointer"
+              className="p-1.5 text-rose-500 hover:text-rose-700 dark:hover:text-rose-300 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors shrink-0 cursor-pointer"
               title="Удалить рейс"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
@@ -1133,8 +1084,6 @@ function FlightRow({
 function areFlightRowsEqual(prevProps, nextProps) {
   if (prevProps.flight !== nextProps.flight) return false;
   if (prevProps.index !== nextProps.index) return false;
-  if (prevProps.isFirst !== nextProps.isFirst) return false;
-  if (prevProps.isLast !== nextProps.isLast) return false;
   if (prevProps.timeMode !== nextProps.timeMode) return false;
   return true;
 }

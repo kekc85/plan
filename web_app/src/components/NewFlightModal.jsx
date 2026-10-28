@@ -139,7 +139,7 @@ export default function NewFlightModal({ isOpen, onClose, onAdd, timeMode = 'MSK
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3">
+    <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-3">
       <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl max-w-2xl w-full p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150 text-slate-900 dark:text-white">
         
         {/* Header */}

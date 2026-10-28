@@ -42,6 +42,221 @@ const mskTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   hour12: false
 });
 
+// Изолированный компонент часов и переключателя часовых поясов для десктопа
+// Обновляется каждую секунду локально, НЕ вызывая ререндер всей огромной шапки!
+const ClockDisplay = React.memo(function ClockDisplay({ timeMode, onTimeModeChange }) {
+  const [utcTime, setUtcTime] = useState('');
+  const [utcDateStr, setUtcDateStr] = useState('');
+  const [mskTime, setMskTime] = useState('');
+  const [mskDateStr, setMskDateStr] = useState('');
+
+  useEffect(() => {
+    const updateClocks = () => {
+      if (document.visibilityState === 'hidden') return;
+      const now = new Date();
+
+      const uH = String(now.getUTCHours()).padStart(2, '0');
+      const uM = String(now.getUTCMinutes()).padStart(2, '0');
+      const uS = String(now.getUTCSeconds()).padStart(2, '0');
+      setUtcTime(`${uH}:${uM}:${uS}`);
+
+      const uDay = String(now.getUTCDate()).padStart(2, '0');
+      const uMonth = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const uYear = now.getUTCFullYear();
+      setUtcDateStr(`${uDay}.${uMonth}.${uYear}`);
+
+      try {
+        setMskDateStr(mskDateFormatter.format(now));
+        setMskTime(mskTimeFormatter.format(now));
+      } catch (e) {
+        setMskTime(now.toLocaleTimeString('ru-RU'));
+        setMskDateStr(now.toLocaleDateString('ru-RU'));
+      }
+    };
+
+    updateClocks();
+    const interval = setInterval(updateClocks, 1000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateClocks();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  return (
+    <div className="flex flex-wrap items-center gap-1 sm:gap-2 max-w-full">
+      {/* Сегментированный переключатель МСК / UTC */}
+      <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-300 dark:border-slate-700 shadow-inner">
+        <button
+          type="button"
+          onClick={() => onTimeModeChange('MSK')}
+          className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[10px] font-extrabold transition-all cursor-pointer ${
+            timeMode === 'MSK'
+              ? 'bg-amber-500 text-white shadow-sm font-black'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+          title="Отображать дату и фокус по Московскому времени (МСК / UTC+3)"
+        >
+          МСК
+        </button>
+        <button
+          type="button"
+          onClick={() => onTimeModeChange('UTC')}
+          className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[10px] font-extrabold transition-all cursor-pointer ${
+            timeMode === 'UTC'
+              ? 'bg-emerald-600 text-white shadow-sm font-black'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+          title="Отображать дату и фокус по всемирному времени (UTC / ZULU)"
+        >
+          UTC
+        </button>
+      </div>
+
+      {/* ТЕКУЩЕЕ ЧИСЛО (МСК / UTC) */}
+      <div className={`flex items-center gap-1 rounded-lg px-1.5 sm:px-2 py-0.5 sm:py-1 shadow-sm transition-all ${
+        timeMode === 'UTC'
+          ? 'bg-emerald-50/90 dark:bg-slate-900/90 border border-emerald-300 dark:border-emerald-500/40'
+          : 'bg-sky-50/90 dark:bg-slate-900/90 border border-sky-300 dark:border-sky-500/40'
+      }`}>
+        <Calendar className={`w-3.5 h-3.5 shrink-0 ${timeMode === 'UTC' ? 'text-emerald-600 dark:text-emerald-400' : 'text-sky-600 dark:text-sky-400'}`} />
+        <div className="flex flex-col">
+          <span className={`text-[8px] sm:text-[9px] uppercase font-extrabold tracking-wider leading-none ${
+            timeMode === 'UTC' ? 'text-emerald-800 dark:text-emerald-400' : 'text-sky-800 dark:text-sky-400'
+          }`}>
+            {timeMode === 'UTC' ? 'ЧИСЛО (UTC)' : 'ЧИСЛО (МСК)'}
+          </span>
+          <span className={`font-mono text-xs sm:text-sm font-black tracking-wide leading-tight ${
+            timeMode === 'UTC' ? 'text-emerald-700 dark:text-emerald-300' : 'text-sky-700 dark:text-sky-300'
+          }`}>
+            {(timeMode === 'UTC' ? utcDateStr : mskDateStr) || '--.--.----'}
+          </span>
+        </div>
+      </div>
+
+      {/* UTC часы */}
+      <button
+        type="button"
+        onClick={() => onTimeModeChange('UTC')}
+        className={`flex items-center gap-1 rounded-lg px-1.5 sm:px-2 py-0.5 sm:py-1 shadow-sm transition-all cursor-pointer text-left ${
+          timeMode === 'UTC'
+            ? 'bg-emerald-100/90 dark:bg-emerald-950/90 border-2 border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30'
+            : 'bg-emerald-50/60 dark:bg-slate-900/60 border border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-slate-900 opacity-80 hover:opacity-100'
+        }`}
+        title="Кликните для выбора UTC"
+      >
+        <Globe className={`w-3.5 h-3.5 shrink-0 ${timeMode === 'UTC' ? 'text-emerald-600 dark:text-emerald-400' : 'text-emerald-600/70 dark:text-emerald-400/70'}`} />
+        <div className="flex flex-col">
+          <div className="flex items-center gap-1">
+            <span className="text-[8px] sm:text-[9px] uppercase font-extrabold text-emerald-800 dark:text-emerald-400/80 tracking-wider leading-none">UTC</span>
+            {timeMode === 'UTC' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>}
+          </div>
+          <span className="font-mono text-xs sm:text-sm font-extrabold text-emerald-700 dark:text-emerald-300 tracking-wider leading-tight">
+            {utcTime || '--:--:--'}
+          </span>
+        </div>
+      </button>
+
+      {/* МСК часы */}
+      <button
+        type="button"
+        onClick={() => onTimeModeChange('MSK')}
+        className={`flex items-center gap-1 rounded-lg px-1.5 sm:px-2 py-0.5 sm:py-1 shadow-sm transition-all cursor-pointer text-left ${
+          timeMode === 'MSK'
+            ? 'bg-amber-100/90 dark:bg-amber-950/90 border-2 border-amber-500 dark:border-amber-400 ring-2 ring-amber-500/30'
+            : 'bg-amber-50/60 dark:bg-slate-900/60 border border-amber-200 dark:border-amber-500/30 hover:bg-amber-50 dark:hover:bg-slate-900 opacity-80 hover:opacity-100'
+        }`}
+        title="Кликните для выбора МСК"
+      >
+        <Clock className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="flex flex-col">
+          <div className="flex items-center gap-1">
+            <span className="text-[8px] sm:text-[9px] uppercase font-extrabold text-amber-800 dark:text-amber-400/80 tracking-wider leading-none">МСК</span>
+            {timeMode === 'MSK' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>}
+          </div>
+          <span className="font-mono text-xs sm:text-sm font-extrabold text-amber-700 dark:text-amber-300 tracking-wider leading-tight">
+            {mskTime || '--:--:--'}
+          </span>
+        </div>
+      </button>
+    </div>
+  );
+});
+
+// Изолированный компонент часов для компактного мобильного бара
+const MobileClockDisplay = React.memo(function MobileClockDisplay({ timeMode, onTimeModeChange }) {
+  const [timeStr, setTimeStr] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      if (document.visibilityState === 'hidden') return;
+      const now = new Date();
+      if (timeMode === 'UTC') {
+        const uH = String(now.getUTCHours()).padStart(2, '0');
+        const uM = String(now.getUTCMinutes()).padStart(2, '0');
+        const uS = String(now.getUTCSeconds()).padStart(2, '0');
+        setTimeStr(`${uH}:${uM}:${uS}`);
+      } else {
+        try {
+          setTimeStr(mskTimeFormatter.format(now));
+        } catch (e) {
+          setTimeStr(now.toLocaleTimeString('ru-RU'));
+        }
+      }
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    const handleVis = () => { if (document.visibilityState === 'visible') updateTime(); };
+    document.addEventListener('visibilitychange', handleVis);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVis);
+    };
+  }, [timeMode]);
+
+  return (
+    <>
+      <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-md border border-slate-300 dark:border-slate-700 shadow-inner text-[10px]">
+        <button
+          type="button"
+          onClick={() => onTimeModeChange('MSK')}
+          className={`px-1.5 py-0.5 rounded font-bold transition-all ${
+            timeMode === 'MSK'
+              ? 'bg-amber-500 text-white font-black shadow-xs'
+              : 'text-slate-600 dark:text-slate-400'
+          }`}
+          title="МСК"
+        >
+          МСК
+        </button>
+        <button
+          type="button"
+          onClick={() => onTimeModeChange('UTC')}
+          className={`px-1.5 py-0.5 rounded font-bold transition-all ${
+            timeMode === 'UTC'
+              ? 'bg-emerald-600 text-white font-black shadow-xs'
+              : 'text-slate-600 dark:text-slate-400'
+          }`}
+          title="UTC"
+        >
+          UTC
+        </button>
+      </div>
+
+      <span className="font-mono text-xs font-black text-slate-800 dark:text-slate-200 shrink-0">
+        {timeStr}
+      </span>
+    </>
+  );
+});
+
 export default function Header({
   shiftInfo,
   setShiftInfo,
@@ -79,10 +294,7 @@ export default function Header({
   isMobileMenuCollapsed = false,
   setIsMobileMenuCollapsed
 }) {
-  const [utcTime, setUtcTime] = useState('');
-  const [mskTime, setMskTime] = useState('');
-  const [utcDateStr, setUtcDateStr] = useState('');
-  const [mskDateStr, setMskDateStr] = useState('');
+
   const [internalTimeMode, setInternalTimeMode] = useState(() => {
     try {
       return localStorage.getItem('aeroplan_time_mode') || 'MSK';
@@ -103,50 +315,7 @@ export default function Header({
     } catch (e) {}
   };
 
-  // Идущие часы UTC, МСК и текущая дата (каждую секунду)
-  useEffect(() => {
-    const updateClocks = () => {
-      // При свернутой вкладке пропускаем холостые перерисовки
-      if (document.visibilityState === 'hidden') return;
 
-      const now = new Date();
-
-      // UTC (ZULU)
-      const uH = String(now.getUTCHours()).padStart(2, '0');
-      const uM = String(now.getUTCMinutes()).padStart(2, '0');
-      const uS = String(now.getUTCSeconds()).padStart(2, '0');
-      setUtcTime(`${uH}:${uM}:${uS}`);
-
-      const uDay = String(now.getUTCDate()).padStart(2, '0');
-      const uMonth = String(now.getUTCMonth() + 1).padStart(2, '0');
-      const uYear = now.getUTCFullYear();
-      setUtcDateStr(`${uDay}.${uMonth}.${uYear}`);
-
-      // MSK (Europe/Moscow, UTC+3) Date & Time
-      try {
-        setMskDateStr(mskDateFormatter.format(now));
-        setMskTime(mskTimeFormatter.format(now));
-      } catch (e) {
-        setMskTime(now.toLocaleTimeString('ru-RU'));
-        setMskDateStr(now.toLocaleDateString('ru-RU'));
-      }
-    };
-
-    updateClocks();
-    const interval = setInterval(updateClocks, 1000);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        updateClocks();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
 
   const handleDateChange = (e) => {
     const rawVal = e.target.value;
@@ -167,7 +336,7 @@ export default function Header({
   };
 
   return (
-    <header className={`bg-white/95 dark:bg-slate-950/95 border-b border-slate-200 dark:border-slate-800 backdrop-blur-md sticky top-0 z-30 px-2 sm:px-4 lg:px-6 ${isMobileMenuCollapsed ? 'py-1' : 'py-1.5 sm:py-2'} no-print shadow-sm transition-all`}>
+    <header className={`bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 px-2 sm:px-4 lg:px-6 ${isMobileMenuCollapsed ? 'py-1' : 'py-1.5 sm:py-2'} no-print shadow-sm transition-all`}>
       {/* 1. Мобильная компактная полоса (когда меню свернуто диспетчером) */}
       {isMobileMenuCollapsed && (
         <div className="flex items-center justify-between gap-1.5 py-0.5 sm:hidden">
@@ -179,38 +348,8 @@ export default function Header({
               AEROPLAN
             </span>
 
-            {/* Сегментированный переключатель МСК / UTC */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-md border border-slate-300 dark:border-slate-700 shadow-inner text-[10px]">
-              <button
-                type="button"
-                onClick={() => handleSetTimeMode('MSK')}
-                className={`px-1.5 py-0.5 rounded font-bold transition-all ${
-                  timeMode === 'MSK'
-                    ? 'bg-amber-500 text-white font-black shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-                title="МСК"
-              >
-                МСК
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSetTimeMode('UTC')}
-                className={`px-1.5 py-0.5 rounded font-bold transition-all ${
-                  timeMode === 'UTC'
-                    ? 'bg-emerald-600 text-white font-black shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-                title="UTC"
-              >
-                UTC
-              </button>
-            </div>
-
-            {/* Текущее время */}
-            <span className="font-mono text-xs font-black text-slate-800 dark:text-slate-200 shrink-0">
-              {timeMode === 'UTC' ? utcTime : mskTime}
-            </span>
+            {/* Изолированные часы для мобильного вида */}
+            <MobileClockDisplay timeMode={timeMode} onTimeModeChange={handleSetTimeMode} />
           </div>
 
           {/* Правая часть: счетчик рейсов и кнопка развернуть меню */}
@@ -259,103 +398,8 @@ export default function Header({
             </div>
           </div>
 
-          {/* Часы и Дата с интерактивным переключателем МСК / UTC */}
-          <div className="flex flex-wrap items-center gap-1 sm:gap-2 max-w-full">
-            {/* Сегментированный переключатель МСК / UTC */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-300 dark:border-slate-700 shadow-inner">
-              <button
-                type="button"
-                onClick={() => handleSetTimeMode('MSK')}
-                className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[10px] font-extrabold transition-all cursor-pointer ${
-                  timeMode === 'MSK'
-                    ? 'bg-amber-500 text-white shadow-sm font-black'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-                title="Отображать дату и фокус по Московскому времени (МСК / UTC+3)"
-              >
-                МСК
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSetTimeMode('UTC')}
-                className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[10px] font-extrabold transition-all cursor-pointer ${
-                  timeMode === 'UTC'
-                    ? 'bg-emerald-600 text-white shadow-sm font-black'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-                title="Отображать дату и фокус по всемирному времени (UTC / ZULU)"
-              >
-                UTC
-              </button>
-            </div>
-
-            {/* ТЕКУЩЕЕ ЧИСЛО (МСК / UTC) */}
-            <div className={`flex items-center gap-1 rounded-lg px-1.5 sm:px-2 py-0.5 sm:py-1 shadow-sm transition-all ${
-              timeMode === 'UTC'
-                ? 'bg-emerald-50/90 dark:bg-slate-900/90 border border-emerald-300 dark:border-emerald-500/40'
-                : 'bg-sky-50/90 dark:bg-slate-900/90 border border-sky-300 dark:border-sky-500/40'
-            }`}>
-              <Calendar className={`w-3.5 h-3.5 shrink-0 ${timeMode === 'UTC' ? 'text-emerald-600 dark:text-emerald-400' : 'text-sky-600 dark:text-sky-400'}`} />
-              <div className="flex flex-col">
-                <span className={`text-[8px] sm:text-[9px] uppercase font-extrabold tracking-wider leading-none ${
-                  timeMode === 'UTC' ? 'text-emerald-800 dark:text-emerald-400' : 'text-sky-800 dark:text-sky-400'
-                }`}>
-                  {timeMode === 'UTC' ? 'ЧИСЛО (UTC)' : 'ЧИСЛО (МСК)'}
-                </span>
-                <span className={`font-mono text-xs sm:text-sm font-black tracking-wide leading-tight ${
-                  timeMode === 'UTC' ? 'text-emerald-700 dark:text-emerald-300' : 'text-sky-700 dark:text-sky-300'
-                }`}>
-                  {(timeMode === 'UTC' ? utcDateStr : mskDateStr) || '--.--.----'}
-                </span>
-              </div>
-            </div>
-
-            {/* UTC часы */}
-            <button
-              type="button"
-              onClick={() => handleSetTimeMode('UTC')}
-              className={`flex items-center gap-1 rounded-lg px-1.5 sm:px-2 py-0.5 sm:py-1 shadow-sm transition-all cursor-pointer text-left ${
-                timeMode === 'UTC'
-                  ? 'bg-emerald-100/90 dark:bg-emerald-950/90 border-2 border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30'
-                  : 'bg-emerald-50/60 dark:bg-slate-900/60 border border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-slate-900 opacity-80 hover:opacity-100'
-              }`}
-              title="Кликните для выбора UTC"
-            >
-              <Globe className={`w-3.5 h-3.5 shrink-0 ${timeMode === 'UTC' ? 'text-emerald-600 dark:text-emerald-400 animate-pulse' : 'text-emerald-600/70 dark:text-emerald-400/70'}`} />
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1">
-                  <span className="text-[8px] sm:text-[9px] uppercase font-extrabold text-emerald-800 dark:text-emerald-400/80 tracking-wider leading-none">UTC</span>
-                  {timeMode === 'UTC' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
-                </div>
-                <span className="font-mono text-xs sm:text-sm font-extrabold text-emerald-700 dark:text-emerald-300 tracking-wider leading-tight">
-                  {utcTime || '--:--:--'}
-                </span>
-              </div>
-            </button>
-
-            {/* МСК часы */}
-            <button
-              type="button"
-              onClick={() => handleSetTimeMode('MSK')}
-              className={`flex items-center gap-1 rounded-lg px-1.5 sm:px-2 py-0.5 sm:py-1 shadow-sm transition-all cursor-pointer text-left ${
-                timeMode === 'MSK'
-                  ? 'bg-amber-100/90 dark:bg-amber-950/90 border-2 border-amber-500 dark:border-amber-400 ring-2 ring-amber-500/30'
-                  : 'bg-amber-50/60 dark:bg-slate-900/60 border border-amber-200 dark:border-amber-500/30 hover:bg-amber-50 dark:hover:bg-slate-900 opacity-80 hover:opacity-100'
-              }`}
-              title="Кликните для выбора МСК"
-            >
-              <Clock className={`w-3.5 h-3.5 shrink-0 ${timeMode === 'MSK' ? 'text-amber-600 dark:text-amber-400' : 'text-amber-600/70 dark:text-amber-400/70'}`} />
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1">
-                  <span className="text-[8px] sm:text-[9px] uppercase font-extrabold text-amber-800 dark:text-amber-400/80 tracking-wider leading-none">МСК</span>
-                  {timeMode === 'MSK' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>}
-                </div>
-                <span className="font-mono text-xs sm:text-sm font-extrabold text-amber-700 dark:text-amber-300 tracking-wider leading-tight">
-                  {mskTime || '--:--:--'}
-                </span>
-              </div>
-            </button>
-          </div>
+          {/* Часы и Дата с интерактивным переключателем МСК / UTC (Изолированный компонент, не ререндерит Header каждую секунду) */}
+          <ClockDisplay timeMode={timeMode} onTimeModeChange={handleSetTimeMode} />
 
           {/* User profile & Action toggles */}
           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -492,7 +536,7 @@ export default function Header({
             
             {/* БЕЙДЖ НЕПОДТВЕРЖДЕННЫХ ИЗМЕНЕНИЙ В РЕЙСАХ */}
             {unreadChangesCount > 0 && (
-              <div className="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-950/90 border-2 border-amber-400 dark:border-amber-500/80 rounded-xl px-2.5 py-1 text-xs text-amber-950 dark:text-amber-200 shadow-md animate-pulse">
+              <div className="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-950/90 border-2 border-amber-400 dark:border-amber-500/80 rounded-xl px-2.5 py-1 text-xs text-amber-950 dark:text-amber-200 shadow-md ">
                 <Bell className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0 fill-current" />
                 <span className="font-extrabold whitespace-nowrap">
                   Изменений: <span className="underline decoration-amber-500 dark:decoration-amber-400 font-mono text-sm">{unreadChangesCount}</span>
@@ -527,7 +571,7 @@ export default function Header({
                 ) : (
                   <span
                     className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                      autoSyncEnabled ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.7)]' : 'bg-slate-400'
+                      autoSyncEnabled ? 'bg-emerald-500  shadow-[0_0_8px_rgba(16,185,129,0.7)]' : 'bg-slate-400'
                     }`}
                   />
                 )}
