@@ -83,6 +83,7 @@ function getDb() {
                 "ALTER TABLE plan_flights ADD COLUMN outbound_takeoff_time VARCHAR(16) NULL",
                 "ALTER TABLE plan_flights ADD COLUMN plane_status VARCHAR(32) NULL",
                 "ALTER TABLE plan_flights ADD COLUMN crew_manual TINYINT(1) DEFAULT 0",
+                "ALTER TABLE plan_flights ADD COLUMN fuel_confirmed TINYINT(1) DEFAULT 0",
                 "ALTER TABLE plan_shifts ADD COLUMN deleted_flights TEXT NULL",
                 "ALTER TABLE plan_handover_logs ADD COLUMN is_read TINYINT(1) DEFAULT 0",
                 "ALTER TABLE plan_handover_logs ADD COLUMN read_at VARCHAR(64) NULL",
@@ -323,6 +324,30 @@ function parseTelegramLoad($text, $code = '') {
         'mail' => ($hasMail && $mailTotal > 0) ? (string)$mailTotal : '',
         'baggage' => ($hasBaggage && $baggageTotal > 0) ? (string)$baggageTotal : ''
     ];
+}
+
+function parseTelegramCfp($text) {
+    $res = ['fuel_taxi' => '', 'fuel_trip' => '', 'fuel_block' => ''];
+    if (!$text) {
+        return $res;
+    }
+
+    // 1. TAXI / TAXI/APU
+    if (preg_match('/^\s*TAXI(?:\/APU)?\s+(?:[\d.:]+\s+)?(\d+)/mi', $text, $m)) {
+        $res['fuel_taxi'] = $m[1];
+    }
+
+    // 2. TRIP FUEL
+    if (preg_match('/^\s*TRIP(?:\s+FUEL)?\s+(?:[\d.:]+\s+)?(\d+)/mi', $text, $m)) {
+        $res['fuel_trip'] = $m[1];
+    }
+
+    // 3. TOTAL FUEL / BLOCK FUEL
+    if (preg_match('/^\s*(?:TOTAL|BLOCK)(?:\s+FUEL)?\s+(?:[\d.:]+\s+)?(\d+)/mi', $text, $m)) {
+        $res['fuel_block'] = $m[1];
+    }
+
+    return $res;
 }
 
 // Fallback для заголовков
@@ -1037,6 +1062,7 @@ if ($route === '/shift/current') {
             'fuel_block' => (string)($r['fuel_block'] ?? ''),
             'fuel_trip' => (string)($r['fuel_trip'] ?? ''),
             'fuel_taxi' => (string)($r['fuel_taxi'] ?? ''),
+            'fuel_confirmed' => !empty($r['fuel_confirmed']),
             'dow' => (string)($r['dow'] ?? ''),
             'doi' => (string)($r['doi'] ?? ''),
             'galley' => (string)($r['galley'] ?? 'D'),
@@ -1149,6 +1175,7 @@ if ($route === '/shift/save') {
             ['fuel_block', 'fuel_block'],
             ['fuel_trip', 'fuel_trip'],
             ['fuel_taxi', 'fuel_taxi'],
+            ['fuel_confirmed', 'fuel_confirmed'],
             ['dow', 'dow'],
             ['doi', 'doi'],
             ['galley', 'galley'],
@@ -1177,7 +1204,7 @@ if ($route === '/shift/save') {
                     $newV = $f[$reqK] ?? null;
                     $oldV = $oldF[$dbK] ?? null;
 
-                    if (in_array($reqK, ['lir_sent', 'szv_sent', 'ldm_sent', 'astra_times_sent'])) {
+                    if (in_array($reqK, ['lir_sent', 'szv_sent', 'ldm_sent', 'astra_times_sent', 'fuel_confirmed'])) {
                         $bNew = !empty($newV);
                         $bOld = !empty($oldV);
                         if ($bNew !== $bOld) {
@@ -1217,7 +1244,7 @@ if ($route === '/shift/save') {
             INSERT INTO plan_flights (
                 id, shift_id, flight_number, flight_date, route_city, route_airports,
                 departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
-                fuel_block, fuel_trip, fuel_taxi, dow, doi, galley, mtow, crew_manual,
+                fuel_block, fuel_trip, fuel_taxi, fuel_confirmed, dow, doi, galley, mtow, crew_manual,
                 lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
                 status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
                 inbound_landing_calc, inbound_landing_time, outbound_takeoff_time,
@@ -1225,7 +1252,7 @@ if ($route === '/shift/save') {
             ) VALUES (
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
                 ?, ?, ?,
@@ -1253,6 +1280,7 @@ if ($route === '/shift/save') {
                 (string)($f['fuel_block'] ?? ''),
                 (string)($f['fuel_trip'] ?? ''),
                 (string)($f['fuel_taxi'] ?? ''),
+                !empty($f['fuel_confirmed']) ? 1 : 0,
                 (string)($f['dow'] ?? ''),
                 (string)($f['doi'] ?? ''),
                 (string)($f['galley'] ?? 'D'),
@@ -1350,7 +1378,24 @@ if ($route === '/shift/smart_merge') {
             $item['notes'] = !empty($old['notes']) ? $old['notes'] : ($inc['notes'] ?? '');
 
             // 1. Сохраняем ручные диспетчерские поля
-            foreach (['fuel_block', 'fuel_trip', 'fuel_taxi', 'dow', 'doi', 'galley', 'mtow', 'baggage'] as $field) {
+            if (!empty($old['fuel_confirmed'])) {
+                $item['fuel_confirmed'] = true;
+                $item['fuel_block'] = $old['fuel_block'] ?? '';
+                $item['fuel_trip'] = $old['fuel_trip'] ?? '';
+                $item['fuel_taxi'] = $old['fuel_taxi'] ?? '';
+            } else {
+                if (!empty($inc['fuel_block']) || !empty($inc['fuel_trip']) || !empty($inc['fuel_taxi'])) {
+                    $item['fuel_block'] = !empty($inc['fuel_block']) ? $inc['fuel_block'] : ($old['fuel_block'] ?? '');
+                    $item['fuel_trip'] = !empty($inc['fuel_trip']) ? $inc['fuel_trip'] : ($old['fuel_trip'] ?? '');
+                    $item['fuel_taxi'] = !empty($inc['fuel_taxi']) ? $inc['fuel_taxi'] : ($old['fuel_taxi'] ?? '');
+                } else {
+                    $item['fuel_block'] = $old['fuel_block'] ?? '';
+                    $item['fuel_trip'] = $old['fuel_trip'] ?? '';
+                    $item['fuel_taxi'] = $old['fuel_taxi'] ?? '';
+                }
+            }
+
+            foreach (['dow', 'doi', 'galley', 'mtow', 'baggage'] as $field) {
                 if (isset($old[$field]) && $old[$field] !== '') {
                     $item[$field] = $old[$field];
                 }
@@ -1900,10 +1945,11 @@ if ($route === '/fetch_schedule') {
         }
         curl_multi_close($mh);
 
-        // 2.3 Выбор наиболее приоритетной телеграммы (FBL -> FFM -> UWS -> LDM) и дозагрузка текста
+        // 2.3 Выбор наиболее приоритетной телеграммы (FBL -> FFM -> UWS -> LDM) и CFP и дозагрузка текста
         $msgHandles = [];
         $mh2 = curl_multi_init();
         $bestMeta = [];
+        $cfpTelegrams = [];
 
         foreach ($candidates as $c) {
             $pfId = $c['pfRecordId'] ?? null;
@@ -1917,6 +1963,7 @@ if ($route === '/fetch_schedule') {
                 }
             }
 
+            // 1. Поиск лучшей грузовой телеграммы (FBL -> FFM -> UWS -> LDM)
             $bestT = null;
             foreach (['FBL', 'FFM', 'UWS', 'LDM'] as $targetName) {
                 foreach ($allTelegrams as $t) {
@@ -1929,15 +1976,25 @@ if ($route === '/fetch_schedule') {
                 if ($bestT) break;
             }
 
+            // 2. Поиск CFP телеграммы для топлива
+            $bestCfp = null;
+            for ($k = count($allTelegrams) - 1; $k >= 0; $k--) {
+                $tName = strtoupper($allTelegrams[$k]['name'] ?? $allTelegrams[$k]['telexCode'] ?? '');
+                if (strpos($tName, 'CFP') !== false || strpos($tName, 'OFP') !== false) {
+                    $bestCfp = $allTelegrams[$k];
+                    break;
+                }
+            }
+
+            $airlineName = $c['_airline'] ?? 'nordwind';
+            $baseUrl = ($airlineName === 'ikar') ? 'https://aviabit.ikar.aero' : 'https://aviabit.nordwindairlines.ru';
+            $cookieVal = getAviaBitCookie($airlineName, $defaultCookies[$airlineName] ?? '');
+
             if ($bestT) {
                 $tId = $bestT['id'] ?? $bestT['telexID'] ?? null;
                 $tName = strtoupper($bestT['name'] ?? $bestT['telexCode'] ?? '');
                 if ($tId) {
-                    $airlineName = $c['_airline'] ?? 'nordwind';
-                    $baseUrl = ($airlineName === 'ikar') ? 'https://aviabit.ikar.aero' : 'https://aviabit.nordwindairlines.ru';
-                    $cookieVal = getAviaBitCookie($airlineName, $defaultCookies[$airlineName] ?? '');
                     $urlMsg = "$baseUrl/api/telex-message?id=$tId";
-
                     $chM = curl_init($urlMsg);
                     curl_setopt($chM, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($chM, CURLOPT_TIMEOUT, 6);
@@ -1950,8 +2007,28 @@ if ($route === '/fetch_schedule') {
                         "Cookie: connect.sid=$cookieVal"
                     ]);
                     curl_multi_add_handle($mh2, $chM);
-                    $msgHandles[$pfId] = $chM;
-                    $bestMeta[$pfId] = $tName;
+                    $msgHandles["load_{$pfId}"] = $chM;
+                    $bestMeta["load_{$pfId}"] = $tName;
+                }
+            }
+
+            if ($bestCfp) {
+                $cfpId = $bestCfp['id'] ?? $bestCfp['telexID'] ?? null;
+                if ($cfpId) {
+                    $urlCfp = "$baseUrl/api/telex-message?id=$cfpId";
+                    $chCfp = curl_init($urlCfp);
+                    curl_setopt($chCfp, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($chCfp, CURLOPT_TIMEOUT, 6);
+                    curl_setopt($chCfp, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($chCfp, CURLOPT_HTTPHEADER, [
+                        "Origin: $baseUrl",
+                        "Referer: $baseUrl/plan-flight",
+                        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+                        'Accept: application/json, text/plain, */*',
+                        "Cookie: connect.sid=$cookieVal"
+                    ]);
+                    curl_multi_add_handle($mh2, $chCfp);
+                    $msgHandles["cfp_{$pfId}"] = $chCfp;
                 }
             }
         }
@@ -1963,14 +2040,20 @@ if ($route === '/fetch_schedule') {
                 curl_multi_select($mh2);
             } while ($running2 > 0);
 
-            foreach ($msgHandles as $pfId => $chM) {
+            foreach ($msgHandles as $hKey => $chM) {
                 $resp = curl_multi_getcontent($chM);
                 $code = curl_getinfo($chM, CURLINFO_HTTP_CODE);
                 if ($code === 200 && $resp) {
                     $json = json_decode($resp, true);
                     if (is_array($json)) {
-                        $json['target_name'] = $bestMeta[$pfId] ?? '';
-                        $telegrams[$pfId] = $json;
+                        if (strpos($hKey, 'load_') === 0) {
+                            $pfId = (int)substr($hKey, 5);
+                            $json['target_name'] = $bestMeta[$hKey] ?? '';
+                            $telegrams[$pfId] = $json;
+                        } elseif (strpos($hKey, 'cfp_') === 0) {
+                            $pfId = (int)substr($hKey, 4);
+                            $cfpTelegrams[$pfId] = $json;
+                        }
                     }
                 }
                 curl_multi_remove_handle($mh2, $chM);
@@ -2095,6 +2178,14 @@ if ($route === '/fetch_schedule') {
         $cargoVal = $tlgLoad['cargo'] ?? '';
         $mailVal = $tlgLoad['mail'] ?? '';
 
+        // Парсинг телеграммы CFP для автоматического извлечения топлива (Block, Trip, Taxi)
+        $cfpData = $cfpTelegrams[$pfId] ?? [];
+        $cfpText = $cfpData['text'] ?? '';
+        $tlgFuel = parseTelegramCfp($cfpText);
+        $fuelBlock = $tlgFuel['fuel_block'] ?? '';
+        $fuelTrip = $tlgFuel['fuel_trip'] ?? '';
+        $fuelTaxi = $tlgFuel['fuel_taxi'] ?? '';
+
         // Фолбэк на preliminary load block если в телеграмме нет
         if ($cargoVal === '' && !empty($loadList) && is_array($loadList)) {
             $ld0 = $loadList[0] ?? [];
@@ -2205,9 +2296,10 @@ if ($route === '/fetch_schedule') {
             'ac_config' => $layout,
             'pax' => $paxCount,
             'crew' => $crewStr,
-            'fuel_block' => '',
-            'fuel_trip' => '',
-            'fuel_taxi' => '',
+            'fuel_block' => $fuelBlock,
+            'fuel_trip' => $fuelTrip,
+            'fuel_taxi' => $fuelTaxi,
+            'fuel_confirmed' => false,
             'dow' => '',
             'doi' => '',
             'galley' => 'D',
