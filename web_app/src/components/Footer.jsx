@@ -3,7 +3,7 @@ import { APP_NAME, APP_VERSION, BUILD_DATE, DEVELOPER } from '../version';
 
 export default function Footer() {
   return (
-    <footer className="w-full py-4 text-center border-t border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/50 no-print mt-auto">
+    <footer className="flex-none w-full py-1.5 sm:py-2 text-center border-t border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/50 no-print">
       <div className="flex items-center justify-center gap-2 font-mono text-xs text-sky-800/80 dark:text-sky-400/80">
         <span className="font-semibold tracking-wide">
           {APP_NAME} <span className="text-sky-600 dark:text-sky-300 font-bold">{APP_VERSION}</span> ({BUILD_DATE})

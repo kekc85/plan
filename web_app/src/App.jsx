@@ -1211,7 +1211,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-150">
+    <div className="h-[100dvh] max-h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-150 overflow-hidden">
       {/* Header Bar */}
       <Header
         shiftInfo={shiftInfo}
@@ -1253,7 +1253,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 p-1.5 sm:p-3 lg:p-4 max-w-[1920px] w-full mx-auto">
+      <main className="flex-1 min-h-0 flex flex-col p-1 sm:p-2 lg:p-2.5 max-w-[1920px] w-full mx-auto overflow-hidden">
         
         {/* Printable Shift Title Header (visible only on print) */}
         <div className="hidden print-only mb-4 text-center">

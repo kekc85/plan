@@ -16,18 +16,14 @@ export default function ShiftTable({
 }) {
 
   return (
-    <div className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl shadow-md dark:shadow-2xl w-full">
+    <div className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl shadow-md dark:shadow-2xl w-full flex-1 min-h-0 flex flex-col">
       <div 
         onScroll={(e) => {
           if (window.innerWidth < 640 && !isMobileMenuCollapsed && e.currentTarget.scrollTop > 35) {
             onAutoCollapseMobileMenu?.();
           }
         }}
-        className={`overflow-x-auto overflow-y-auto w-full rounded-xl p-0.5 [scrollbar-gutter:stable] ${
-          isMobileMenuCollapsed 
-            ? 'max-h-[calc(100dvh-55px)] sm:max-h-[calc(100vh-230px)]' 
-            : 'max-h-[calc(100vh-210px)] sm:max-h-[calc(100vh-260px)]'
-        }`}
+        className="flex-1 min-h-0 overflow-x-auto overflow-y-auto w-full rounded-t-xl p-0.5 [scrollbar-gutter:stable]"
       >
         <table className="w-full text-left border-separate border-spacing-y-1 text-xs">
           {/* Table Header */}
@@ -99,7 +95,7 @@ export default function ShiftTable({
       </div>
 
       {/* Footer bar */}
-      <div className="bg-slate-50 dark:bg-slate-950 border-t border-slate-300 dark:border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between text-xs text-slate-600 dark:text-slate-400 no-print">
+      <div className="flex-none bg-slate-50 dark:bg-slate-950 border-t border-slate-300 dark:border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between text-xs text-slate-600 dark:text-slate-400 no-print">
         <div className="flex items-center gap-2.5">
           <span>Всего рейсов в суточном плане: <strong className="text-slate-950 dark:text-white font-mono text-sm font-extrabold">{flights.length}</strong></span>
 
