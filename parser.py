@@ -442,8 +442,9 @@ def parse_telegram_cfp(text: str) -> dict:
     - TAXI / TAXI/APU   -> fuel_taxi (например 200)
     - TRIP FUEL         -> fuel_trip (например 9000)
     - TOTAL FUEL/BLOCK  -> fuel_block (например 12600)
+    - PANTRY <код>      -> galley (например PANTRY F -> F, PANTRY D -> D)
     """
-    res = {'fuel_taxi': '', 'fuel_trip': '', 'fuel_block': ''}
+    res = {'fuel_taxi': '', 'fuel_trip': '', 'fuel_block': '', 'galley': ''}
     if not text:
         return res
 
@@ -461,6 +462,11 @@ def parse_telegram_cfp(text: str) -> dict:
     m_block = re.search(r'^\s*(?:TOTAL|BLOCK)(?:\s+FUEL)?\s+(?:[\d.:]+\s+)?(\d+)', text, re.MULTILINE | re.IGNORECASE)
     if m_block:
         res['fuel_block'] = m_block.group(1)
+
+    # 4. PANTRY (Кухня, например PANTRY F -> F, PANTRY D -> D)
+    m_pantry = re.search(r'\bPANTRY\s+([A-Z0-9]+)\b', text, re.IGNORECASE)
+    if m_pantry:
+        res['galley'] = m_pantry.group(1).upper()
 
     return res
 
@@ -932,6 +938,7 @@ def process_flights(
         fuel_block = tlg_fuel.get("fuel_block", "")
         fuel_trip = tlg_fuel.get("fuel_trip", "")
         fuel_taxi = tlg_fuel.get("fuel_taxi", "")
+        galley_val = tlg_fuel.get("galley", "")
 
         # Если в телеграмме нет, проверяем блок load в preliminary
         if not cargo_val and load_list and isinstance(load_list, list) and len(load_list) > 0:
@@ -1061,6 +1068,7 @@ def process_flights(
             "fuel_trip": fuel_trip,
             "fuel_taxi": fuel_taxi,
             "fuel_confirmed": False,
+            "galley": galley_val or "D",
             "cargo": cargo_val,
             "mail": mail_val,
             "dep": dep,

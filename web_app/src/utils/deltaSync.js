@@ -426,7 +426,7 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     // 1. Сохраняем идентификатор
     merged.id = old.id || inc.id || `flight_${flNum || 'fl'}_${flDate || ''}_${(inc.time || '').replace(':', '')}_${Math.random().toString(36).substr(2, 6)}`;
 
-    // 2. Топливо: если подтверждено диспетчером — строго блокируем от перезаписи
+    // 2. Топливо и кухня: если подтверждено диспетчером — строго блокируем от перезаписи
     if (old.fuel_confirmed !== undefined) {
       merged.fuel_confirmed = old.fuel_confirmed;
     }
@@ -434,6 +434,7 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
       merged.fuel_block = old.fuel_block || '';
       merged.fuel_trip = old.fuel_trip || '';
       merged.fuel_taxi = old.fuel_taxi || '';
+      merged.galley = old.galley || 'D';
     } else {
       // Если не подтверждено, но пришло из CFP — подтягиваем CFP, либо сохраняем прежнее
       if (inc.fuel_block || inc.fuel_trip || inc.fuel_taxi) {
@@ -445,13 +446,13 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
         merged.fuel_trip = old.fuel_trip || '';
         merged.fuel_taxi = old.fuel_taxi || '';
       }
+      merged.galley = inc.galley || old.galley || 'D';
     }
 
     // 2.1 Строго сохраняем остальные ручные поля диспетчера центровки
     const manualFields = [
       'dow',
       'doi',
-      'galley',
       'mtow',
       'baggage',
       'notes'

@@ -1681,7 +1681,7 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
             "fuel_confirmed": False,
             "dow": "",
             "doi": "",
-            "galley": "D",
+            "galley": str(row.get("galley") or "D"),
             "mtow": str(row.get("mtow") or ""),
             "lir_sent": False,
             "cargo": str(row.get("cargo") or ""),

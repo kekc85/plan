@@ -327,7 +327,7 @@ function parseTelegramLoad($text, $code = '') {
 }
 
 function parseTelegramCfp($text) {
-    $res = ['fuel_taxi' => '', 'fuel_trip' => '', 'fuel_block' => ''];
+    $res = ['fuel_taxi' => '', 'fuel_trip' => '', 'fuel_block' => '', 'galley' => ''];
     if (!$text) {
         return $res;
     }
@@ -345,6 +345,11 @@ function parseTelegramCfp($text) {
     // 3. TOTAL FUEL / BLOCK FUEL
     if (preg_match('/^\s*(?:TOTAL|BLOCK)(?:\s+FUEL)?\s+(?:[\d.:]+\s+)?(\d+)/mi', $text, $m)) {
         $res['fuel_block'] = $m[1];
+    }
+
+    // 4. PANTRY (Кухня, например PANTRY F -> F, PANTRY D -> D)
+    if (preg_match('/\bPANTRY\s+([A-Z0-9]+)\b/i', $text, $m)) {
+        $res['galley'] = strtoupper($m[1]);
     }
 
     return $res;
@@ -1383,6 +1388,7 @@ if ($route === '/shift/smart_merge') {
                 $item['fuel_block'] = $old['fuel_block'] ?? '';
                 $item['fuel_trip'] = $old['fuel_trip'] ?? '';
                 $item['fuel_taxi'] = $old['fuel_taxi'] ?? '';
+                $item['galley'] = $old['galley'] ?? 'D';
             } else {
                 if (!empty($inc['fuel_block']) || !empty($inc['fuel_trip']) || !empty($inc['fuel_taxi'])) {
                     $item['fuel_block'] = !empty($inc['fuel_block']) ? $inc['fuel_block'] : ($old['fuel_block'] ?? '');
@@ -1393,9 +1399,10 @@ if ($route === '/shift/smart_merge') {
                     $item['fuel_trip'] = $old['fuel_trip'] ?? '';
                     $item['fuel_taxi'] = $old['fuel_taxi'] ?? '';
                 }
+                $item['galley'] = !empty($inc['galley']) ? $inc['galley'] : ($old['galley'] ?? 'D');
             }
 
-            foreach (['dow', 'doi', 'galley', 'mtow', 'baggage'] as $field) {
+            foreach (['dow', 'doi', 'mtow', 'baggage'] as $field) {
                 if (isset($old[$field]) && $old[$field] !== '') {
                     $item[$field] = $old[$field];
                 }
@@ -2185,6 +2192,7 @@ if ($route === '/fetch_schedule') {
         $fuelBlock = $tlgFuel['fuel_block'] ?? '';
         $fuelTrip = $tlgFuel['fuel_trip'] ?? '';
         $fuelTaxi = $tlgFuel['fuel_taxi'] ?? '';
+        $galleyVal = $tlgFuel['galley'] ?? '';
 
         // Фолбэк на preliminary load block если в телеграмме нет
         if ($cargoVal === '' && !empty($loadList) && is_array($loadList)) {
@@ -2302,7 +2310,7 @@ if ($route === '/fetch_schedule') {
             'fuel_confirmed' => false,
             'dow' => '',
             'doi' => '',
-            'galley' => 'D',
+            'galley' => $galleyVal ?: 'D',
             'mtow' => '',
             'lir_sent' => false,
             'cargo' => $cargoVal,
