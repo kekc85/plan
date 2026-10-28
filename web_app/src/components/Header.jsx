@@ -1,3 +1,4 @@
+import SummaryStats from './SummaryStats';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plane, 
@@ -291,6 +292,7 @@ export default function Header({
   timeMode: externalTimeMode,
   onTimeModeChange,
   flightsCount = 0,
+  flights = [],
   isMobileMenuCollapsed = false,
   setIsMobileMenuCollapsed
 }) {
@@ -678,6 +680,11 @@ export default function Header({
             )}
           </div>
 
+        </div>
+
+        {/* Row 3: Summary Metric Tiles (Жестко зафиксированы в шапке) */}
+        <div className="pt-1 border-t border-slate-200/80 dark:border-slate-800/80">
+          <SummaryStats flights={flights} />
         </div>
 
         {/* Мобильная кнопка: Свернуть меню для работы с таблицей на весь экран */}

@@ -1247,6 +1247,7 @@ export default function App() {
         timeMode={timeMode}
         onTimeModeChange={handleTimeModeChange}
         flightsCount={flights.length}
+        flights={flights}
         isMobileMenuCollapsed={isMobileMenuCollapsed}
         setIsMobileMenuCollapsed={setIsMobileMenuCollapsed}
       />
@@ -1330,11 +1331,6 @@ export default function App() {
             </div>
           </div>
         )}
-
-        {/* Summary Metric Tiles */}
-        <div className={isMobileMenuCollapsed ? 'hidden sm:block' : ''}>
-          <SummaryStats flights={flights} />
-        </div>
 
         {/* Interactive Sortable Shift Table */}
         <ShiftTable
