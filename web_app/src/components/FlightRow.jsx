@@ -308,7 +308,13 @@ function FlightRow({
     if (depTime) params.set('dep_time', depTime);
     params.set('return_url', window.location.href);
 
-    window.open(`${targetAeroBagUrl}?${params.toString()}`, '_blank');
+    if (typeof window !== 'undefined') {
+      window.name = 'AeroPlan_Workspace';
+    }
+    const bagWindow = window.open(`${targetAeroBagUrl}?${params.toString()}`, 'AeroBag_Workspace');
+    if (bagWindow) {
+      try { bagWindow.focus(); } catch (err) {}
+    }
   };
 
   // Чекбокс LIR -> синхронизация
