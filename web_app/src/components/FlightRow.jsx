@@ -353,10 +353,111 @@ function FlightRow({
     if (pax) params.set('pax', pax);
     if (acNum) params.set('ac_num', acNum);
     if (depTime) params.set('dep_time', depTime);
+    if (flight.crew) params.set('crew', flight.crew);
+    if (flight.fuel_block) params.set('to_fuel', String(flight.fuel_block).replace(/\D/g, ''));
+    if (flight.fuel_trip) params.set('trip_fuel', String(flight.fuel_trip).replace(/\D/g, ''));
+    if (flight.pax_m) params.set('pax_m', flight.pax_m);
+    if (flight.pax_f) params.set('pax_f', flight.pax_f);
+    if (flight.pax_ch) params.set('pax_ch', flight.pax_ch);
+    if (flight.pax_inf) params.set('pax_inf', flight.pax_inf);
+    if (flight.cargo) params.set('cargo', flight.cargo);
+    if (flight.mail) params.set('mail', flight.mail);
     params.set('return_url', window.location.href);
 
     // Прямой переход в этой же вкладке: 100% надежность без блокировок Chrome
     window.location.href = `${targetAeroBagUrl}?${params.toString()}`;
+  };
+
+  // Переход в центровочный график W&B Loadsheet
+  const handleOpenLoadsheet = () => {
+    const rawFlight = (flight.flight || flight.flight_no || flight.flight_number || '').trim();
+    let cleanFlt = rawFlight.toUpperCase();
+    cleanFlt = cleanFlt.replace(/^(N4|EO|NWS|KAR|NW|WZ|S7|SU|DP|UT|A4|U6|FV|5N|7R|KL|КЛ|Н4|ЕО)[-\s]?/i, '');
+    cleanFlt = cleanFlt.replace(/^[A-ZА-Я][A-ZА-Я0-9]{0,2}[-\s]?/i, '');
+    const fltMatch = cleanFlt.match(/\d+/);
+    const flightNum = fltMatch ? fltMatch[0] : cleanFlt.replace(/\D/g, '');
+    if (!flightNum) return;
+
+    let from = '';
+    let to = '';
+    const rawAirports = (flight.route_airports || '').trim();
+    if (rawAirports) {
+      const parts = rawAirports.split(/[\-\—\–\/\\,\s]+/).filter(Boolean);
+      if (parts.length >= 2) {
+        from = resolveAirportIata(parts[0]);
+        to = resolveAirportIata(parts[1]);
+      } else if (parts.length === 1) {
+        from = resolveAirportIata(parts[0]);
+      }
+    }
+    const rawCity = (flight.route_city || '').trim();
+    if (!to && rawCity) {
+      const cityParts = rawCity.split(/[\-\—\–\/\\,]+/).filter(Boolean);
+      if (cityParts.length >= 2) {
+        if (!from) from = resolveAirportIata(cityParts[0]);
+        to = resolveAirportIata(cityParts[1]);
+      } else if (cityParts.length === 1) {
+        to = resolveAirportIata(cityParts[0]);
+      }
+    }
+    if (!from && flight.dep) from = resolveAirportIata(flight.dep);
+    if (!to && flight.arr) to = resolveAirportIata(flight.arr);
+
+    const acNum = (flight.ac_num || '').trim();
+    const acConfig = (flight.ac_config || '').trim();
+    const depTime = (displayTimes?.time || flight.time || flight.departure_time || '').trim();
+    const pax = flight.pax ? String(flight.pax).trim() : '';
+
+    let crewVal = (flight.crew || '').trim();
+    if (crewVal) {
+      const cParts = crewVal.split(/[\/\-\s]+/).filter(Boolean);
+      if (cParts.length >= 2) {
+        crewVal = `${cParts[0]}/${cParts[1]}`;
+      }
+    }
+
+    let date = flight.flight_date || '';
+    if (date && date.includes('.')) {
+      const p = date.split('.');
+      if (p.length === 2) {
+        const year = new Date().getFullYear();
+        date = `${year}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+      } else if (p.length === 3) {
+        date = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+      }
+    }
+
+    const isTest = window.location.href.includes('plan_test') || 
+                   window.location.hostname === 'localhost' || 
+                   window.location.hostname === '127.0.0.1';
+    
+    const targetLoadsheetUrl = isTest 
+      ? 'https://boostandgo.ru/loadsheet_test/' 
+      : 'https://boostandgo.ru/loadsheet/';
+
+    const params = new URLSearchParams();
+    params.set('flight', flightNum);
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    if (date) params.set('date', date);
+    if (acNum) params.set('acreg', acNum);
+    if (acConfig) params.set('version', acConfig);
+    if (crewVal) params.set('crew', crewVal);
+    if (depTime) params.set('time', depTime);
+
+    if (flight.fuel_block) params.set('to_fuel', String(flight.fuel_block).replace(/\D/g, ''));
+    if (flight.fuel_trip) params.set('trip_fuel', String(flight.fuel_trip).replace(/\D/g, ''));
+    if (flight.pax_m) params.set('pax_m', flight.pax_m);
+    if (flight.pax_f) params.set('pax_f', flight.pax_f);
+    if (flight.pax_ch) params.set('pax_ch', flight.pax_ch);
+    if (flight.pax_inf) params.set('pax_inf', flight.pax_inf);
+    if (pax) params.set('pax', pax);
+    if (flight.cargo) params.set('cargo', flight.cargo);
+    if (flight.mail) params.set('mail', flight.mail);
+
+    params.set('return_url', window.location.href);
+
+    window.location.href = `${targetLoadsheetUrl}?${params.toString()}`;
   };
 
   // Чекбокс LIR -> синхронизация
@@ -552,6 +653,20 @@ function FlightRow({
           >
             <Luggage className="w-2.5 h-2.5 text-sky-600 dark:text-sky-400 shrink-0" />
             <span className="tracking-tighter">AeroBag</span>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenLoadsheet();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="inline-flex items-center justify-center gap-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 text-emerald-700 dark:text-emerald-300 border border-emerald-400/50 hover:border-emerald-400 font-mono text-[9px] font-black px-1 py-0.5 rounded shadow-2xs hover:shadow-xs transition-all active:scale-95 cursor-pointer shrink-0 w-[58px]"
+            title="Открыть центровочный график W&B Loadsheet"
+          >
+            <FileText className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span className="tracking-tighter">Loadsheet</span>
           </button>
         </div>
       </td>

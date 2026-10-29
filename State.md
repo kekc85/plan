@@ -480,3 +480,4 @@
     2. Детальная структура пассажиров (`parser.py`, `public/api/index.php`): внедрен `parse_pax_details` для извлечения раздельных категорий `pax_m` (мужчины), `pax_f` (женщины), `pax_ch` (дети), `pax_inf` (младенцы) из AviaBit preliminary (`prePassengerInfo` и `loadList`).
     3. Интерфейс AeroPlan (`Header.jsx`, `FlightRow.jsx`): в шапку рядом с поиском добавлена быстрая кнопка `[ 📄 Loadsheet ]` без выбора рейса; в каждую строку таблицы рейсов добавлена кнопка `[ 📄 Loadsheet ]` с автопередачей всех реквизитов рейса, экипажа, топлива и пассажиров.
     4. Версия обновлена до v1.0.186 (`package.json`, `version.js`), выполнен `npm run build`.
+    5. Исправлена передача параметров экипажа (crew), топлива (to_fuel, trip_fuel) и кнопка Loadsheet в FlightRow.jsx. Обновлен экранный масштаб loadsheet до 125% с контроллером зума.

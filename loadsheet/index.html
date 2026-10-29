@@ -135,6 +135,7 @@
       width: 210mm;
       height: 297mm;
       max-height: 297mm;
+      zoom: 1.25;
       padding: 5mm 6mm;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
       position: relative;
@@ -1025,6 +1026,13 @@
         <button type="button" class="season-btn" id="btnSeasonWinter" onclick="setSeason('winter')">Зима (Взр 80 кг)</button>
       </div>
       <button type="button" class="btn btn-secondary" onclick="openSettingsModal()" title="Настроить нормативы веса пассажиров">⚙ Веса</button>
+      <div class="zoom-controls" style="display: inline-flex; align-items: center; gap: 4px; background: #2d3748; padding: 2px 6px; border-radius: 6px;" title="Масштаб отображения бланка на экране">
+        <span style="font-size: 11px; font-weight: bold; color: #a0aec0;">🔍 Масштаб:</span>
+        <button type="button" class="btn btn-secondary" onclick="changeZoom(-0.1)" style="padding: 2px 7px; font-size: 12px; font-weight: bold; min-width: 24px;" title="Уменьшить масштаб">-</button>
+        <span id="zoomDisplay" style="font-size: 11px; font-weight: 800; min-width: 38px; text-align: center; color: #63b3ed;">125%</span>
+        <button type="button" class="btn btn-secondary" onclick="changeZoom(0.1)" style="padding: 2px 7px; font-size: 12px; font-weight: bold; min-width: 24px;" title="Увеличить масштаб">+</button>
+        <button type="button" class="btn btn-secondary" onclick="applyZoom(1.0)" style="padding: 2px 6px; font-size: 10px;" title="Сбросить на 100%">100%</button>
+      </div>
     </div>
 
     <div class="toolbar-center">
@@ -2607,6 +2615,25 @@
       calculate();
     }
 
+    let currentZoom = parseFloat(localStorage.getItem('wb_loadsheet_zoom')) || 1.25;
+
+    function applyZoom(val) {
+      currentZoom = Math.min(Math.max(val, 0.8), 2.2);
+      const wrapper = document.querySelector('.sheet-wrapper');
+      if (wrapper) {
+        wrapper.style.zoom = currentZoom;
+      }
+      const label = document.getElementById('zoomDisplay');
+      if (label) {
+        label.textContent = Math.round(currentZoom * 100) + '%';
+      }
+      localStorage.setItem('wb_loadsheet_zoom', currentZoom);
+    }
+
+    function changeZoom(delta) {
+      applyZoom(Math.round((currentZoom + delta) * 10) / 10);
+    }
+
     function handleReturnBack() {
       const returnUrl = sessionStorage.getItem('wb_loadsheet_return_url');
       if (returnUrl) {
@@ -2675,7 +2702,14 @@
       setInp('f_acreg', data.acreg || data.ac_num || data.f_acreg || data.tail);
       setInp('f_version', data.version || data.f_version || data.ac_config || data.layout);
       setInp('f_captain', data.captain || data.f_captain);
-      setInp('f_crew', data.crew || data.f_crew);
+      let crewRaw = String(data.crew || data.f_crew || '').trim();
+      if (crewRaw) {
+        const cParts = crewRaw.split(/[\/\-\s]+/).filter(Boolean);
+        if (cParts.length >= 2) {
+          crewRaw = `${cParts[0]}/${cParts[1]}`;
+        }
+        setInp('f_crew', crewRaw);
+      }
       setInp('f_from', data.from || data.f_from || data.dep);
       setInp('f_to', data.to || data.f_to || data.arr);
       
@@ -2692,9 +2726,17 @@
       }
       setInp('f_time', data.time || data.f_time || data.departure_time);
 
-      // 5. Заполнение топлива
-      setInp('inp_takeoff_fuel', data.to_fuel || data.takeoff_fuel || data.fuel_block || data.inp_takeoff_fuel);
-      setInp('inp_trip_fuel', data.trip_fuel || data.fuel_trip || data.inp_trip_fuel);
+      // 5. Заполнение топлива (взлетное и рейсовое)
+      const toFuelVal = data.to_fuel || data.takeoff_fuel || data.fuel_block || data.fuel || data.inp_takeoff_fuel;
+      if (toFuelVal !== undefined && toFuelVal !== null && toFuelVal !== '') {
+        const cleanToFuel = String(toFuelVal).replace(/\D/g, '');
+        if (cleanToFuel) setInp('inp_takeoff_fuel', cleanToFuel);
+      }
+      const tripFuelVal = data.trip_fuel || data.fuel_trip || data.inp_trip_fuel;
+      if (tripFuelVal !== undefined && tripFuelVal !== null && tripFuelVal !== '') {
+        const cleanTripFuel = String(tripFuelVal).replace(/\D/g, '');
+        if (cleanTripFuel) setInp('inp_trip_fuel', cleanTripFuel);
+      }
 
       // 6. Заполнение весов (если переданы)
       setInp('inp_dow', data.dow || data.inp_dow);
@@ -2776,6 +2818,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      applyZoom(currentZoom);
       loadConfigFromStorage();
       initTrafficTable();
       checkIncomingLoadsheetData();
