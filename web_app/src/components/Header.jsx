@@ -531,6 +531,27 @@ export default function Header({
                 className="bg-slate-50 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none w-full sm:w-36 sm:focus:w-48 transition-all placeholder:text-slate-400 font-medium shadow-sm"
               />
             </div>
+
+            {/* Кнопка быстрого перехода в AeroBag (без выбора рейса) */}
+            <button
+              type="button"
+              onClick={() => {
+                const isTest = window.location.href.includes('plan_test') || 
+                               window.location.hostname === 'localhost' || 
+                               window.location.hostname === '127.0.0.1';
+                const targetAeroBagUrl = isTest 
+                  ? 'https://boostandgo.ru/aerobag-test/' 
+                  : 'https://boostandgo.ru/aerobag/';
+                const params = new URLSearchParams();
+                params.set('return_url', window.location.href);
+                window.location.href = `${targetAeroBagUrl}?${params.toString()}`;
+              }}
+              className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer border border-cyan-400/40 shrink-0"
+              title="Открыть калькулятор AeroBag Predictor (без привязки к рейсу)"
+            >
+              <span className="text-sm leading-none">🧳</span>
+              <span className="tracking-tight font-sans">AeroBag</span>
+            </button>
           </div>
 
           {/* Action Buttons Toolbar */}
@@ -653,27 +674,6 @@ export default function Header({
             >
               <Upload className="w-3.5 h-3.5" />
               <span>Excel</span>
-            </button>
-
-            {/* КНОПКА 5: ПРЯМОЙ ПЕРЕХОД В AEROBAG (БЕЗ ДАННЫХ РЕЙСА) */}
-            <button
-              type="button"
-              onClick={() => {
-                const isTest = window.location.href.includes('plan_test') || 
-                               window.location.hostname === 'localhost' || 
-                               window.location.hostname === '127.0.0.1';
-                const targetAeroBagUrl = isTest 
-                  ? 'https://boostandgo.ru/aerobag-test/' 
-                  : 'https://boostandgo.ru/aerobag/';
-                const params = new URLSearchParams();
-                params.set('return_url', window.location.href);
-                window.location.href = `${targetAeroBagUrl}?${params.toString()}`;
-              }}
-              className="flex items-center gap-1.5 bg-cyan-100 hover:bg-cyan-200 dark:bg-cyan-950/80 dark:hover:bg-cyan-900 text-cyan-900 dark:text-cyan-300 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-cyan-300 dark:border-cyan-700/80 shadow-sm transition-all active:scale-95 cursor-pointer"
-              title="Открыть калькулятор AeroBag Predictor (без привязки к рейсу)"
-            >
-              <span>🧳</span>
-              <span>AeroBag</span>
             </button>
 
             {/* КНОПКА 6: ИНСТРУКЦИЯ ДЛЯ ДИСПЕТЧЕРА */}
