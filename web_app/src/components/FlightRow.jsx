@@ -251,6 +251,35 @@ function FlightRow({
   };
 
   
+  // Справочник ключевых городов и аэропортов маршрутной сети АК
+  const CITY_TO_IATA_MAP = {
+    'МОСКВА': 'SVO', 'ШЕРЕМЕТЬЕВО': 'SVO', 'ВНУКОВО': 'VKO', 'ДОМОДЕДОВО': 'DME',
+    'КРАСНОЯРСК': 'KJA', 'КАЗАНЬ': 'KZN', 'НОВОСИБИРСК': 'OVB', 'ТОЛМАЧЕВО': 'OVB',
+    'ИРКУТСК': 'IKT', 'ХАБАРОВСК': 'KHV', 'ВЛАДИВОСТОК': 'VVO', 'СОЧИ': 'AER',
+    'САНКТ-ПЕТЕРБУРГ': 'LED', 'ПЕТЕРБУРГ': 'LED', 'ПУЛКОВО': 'LED',
+    'ЕКАТЕРИНБУРГ': 'SVX', 'КОЛЬЦОВО': 'SVX', 'САМАРА': 'KUF', 'КУРУМОЧ': 'KUF',
+    'УФА': 'UFA', 'ТЮМЕНЬ': 'TJM', 'РОЩИНО': 'TJM', 'ПЕРМЬ': 'PEE', 'ЧЕЛЯБИНСК': 'CEK',
+    'ОМСК': 'OMS', 'ОРЕНБУРГ': 'REN', 'МИНЕРАЛЬНЫЕ ВОДЫ': 'MRV', 'МИНВОДЫ': 'MRV',
+    'МАХАЧКАЛА': 'MCX', 'ГРОЗНЫЙ': 'GRV', 'ВЛАДИКАВКАЗ': 'OGZ', 'НАЛЬЧИК': 'NAL',
+    'КАЛИНИНГРАД': 'KGD', 'МУРМАНСК': 'MMK', 'АРХАНГЕЛЬСК': 'ARH',
+    'КАМРАНЬ': 'CXR', 'НЯЧАНГ': 'CXR', 'ПХУКЕТ': 'HKT', 'БАНГКОК': 'BKK',
+    'УТАПАО': 'UTP', 'ПАТТАЙЯ': 'UTP', 'ВАРАДЕРО': 'VRA', 'КАЙО-КОКО': 'CCC', 'КАЙОКОКО': 'CCC',
+    'ГОА': 'GOI', 'ТАШКЕНТ': 'TAS', 'САМАРКАНД': 'SKD', 'БУХАРА': 'BHK', 'НАМАНГАН': 'NMA',
+    'ФЕРГАНА': 'FEG', 'ДУШАНБЕ': 'DYU', 'ХУДЖАНД': 'LBD', 'ХУДЖАНТ': 'LBD', 'БОХТАР': 'KQT',
+    'КУЛЯБ': 'TJU', 'ОШ': 'OSS', 'БИШКЕК': 'FRU', 'ЕРЕВАН': 'EVN', 'БАКУ': 'GYD',
+    'ТБИЛИСИ': 'TBS', 'БАТУМИ': 'BUS', 'АНТАЛЬЯ': 'AYT', 'СТАМБУЛ': 'IST',
+    'БОДРУМ': 'BJV', 'ДАЛАМАН': 'DLM', 'ДУБАЙ': 'DXB', 'ШАРМ-ЭЛЬ-ШЕЙХ': 'SSH', 'ШАРМ': 'SSH', 'ХУРГАДА': 'HRG'
+  };
+
+  const resolveAirportIata = (str) => {
+    if (!str) return '';
+    const clean = String(str).trim().toUpperCase();
+    if (/^[A-Z]{3}$/.test(clean)) return clean;
+    if (CITY_TO_IATA_MAP[clean]) return CITY_TO_IATA_MAP[clean];
+    const match = Object.keys(CITY_TO_IATA_MAP).find(k => clean.includes(k));
+    return match ? CITY_TO_IATA_MAP[match] : clean;
+  };
+
   // Переход в калькулятор веса коммерческой загрузки AeroBag Predictor
   const handleOpenAeroBag = () => {
     const rawFlight = (flight.flight || flight.flight_no || flight.flight_number || '').trim();
@@ -264,16 +293,34 @@ function FlightRow({
 
     let from = '';
     let to = '';
-    const routeAirports = flight.route_airports || '';
-    if (routeAirports.includes('-')) {
-      const parts = routeAirports.split('-');
-      from = parts[0].trim().toUpperCase();
-      to = parts[1].trim().toUpperCase();
-    } else if (flight.route_city && flight.route_city.includes('-')) {
-      const parts = flight.route_city.split('-');
-      from = parts[0].trim().toUpperCase();
-      to = parts[1].trim().toUpperCase();
+
+    // 1. Извлекаем из поля route_airports (любые разделители: -, —, –, /, пробел)
+    const rawAirports = (flight.route_airports || '').trim();
+    if (rawAirports) {
+      const parts = rawAirports.split(/[\-\—\–\/\\,\s]+/).filter(Boolean);
+      if (parts.length >= 2) {
+        from = resolveAirportIata(parts[0]);
+        to = resolveAirportIata(parts[1]);
+      } else if (parts.length === 1) {
+        from = resolveAirportIata(parts[0]);
+      }
     }
+
+    // 2. Если to все еще пустой, проверяем route_city
+    const rawCity = (flight.route_city || '').trim();
+    if (!to && rawCity) {
+      const cityParts = rawCity.split(/[\-\—\–\/\\,]+/).filter(Boolean);
+      if (cityParts.length >= 2) {
+        if (!from) from = resolveAirportIata(cityParts[0]);
+        to = resolveAirportIata(cityParts[1]);
+      } else if (cityParts.length === 1) {
+        to = resolveAirportIata(cityParts[0]);
+      }
+    }
+
+    // 3. Дополнительные поля объекта (от парсера Aviabit / API)
+    if (!from && flight.dep) from = resolveAirportIata(flight.dep);
+    if (!to && flight.arr) to = resolveAirportIata(flight.arr);
 
     const acNum = (flight.ac_num || '').trim();
     const depTime = (displayTimes?.time || flight.time || flight.departure_time || '').trim();
