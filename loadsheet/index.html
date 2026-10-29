@@ -1041,7 +1041,7 @@
 
     <div class="toolbar-right">
       <button type="button" class="btn btn-danger" onclick="resetForm()" title="Очистить все поля бланка">🗑 Очистить бланк</button>
-      <button type="button" class="btn btn-primary" onclick="window.print()" title="Распечатать документ на принтере или сохранить в PDF">🖨 Печать / PDF</button>
+      <button type="button" class="btn btn-primary" onclick="triggerPrint()" title="Распечатать документ на принтере или сохранить в PDF">🖨 Печать / PDF</button>
     </div>
   </div>
 
@@ -2634,6 +2634,37 @@
       applyZoom(Math.round((currentZoom + delta) * 10) / 10);
     }
 
+    function triggerPrint() {
+      const wrapper = document.querySelector('.sheet-wrapper');
+      if (wrapper) {
+        wrapper.style.zoom = '1';
+        wrapper.style.transform = 'none';
+      }
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+          if (wrapper) {
+            wrapper.style.zoom = currentZoom;
+          }
+        }, 500);
+      }, 60);
+    }
+
+    window.addEventListener('beforeprint', () => {
+      const wrapper = document.querySelector('.sheet-wrapper');
+      if (wrapper) {
+        wrapper.style.zoom = '1';
+        wrapper.style.transform = 'none';
+      }
+    });
+
+    window.addEventListener('afterprint', () => {
+      const wrapper = document.querySelector('.sheet-wrapper');
+      if (wrapper) {
+        wrapper.style.zoom = currentZoom;
+      }
+    });
+
     function handleReturnBack() {
       const returnUrl = sessionStorage.getItem('wb_loadsheet_return_url');
       if (returnUrl) {
@@ -2700,7 +2731,36 @@
       setInp('f_flight', data.flight || data.f_flight || data.flight_no || data.flight_number);
       setInp('f_originator', data.originator || data.f_originator || 'DISPATCH');
       setInp('f_acreg', data.acreg || data.ac_num || data.f_acreg || data.tail);
-      setInp('f_version', data.version || data.f_version || data.ac_config || data.layout);
+      let versionVal = String(data.version || data.f_version || data.ac_config || data.layout || '').trim();
+      const modelToLayout = {
+        'B737-900': 'Y215',
+        'B739': 'Y215',
+        '739': 'Y215',
+        'B737-800': 'Y189',
+        'B738': 'Y189',
+        '738': 'Y189',
+        'A321': 'Y220',
+        'A321-NEO': 'Y218',
+        '321': 'Y220',
+        'E190': 'Y110',
+        '190': 'Y110',
+        'A330-200': 'Y365',
+        'A332': 'Y365',
+        '332': 'Y365',
+        'A330-300': 'Y379',
+        'A333': 'Y379',
+        '333': 'Y379',
+        'B777-200': 'Y440',
+        'B772': 'Y440',
+        '772': 'Y440',
+        'B777-300': 'Y486',
+        'B773': 'Y486',
+        '773': 'Y486'
+      };
+      if (modelToLayout[versionVal]) {
+        versionVal = modelToLayout[versionVal];
+      }
+      setInp('f_version', versionVal);
       setInp('f_captain', data.captain || data.f_captain);
       let crewRaw = String(data.crew || data.f_crew || '').trim();
       if (crewRaw) {
@@ -2748,29 +2808,26 @@
       const toDest = data.to || data.f_to || data.arr || data.dest_1;
       setInp('dest_code_1', toDest);
 
-      // Пассажиры: если переданы отдельно M, F, CH, INF
-      let hasPax = false;
-      if (data.pax_m !== undefined || data.pax_m_1 !== undefined) {
-        setInp('pax_m_1', data.pax_m !== undefined ? data.pax_m : data.pax_m_1);
-        hasPax = true;
-      }
-      if (data.pax_f !== undefined || data.pax_f_1 !== undefined) {
-        setInp('pax_f_1', data.pax_f !== undefined ? data.pax_f : data.pax_f_1);
-        hasPax = true;
-      }
-      if (data.pax_ch !== undefined || data.pax_ch_1 !== undefined) {
-        setInp('pax_ch_1', data.pax_ch !== undefined ? data.pax_ch : data.pax_ch_1);
-        hasPax = true;
-      }
-      if (data.pax_inf !== undefined || data.pax_inf_1 !== undefined) {
-        setInp('pax_inf_1', data.pax_inf !== undefined ? data.pax_inf : data.pax_inf_1);
-        hasPax = true;
-      }
+      // Пассажиры
+      const rawPaxM = data.pax_m !== undefined ? data.pax_m : data.pax_m_1;
+      const rawPaxF = data.pax_f !== undefined ? data.pax_f : data.pax_f_1;
+      const rawPaxCh = data.pax_ch !== undefined ? data.pax_ch : data.pax_ch_1;
+      const rawPaxInf = data.pax_inf !== undefined ? data.pax_inf : data.pax_inf_1;
 
-      // Если передано только общее число pax, а разбивки нет:
-      if (!hasPax && (data.pax || data.pax_total)) {
-        const totalPax = parseInt(data.pax || data.pax_total, 10);
-        if (!isNaN(totalPax) && totalPax > 0) {
+      const numM = parseInt(rawPaxM, 10) || 0;
+      const numF = parseInt(rawPaxF, 10) || 0;
+      const numCh = parseInt(rawPaxCh, 10) || 0;
+      const numInf = parseInt(rawPaxInf, 10) || 0;
+
+      if (numM > 0 || numF > 0 || numCh > 0 || numInf > 0) {
+        if (numM > 0) setInp('pax_m_1', numM);
+        if (numF > 0) setInp('pax_f_1', numF);
+        if (numCh > 0) setInp('pax_ch_1', numCh);
+        if (numInf > 0) setInp('pax_inf_1', numInf);
+      } else {
+        // Если детальной разбивки нет, берем общее число пассажиров pax / pax_total
+        const totalPax = parseInt(data.pax || data.pax_total || 0, 10);
+        if (totalPax > 0) {
           const halfM = Math.ceil(totalPax / 2);
           const halfF = totalPax - halfM;
           setInp('pax_m_1', halfM);

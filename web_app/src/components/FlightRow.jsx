@@ -323,6 +323,7 @@ function FlightRow({
     if (!to && flight.arr) to = resolveAirportIata(flight.arr);
 
     const acNum = (flight.ac_num || '').trim();
+    const acConfig = (flight.ac_config || '').trim();
     const depTime = (displayTimes?.time || flight.time || flight.departure_time || '').trim();
     const pax = flight.pax ? String(flight.pax).trim() : '';
 
@@ -352,6 +353,7 @@ function FlightRow({
     if (date) params.set('date', date);
     if (pax) params.set('pax', pax);
     if (acNum) params.set('ac_num', acNum);
+    if (acConfig) params.set('ac_config', acConfig);
     if (depTime) params.set('dep_time', depTime);
     if (flight.crew) params.set('crew', flight.crew);
     if (flight.fuel_block) params.set('to_fuel', String(flight.fuel_block).replace(/\D/g, ''));
