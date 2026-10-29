@@ -655,7 +655,28 @@ export default function Header({
               <span>Excel</span>
             </button>
 
-            {/* КНОПКА 5: ИНСТРУКЦИЯ ДЛЯ ДИСПЕТЧЕРА */}
+            {/* КНОПКА 5: ПРЯМОЙ ПЕРЕХОД В AEROBAG (БЕЗ ДАННЫХ РЕЙСА) */}
+            <button
+              type="button"
+              onClick={() => {
+                const isTest = window.location.href.includes('plan_test') || 
+                               window.location.hostname === 'localhost' || 
+                               window.location.hostname === '127.0.0.1';
+                const targetAeroBagUrl = isTest 
+                  ? 'https://boostandgo.ru/aerobag-test/' 
+                  : 'https://boostandgo.ru/aerobag/';
+                const params = new URLSearchParams();
+                params.set('return_url', window.location.href);
+                window.location.href = `${targetAeroBagUrl}?${params.toString()}`;
+              }}
+              className="flex items-center gap-1.5 bg-cyan-100 hover:bg-cyan-200 dark:bg-cyan-950/80 dark:hover:bg-cyan-900 text-cyan-900 dark:text-cyan-300 text-xs font-bold px-2.5 py-1.5 rounded-xl border border-cyan-300 dark:border-cyan-700/80 shadow-sm transition-all active:scale-95 cursor-pointer"
+              title="Открыть калькулятор AeroBag Predictor (без привязки к рейсу)"
+            >
+              <span>🧳</span>
+              <span>AeroBag</span>
+            </button>
+
+            {/* КНОПКА 6: ИНСТРУКЦИЯ ДЛЯ ДИСПЕТЧЕРА */}
             <button
               type="button"
               onClick={onOpenManualModal}
