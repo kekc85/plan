@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Check, Bell, History, Luggage } from 'lucide-react';
+import { Trash2, Check, Bell, History, Luggage, FileText } from 'lucide-react';
 import { 
   formatValidTime, 
   calcReleaseTime, 

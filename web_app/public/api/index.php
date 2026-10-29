@@ -2117,22 +2117,77 @@ if ($route === '/fetch_schedule') {
         }
 
         $paxCount = '';
+        $paxM = '';
+        $paxF = '';
+        $paxCh = '';
+        $paxInf = '';
+
         if (!empty($loadList) && is_array($loadList)) {
             $ld0 = $loadList[0] ?? [];
-            if (is_array($ld0) && (isset($ld0['ADT']) || isset($ld0['CHD']))) {
-                $adt = (int)($ld0['ADT'] ?? 0);
-                $chd = (int)($ld0['CHD'] ?? 0);
-                $paxCount = (string)($adt + $chd);
+            if (is_array($ld0)) {
+                $m = $ld0['M'] ?? $ld0['Male'] ?? $ld0['Man'] ?? null;
+                $w = $ld0['W'] ?? $ld0['F'] ?? $ld0['Female'] ?? $ld0['Woman'] ?? null;
+                $ch = $ld0['CHD'] ?? $ld0['CH'] ?? $ld0['C'] ?? null;
+                $inf = $ld0['INF'] ?? $ld0['Inf'] ?? $ld0['I'] ?? null;
+                $adt = $ld0['ADT'] ?? $ld0['Adult'] ?? $ld0['A'] ?? null;
+
+                if ($m !== null || $w !== null) {
+                    $paxM = $m !== null ? (string)(int)$m : '';
+                    $paxF = $w !== null ? (string)(int)$w : '';
+                } elseif ($adt !== null) {
+                    $adtVal = (int)$adt;
+                    $mVal = (int)ceil($adtVal / 2);
+                    $fVal = $adtVal - $mVal;
+                    $paxM = $mVal > 0 ? (string)$mVal : '';
+                    $paxF = $fVal > 0 ? (string)$fVal : '';
+                }
+
+                if ($ch !== null) {
+                    $paxCh = (string)(int)$ch;
+                }
+                if ($inf !== null) {
+                    $paxInf = (string)(int)$inf;
+                }
+
+                $totAdt = (int)$paxM + (int)$paxF;
+                $totCh = (int)$paxCh;
+                if ($totAdt + $totCh > 0) {
+                    $paxCount = (string)($totAdt + $totCh);
+                }
             }
         }
         if ($paxCount === '' && !empty($paxRaw)) {
             $parts = explode('/', $paxRaw);
-            if (count($parts) >= 2) {
+            if (count($parts) >= 4) {
+                $paxM = trim($parts[0]);
+                $paxF = trim($parts[1]);
+                $paxCh = trim($parts[2]);
+                $paxInf = trim($parts[3]);
+                $paxCount = (string)((int)$paxM + (int)$paxF + (int)$paxCh);
+            } elseif (count($parts) === 3) {
                 $adt = (int)trim($parts[0]);
-                $chd = (int)trim($parts[1]);
-                $paxCount = (string)($adt + $chd);
+                $paxCh = trim($parts[1]);
+                $paxInf = trim($parts[2]);
+                $mVal = (int)ceil($adt / 2);
+                $fVal = $adt - $mVal;
+                $paxM = (string)$mVal;
+                $paxF = (string)$fVal;
+                $paxCount = (string)($adt + (int)$paxCh);
+            } elseif (count($parts) >= 2) {
+                $adt = (int)trim($parts[0]);
+                $paxCh = trim($parts[1]);
+                $mVal = (int)ceil($adt / 2);
+                $fVal = $adt - $mVal;
+                $paxM = (string)$mVal;
+                $paxF = (string)$fVal;
+                $paxCount = (string)($adt + (int)$paxCh);
             } elseif (count($parts) === 1 && is_numeric(trim($parts[0]))) {
-                $paxCount = (string)(int)trim($parts[0]);
+                $adt = (int)trim($parts[0]);
+                $mVal = (int)ceil($adt / 2);
+                $fVal = $adt - $mVal;
+                $paxM = (string)$mVal;
+                $paxF = (string)$fVal;
+                $paxCount = (string)$adt;
             } else {
                 $paxCount = trim($paxRaw);
             }
@@ -2303,6 +2358,10 @@ if ($route === '/fetch_schedule') {
             'ac_type' => $acType,
             'ac_config' => $layout,
             'pax' => $paxCount,
+            'pax_m' => $paxM,
+            'pax_f' => $paxF,
+            'pax_ch' => $paxCh,
+            'pax_inf' => $paxInf,
             'crew' => $crewStr,
             'fuel_block' => $fuelBlock,
             'fuel_trip' => $fuelTrip,

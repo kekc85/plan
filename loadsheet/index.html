@@ -1,0 +1,2786 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+  <title>LOADSHEET - NORDWIND AIRLINES</title>
+  <style>
+    /* Сброс и базовые стили */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background-color: #2b303a;
+      color: #000;
+      padding: 15px 5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Верхняя панель управления (скрывается при печати) */
+    .top-toolbar {
+      width: 100%;
+      max-width: 980px;
+      background: #1a1e24;
+      color: #e2e8f0;
+      padding: 10px 16px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    }
+
+    .toolbar-left, .toolbar-right, .toolbar-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-title {
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      color: #63b3ed;
+      margin-right: 6px;
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 5px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease-in-out;
+    }
+
+    .btn-primary {
+      background: #3182ce;
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #2b6cb0;
+    }
+
+    .btn-secondary {
+      background: #2d3748;
+      color: #edf2f7;
+      border-color: #4a5568;
+    }
+    .btn-secondary:hover {
+      background: #4a5568;
+    }
+
+    .btn-danger {
+      background: #e53e3e;
+      color: #fff;
+    }
+    .btn-danger:hover {
+      background: #c53030;
+    }
+
+    .season-selector {
+      display: inline-flex;
+      background: #2d3748;
+      border-radius: 5px;
+      padding: 2px;
+      border: 1px solid #4a5568;
+    }
+
+    .season-btn {
+      background: transparent;
+      border: none;
+      color: #cbd5e0;
+      padding: 4px 9px;
+      font-size: 11.5px;
+      font-weight: 700;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .season-btn.active {
+      background: #4299e1;
+      color: #fff;
+    }
+
+    .status-badge {
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 5px 11px;
+      border-radius: 4px;
+      background: #38a169;
+      color: #fff;
+    }
+    .status-badge.danger {
+      background: #e53e3e;
+      color: #fff;
+    }
+
+    /* ЛИСТ А4 (ЧЕТКО НА ВЕСЬ ЛИСТ А4 - 210 x 297 мм) */
+    .sheet-wrapper {
+      background: #fff;
+      width: 210mm;
+      height: 297mm;
+      max-height: 297mm;
+      padding: 5mm 6mm;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      position: relative;
+      color: #000;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Рамка бланка */
+    .blank-border {
+      border: 1.5px solid #000;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    /* Шапка бланка (согласно оригиналу: слева пусто, справа LOADSHEET NORDWIND AIRLINES) */
+    .blank-header-row {
+      display: flex;
+      width: 100%;
+      border-bottom: 1.5px solid #000;
+      height: 14mm;
+      flex-shrink: 0;
+    }
+
+    .blank-header-left {
+      width: 44%;
+      border-right: 1.5px solid #000;
+    }
+
+    .blank-header-right {
+      width: 56%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .blank-header-right h1 {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 5px;
+      line-height: 1;
+      text-transform: uppercase;
+      font-family: Arial, sans-serif;
+    }
+
+    .blank-header-right h2 {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      line-height: 1.2;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+
+    /* Таблицы бланка */
+    table.ls-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    table.ls-table th,
+    table.ls-table td {
+      border: 1px solid #000;
+      padding: 0 2px;
+      vertical-align: middle;
+      font-size: 8.5px;
+      line-height: 1.1;
+    }
+
+    .cell-label-sm {
+      font-size: 7.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #000;
+      line-height: 1;
+    }
+
+    /* Отключение стрелок спиннеров в числовых полях */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    /* Поля ввода в ячейках */
+    input.ls-input {
+      width: 100%;
+      height: 100%;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #000;
+      padding: 0 2px;
+      text-transform: uppercase;
+      box-sizing: border-box;
+    }
+
+    input.ls-input:focus {
+      background: #e8f4fd;
+    }
+
+    input.ls-input.text-center {
+      text-align: center;
+    }
+
+    input.ls-input.text-right {
+      text-align: right;
+    }
+
+    /* Вычисляемые ячейки */
+    .calc-val {
+      font-weight: 700;
+      font-size: 10.5px;
+      color: #000;
+      text-align: right;
+      padding: 0 2px;
+      white-space: nowrap;
+    }
+
+    .calc-val.center {
+      text-align: center;
+    }
+
+    .calc-val.overweight {
+      background-color: #ffcccc !important;
+      color: #d00000 !important;
+      font-weight: 900;
+    }
+
+    /* Границы секций */
+    .border-b-thick {
+      border-bottom: 1.5px solid #000 !important;
+    }
+    .border-r-thick {
+      border-right: 1.5px solid #000 !important;
+    }
+    .border-l-thick {
+      border-left: 1.5px solid #000 !important;
+    }
+    .border-t-thick {
+      border-top: 1.5px solid #000 !important;
+    }
+
+    /* 1. Блок данных рейса (11 мм) */
+    .flight-info-table {
+      flex-shrink: 0;
+    }
+    .flight-info-table th {
+      background: #fff;
+      text-align: left;
+      font-size: 7.5px;
+      font-weight: 700;
+      padding: 1px 3px;
+      height: 4.5mm;
+    }
+    .flight-info-table td {
+      height: 6.5mm;
+    }
+
+    /* 2. Верхний блок расчета весов (48 мм) */
+    .weights-upper-table {
+      flex-shrink: 0;
+    }
+    .weights-upper-table td {
+      height: 6.8mm;
+      padding: 0 2px;
+    }
+
+    .weights-upper-table input.ls-input,
+    .weights-upper-table .calc-val {
+      font-size: 11.5px;
+      font-weight: 800;
+    }
+
+    .limit-box-cell {
+      position: relative;
+      text-align: right;
+      padding-right: 3px;
+      vertical-align: bottom;
+      font-weight: 800;
+      font-size: 11.5px;
+    }
+
+    .limit-box-cell input.ls-input {
+      font-size: 11.5px;
+      font-weight: 800;
+      padding-left: 12px;
+      padding-right: 3px;
+    }
+
+    .limit-box-num {
+      position: absolute;
+      top: 1px;
+      left: 2px;
+      font-size: 7.5px;
+      font-weight: 900;
+      color: #000;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* 3. Таблица коммерческой загрузки (104 мм) */
+    .traffic-table {
+      flex-shrink: 0;
+    }
+    .traffic-table th {
+      font-size: 7.5px;
+      font-weight: 700;
+      text-align: center;
+      padding: 1px 1px;
+      height: 4.5mm;
+    }
+    .traffic-table tbody td {
+      height: 4.1mm;
+      padding: 0 1px;
+    }
+    .traffic-table tfoot td {
+      height: 6.5mm;
+      padding: 0 1px;
+    }
+    .traffic-table input.ls-input {
+      font-size: 9px;
+      padding: 0 1px;
+    }
+    .traffic-table .calc-val {
+      font-size: 9px;
+      padding: 0 1px;
+    }
+    .sub-type-label {
+      font-size: 8px;
+      font-weight: 700;
+      text-align: center;
+      background: #fff;
+    }
+    .sub-type-t {
+      font-weight: 900;
+      background: #f1f3f5;
+    }
+
+    /* 4. Нижний расчетный блок (полное 1-в-1 соответствие оригинальному бланку NWS) */
+    .lower-block-container {
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      width: 100%;
+      flex: 1;
+      border-top: 1.5px solid #000;
+      min-height: 0;
+    }
+
+    /* Левая секция: расчет весов + 5 колонок отсеков (CPT 1..5) - ~45% */
+    .lower-col-left {
+      width: 44.8%;
+      border-right: 1.5px solid #000;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .lower-weights-table {
+      width: 100%;
+      height: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .lower-weights-table td {
+      border: 1px solid #000;
+      padding: 0;
+      vertical-align: middle;
+      font-size: 8px;
+    }
+
+    /* Строки сетки нижнего блока (равномерная сетка ~4.45 мм по высоте как в оригинале) */
+    .lower-weights-table tr {
+      height: 4.45mm;
+    }
+
+    .lower-weights-table td {
+      border: 1px solid #000;
+      padding: 0;
+      height: 4.45mm;
+      vertical-align: middle;
+      font-size: 7.2px;
+    }
+
+    .weight-label-cell {
+      padding: 0 4px !important;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 100%;
+      font-weight: 700;
+      font-size: 7.5px;
+    }
+
+    /* 6 квадратных ячеек для MAX */
+    .max-digits-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .max-label {
+      font-size: 8px;
+      font-weight: 900;
+      color: #000;
+    }
+
+    .digit-box-row {
+      display: inline-flex;
+      border: 1px solid #000;
+    }
+
+    .digit-box-sq {
+      width: 9.5px;
+      height: 12.5px;
+      border-right: 1px solid #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 800;
+      color: #000;
+      background: #fff;
+    }
+
+    .digit-box-sq:last-child {
+      border-right: none;
+    }
+
+    /* Мини-ячейки LMC +/- [ ] = [ ] */
+    .lmc-sub-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 2px;
+      font-size: 7.5px;
+      font-weight: 700;
+      padding-right: 2px;
+    }
+
+    .lmc-box-field {
+      width: 24px;
+      height: 12.5px;
+      border: 1px solid #000;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 1.5px;
+      font-size: 9.5px;
+      font-weight: 800;
+      background: #fff;
+      box-sizing: border-box;
+    }
+
+    .lmc-sub-input {
+      width: 100%;
+      height: 100%;
+      border: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 9.5px;
+      font-weight: 800;
+      text-align: right;
+      padding: 0;
+      background: transparent;
+    }
+
+    /* 6 колонок CPT для отображения веса по цифрам */
+    .cpt-digit-grid {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+
+    .cpt-digit-cell {
+      flex: 1;
+      height: 100%;
+      border-right: 1px solid #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 800;
+      color: #000;
+      background: #fff;
+    }
+
+    .cpt-digit-cell:last-child {
+      border-right: none;
+    }
+
+    /* Средняя колонка: Allowed TL / Underload / LMC (6 строк) + вертикальная полоса (30.5%) */
+    .lower-col-mid {
+      width: 30.5%;
+      border-right: 1.5px solid #000;
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+    }
+
+    .mid-content-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .underload-calc-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .underload-calc-table tr {
+      height: 4.45mm;
+    }
+
+    .underload-calc-table td {
+      border: 1px solid #000;
+      padding: 0;
+      height: 4.45mm;
+      font-size: 7.2px;
+      vertical-align: middle;
+    }
+
+    .underload-label-cell {
+      padding: 0 3px !important;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 100%;
+    }
+
+    /* Таблица LMC (ровно 6 строк как в оригинальном бланке) */
+    .lmc-header-title {
+      background: #fff;
+      text-align: center;
+      font-size: 7px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      padding: 0;
+      border-bottom: 1px solid #000;
+      height: 4.45mm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lmc-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      flex: 1;
+    }
+
+    .lmc-table th {
+      border: 1px solid #000;
+      font-size: 6.5px;
+      font-weight: 700;
+      text-align: center;
+      background: #fff;
+      padding: 0;
+      height: 4.45mm;
+    }
+
+    .lmc-table td {
+      border: 1px solid #000;
+      height: 4.45mm;
+      padding: 0 1px;
+    }
+
+    .lmc-sign-btn {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 8.5px;
+      font-weight: 900;
+      cursor: pointer;
+      text-align: center;
+      color: #000;
+      padding: 0;
+      outline: none;
+    }
+
+    /* Вертикальная полоса CHECK LMC TOTAL WITH UNDERLOAD со стрелками */
+    .check-lmc-strip {
+      width: 14px;
+      border-left: 1.5px solid #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      background: #fff;
+      padding: 0;
+      flex-shrink: 0;
+    }
+
+    .check-lmc-arrow {
+      font-size: 8px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .check-lmc-text {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-size: 5.8px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      color: #000;
+    }
+
+    /* Правая колонка: Notes / Balance / Total Passengers / Signatures (24.7%) */
+    .lower-col-right {
+      width: 24.7%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .notes-box {
+      font-size: 6.8px;
+      line-height: 1.15;
+      padding: 2px 3.5px;
+      border-bottom: 1px solid #000;
+      height: 26.7mm;
+      flex-shrink: 0;
+      box-sizing: border-box;
+    }
+
+    .notes-header-text {
+      font-weight: 900;
+      font-size: 7.2px;
+      text-decoration: underline;
+      margin-bottom: 1.5px;
+    }
+
+    .balance-header-row {
+      display: flex;
+      border-bottom: 1px solid #000;
+      background: #fff;
+      height: 4.45mm;
+      flex-shrink: 0;
+    }
+
+    .balance-header-cell {
+      width: 50%;
+      text-align: center;
+      font-size: 7px;
+      font-weight: 900;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Чистые открытые текстовые блоки для Balance и Seating Cond (без лишних разделителей) */
+    .balance-open-row {
+      display: flex;
+      flex: 1;
+      border-bottom: 1px solid #000;
+      min-height: 31.15mm;
+    }
+
+    .balance-open-col {
+      width: 50%;
+      height: 100%;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .balance-item-row {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 3.5px;
+      height: 5.2mm;
+      width: 100%;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+
+    .balance-item-lbl {
+      font-size: 11.5px;
+      font-weight: 900;
+      color: #000;
+      white-space: nowrap;
+      flex-shrink: 0;
+      letter-spacing: -0.2px;
+    }
+
+    .balance-item-input {
+      flex: 1;
+      min-width: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-bottom: 1.5px dashed #4a5568;
+      background: transparent;
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 900;
+      color: #000;
+      padding: 0 2px;
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    .balance-item-input:focus {
+      background: #e8f4fd;
+      border-bottom-color: #3182ce;
+    }
+
+    textarea.balance-freeform {
+      width: 100%;
+      height: 100%;
+      border: none;
+      outline: none;
+      resize: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 900;
+      color: #000;
+      padding: 2px 3.5px;
+      line-height: 1.28;
+      box-sizing: border-box;
+    }
+
+    /* Блок TOTAL PASSENGERS */
+    .total-pax-box {
+      border-bottom: 1px solid #000;
+      padding: 1px 3px;
+      text-align: center;
+      height: 8.9mm;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-sizing: border-box;
+    }
+
+    .total-pax-label {
+      font-size: 6.8px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 0.5px;
+    }
+
+    .total-pax-val {
+      font-size: 12.5px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    /* Сертификация */
+    .cert-text-box {
+      font-size: 6.8px;
+      line-height: 1.15;
+      padding: 2px 3.5px;
+      border-bottom: 1px solid #000;
+      height: 8.9mm;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      box-sizing: border-box;
+    }
+
+    /* Подписи */
+    .signatures-block {
+      display: flex;
+      width: 100%;
+      height: 13.35mm;
+      flex-shrink: 0;
+      box-sizing: border-box;
+    }
+
+    .sig-col {
+      width: 50%;
+      padding: 2px 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .sig-col:first-child {
+      border-right: 1px solid #000;
+    }
+
+    .sig-title {
+      font-size: 7.2px;
+      font-weight: 900;
+    }
+
+    .sig-input {
+      width: 100%;
+      border: none;
+      border-bottom: 1px solid #000;
+      outline: none;
+      font-family: inherit;
+      font-size: 9px;
+      font-weight: 700;
+      background: transparent;
+      padding-bottom: 1px;
+    }
+
+    /* Модальное окно настроек весов */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #fff;
+      border-radius: 8px;
+      padding: 18px;
+      width: 360px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      color: #333;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #dee2e6;
+    }
+
+    .modal-header h3 {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #888;
+    }
+
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12.5px;
+    }
+
+    .setting-row input {
+      width: 75px;
+      padding: 3px 6px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      text-align: right;
+      font-weight: 700;
+    }
+
+    /* ПЕЧАТНЫЕ СТИЛИ (PRINT НА ВЕСЬ ЛИСТ А4 СТРОГО НА 1 СТРАНИЦУ НА ПК И МОБИЛЬНЫХ) */
+    @page {
+      size: A4 portrait;
+      margin: 4mm 6mm;
+    }
+
+    @media print {
+      html, body {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        overflow: hidden !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .top-toolbar, .modal-backdrop {
+        display: none !important;
+      }
+
+      .balance-item-input {
+        border-bottom: none !important;
+      }
+
+      .sheet-wrapper {
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 auto !important;
+        width: 100% !important;
+        max-width: 198mm !important;
+        height: 100% !important;
+        max-height: 289mm !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+        page-break-before: avoid !important;
+        break-before: avoid !important;
+      }
+
+      .blank-border {
+        border-width: 1.5pt !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      table, tr, td, th, div {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      input.ls-input, textarea.balance-textarea, .sig-input {
+        background: transparent !important;
+        border: none !important;
+        color: #000 !important;
+      }
+
+      select {
+        appearance: none;
+        -webkit-appearance: none;
+        border: none !important;
+        background: transparent !important;
+      }
+
+      .calc-val.overweight {
+        background: transparent !important;
+        color: #000 !important;
+        text-decoration: underline;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Верхняя панель управления (скрывается при печати) -->
+  <div class="top-toolbar">
+    <div class="toolbar-left">
+      <button type="button" class="btn btn-secondary" id="btnBackToOrigin" onclick="handleReturnBack()" style="display: none;" title="Вернуться назад в систему расчета">↩ Назад</button>
+      <span class="toolbar-title">✈ Nordwind W&amp;B LoadSheet</span>
+      <div class="season-selector" title="Выбор сезона для стандартных весов пассажиров">
+        <button type="button" class="season-btn active" id="btnSeasonSummer" onclick="setSeason('summer')">Лето (Взр 75 кг)</button>
+        <button type="button" class="season-btn" id="btnSeasonWinter" onclick="setSeason('winter')">Зима (Взр 80 кг)</button>
+      </div>
+      <button type="button" class="btn btn-secondary" onclick="openSettingsModal()" title="Настроить нормативы веса пассажиров">⚙ Веса</button>
+    </div>
+
+    <div class="toolbar-center">
+      <div id="statusBadge" class="status-badge">✔ Все весовые лимиты в норме</div>
+    </div>
+
+    <div class="toolbar-right">
+      <button type="button" class="btn btn-danger" onclick="resetForm()" title="Очистить все поля бланка">🗑 Очистить бланк</button>
+      <button type="button" class="btn btn-primary" onclick="window.print()" title="Распечатать документ на принтере или сохранить в PDF">🖨 Печать / PDF</button>
+    </div>
+  </div>
+
+  <!-- Бланк LoadSheet (ровно на весь лист А4) -->
+  <div class="sheet-wrapper">
+    <div class="blank-border">
+      
+      <!-- Шапка бланка (согласно оригиналу: слева пусто, справа LOADSHEET NORDWIND AIRLINES) -->
+      <div class="blank-header-row">
+        <div class="blank-header-left"></div>
+        <div class="blank-header-right">
+          <h1>LOADSHEET</h1>
+          <h2>NORDWIND AIRLINES</h2>
+        </div>
+      </div>
+
+      <!-- 1. Строка общей информации о рейсе -->
+      <table class="ls-table flight-info-table border-b-thick">
+        <colgroup>
+          <col style="width: 11%;">
+          <col style="width: 10%;">
+          <col style="width: 11%;">
+          <col style="width: 11%;">
+          <col style="width: 15%;">
+          <col style="width: 9%;">
+          <col style="width: 11%;">
+          <col style="width: 11%;">
+          <col style="width: 11%;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Flight</th>
+            <th>Originator</th>
+            <th>A/C Reg</th>
+            <th>Version</th>
+            <th>Captain</th>
+            <th>Crew</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><input type="text" class="ls-input text-center" id="f_flight"></td>
+            <td><input type="text" class="ls-input text-center" id="f_originator"></td>
+            <td><input type="text" class="ls-input text-center" id="f_acreg"></td>
+            <td><input type="text" class="ls-input text-center" id="f_version"></td>
+            <td><input type="text" class="ls-input text-center" id="f_captain"></td>
+            <td><input type="text" class="ls-input text-center" id="f_crew"></td>
+            <td><input type="text" class="ls-input text-center" id="f_from"></td>
+            <td><input type="text" class="ls-input text-center" id="f_to"></td>
+            <td><input type="text" class="ls-input text-center" id="f_date"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 2. Верхний блок расчета предельной коммерческой загрузки (точно 1-в-1 по оригиналу бланка) -->
+      <table class="ls-table weights-upper-table border-b-thick">
+        <colgroup>
+          <!-- Левая часть: DOW + Топливо = Operating Weight (43%) -->
+          <col style="width: 25%;">
+          <col style="width: 3%;">
+          <col style="width: 15%;">
+          <!-- Разделитель -->
+          <col style="width: 1%;">
+          <!-- Правая часть: Максимальные веса и расчет Allowed Traffic Load (57%) -->
+          <col style="width: 18%;">
+          <col style="width: 12.6%;">
+          <col style="width: 12.7%;">
+          <col style="width: 12.7%;">
+        </colgroup>
+        <tbody>
+          <!-- Ряд 1: BASIC WEIGHT | MAXIMUM WEIGHTS FOR | ZERO FUEL | TAKE-OFF | LANDING -->
+          <tr>
+            <td class="cell-label-sm">BASIC WEIGHT</td>
+            <td></td>
+            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_basic_weight" oninput="calculate()"></td>
+            <td rowspan="6" class="border-r-thick" style="background:#f4f5f7;"></td>
+            <td class="cell-label-sm font-bold" style="padding-top:2px;">MAXIMUM WEIGHTS FOR &nbsp;&rarr;</td>
+            <td class="text-center font-bold" style="font-size: 7.5px;">ZERO FUEL</td>
+            <td class="text-center font-bold" style="font-size: 7.5px;">&mdash; TAKE-OFF</td>
+            <td class="text-center font-bold" style="font-size: 7.5px;">LANDING</td>
+          </tr>
+
+          <!-- Ряд 2: Crew | Ввод лимитов Max ZFW, Max LAW | Стрелка TAKE-OFF вниз (rowspan=2) -->
+          <tr>
+            <td class="cell-label-sm">Crew</td>
+            <td></td>
+            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_crew_weight" oninput="calculate()"></td>
+            <td></td>
+            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_max_zfw" oninput="calculate()"></td>
+            <!-- Колонка 2 под TAKE-OFF: единая непрерывная стрелка вниз строго одинаковой толщины по всей длине -->
+            <td rowspan="2" style="position: relative; padding: 0; vertical-align: top; background: #fff;">
+              <div style="position: absolute; top: 0; left: 12px; width: 1.5px; bottom: 5px; background: #000;"></div>
+              <div style="position: absolute; bottom: 0; left: 9.25px; width: 0; height: 0; border-left: 3.5px solid transparent; border-right: 3.5px solid transparent; border-top: 6px solid #000;"></div>
+              <div style="position: absolute; bottom: 0; left: 18px; right: -1px; height: 50%; border-top: 1px solid #000; border-left: 1px solid #000; display: flex; align-items: center; justify-content: space-between; padding: 0 3px; background: #fff; box-sizing: border-box; z-index: 1;">
+                <span style="font-size: 6.8px; font-weight: 700; white-space: nowrap;">TRIP FUEL</span>
+                <span style="font-size: 8px; font-weight: 900;">&rarr;&nbsp;+</span>
+              </div>
+            </td>
+            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_max_law" oninput="calculate()"></td>
+          </tr>
+
+          <!-- Ряд 3: Pantry | TAKE-OFF FUEL (+) | TRIP FUEL (+) -->
+          <tr>
+            <td class="cell-label-sm">Pantry</td>
+            <td></td>
+            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_pantry_weight" oninput="calculate()"></td>
+            <td class="cell-label-sm font-bold">TAKE-OFF FUEL <span style="float:right;">+</span></td>
+            <td class="calc-val font-bold" id="disp_lim1_fuel"></td>
+            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_trip_fuel" oninput="calculate()"></td>
+          </tr>
+
+          <!-- Ряд 4: DRY OPERATING WEIGHT = | ALLOWED WEIGHT FOR TAKE-OFF (Колонки 1, 2, 3) -->
+          <tr>
+            <td class="cell-label-sm font-bold">DRY OPERATING WEIGHT</td>
+            <td class="text-center font-bold">=</td>
+            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_dow" oninput="onDowDirectInput()"></td>
+            <td class="cell-label-sm font-bold" style="font-size:6.8px; line-height:1.1;">ALLOWED WEIGHT FOR<br>TAKE-OFF. LOWEST OF 1, 2 OR 3</td>
+            <!-- Колонка 1 (под ZERO FUEL) -->
+            <td class="limit-box-cell" style="background:#fdfefe;">
+              <span class="limit-box-num">1</span>
+              <span id="disp_lim_1"></span>
+            </td>
+            <!-- Колонка 2 (под TAKE-OFF): ввод значения TAKE-OFF -->
+            <td class="limit-box-cell" style="background:#fdfefe; padding: 0;">
+              <span class="limit-box-num">2</span>
+              <input type="number" step="any" class="ls-input text-right font-bold" id="inp_max_tow" oninput="calculate()">
+            </td>
+            <!-- Колонка 3 (под LANDING) -->
+            <td class="limit-box-cell" style="background:#fdfefe;">
+              <span class="limit-box-num">3</span>
+              <span id="disp_lim_3"></span>
+            </td>
+          </tr>
+
+          <!-- Ряд 5: TAKE-OFF FUEL + | WET OPERATING WEIGHT - (Колонки 1, 2, 3 с вертикальными линиями) -->
+          <tr>
+            <td class="cell-label-sm">TAKE-OFF FUEL</td>
+            <td class="text-center font-bold">+</td>
+            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_takeoff_fuel" oninput="calculate()"></td>
+            <td class="cell-label-sm">WET OPERATING<br>WEIGHT <span style="float:right;">&minus;</span></td>
+            <td class="calc-val font-bold" id="disp_wow_1"></td>
+            <td class="calc-val font-bold" id="disp_wow_2"></td>
+            <td class="calc-val font-bold" id="disp_wow_3"></td>
+          </tr>
+
+          <!-- Ряд 6: OPERATING WEIGHT = | ALLOWED TRAFFIC LOAD = (Колонки 1, 2, 3 с вертикальными линиями) -->
+          <tr>
+            <td class="cell-label-sm">OPERATING WEIGHT</td>
+            <td class="text-center font-bold">=</td>
+            <td class="calc-val font-bold" id="disp_operating_weight"></td>
+            <td class="cell-label-sm font-bold" style="background:#eaf2f8;">ALLOWED TRAFFIC<br>LOAD <span style="float:right;">=</span></td>
+            <td class="calc-val font-bold" id="disp_atl_1" style="background:#eaf2f8; font-size:11px; color:#1864ab;"></td>
+            <td class="calc-val font-bold" id="disp_atl_2" style="background:#eaf2f8; font-size:11px; color:#1864ab;"></td>
+            <td class="calc-val font-bold" id="disp_atl_3" style="background:#eaf2f8; font-size:11px; color:#1864ab;"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 3. Таблица коммерческой загрузки и распределения (No. OF PASSENGERS, BAGGAGE/CARGO, COMPARTMENTS) -->
+      <table class="ls-table traffic-table">
+        <colgroup>
+          <!-- DEST (1) -->
+          <col style="width: 5.2%;">
+          <!-- PAX M, F, CH, INF (2, 3, 4, 5) -->
+          <col style="width: 4.8%;">
+          <col style="width: 4.8%;">
+          <col style="width: 4.8%;">
+          <col style="width: 4.8%;">
+          <!-- CABIN BAG WT (6) -->
+          <col style="width: 5.8%;">
+          <!-- TOTAL (Type, Val) (7, 8) -->
+          <col style="width: 2.8%;">
+          <col style="width: 7.6%;">
+          <!-- CPT 1..5 (9, 10, 11, 12, 13) -->
+          <col style="width: 7.2%;">
+          <col style="width: 7.2%;">
+          <col style="width: 7.2%;">
+          <col style="width: 7.2%;">
+          <col style="width: 7.2%;">
+          <!-- REMARKS PAX C, Y / PAD C, Y (14, 15, 16, 17) -->
+          <col style="width: 5.0%;">
+          <col style="width: 5.8%;">
+          <col style="width: 5.0%;">
+          <col style="width: 5.6%;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th rowspan="3">DEST.</th>
+            <th colspan="4">No. OF PASSENGERS</th>
+            <th rowspan="3">CABIN<br>BAG<br>WT</th>
+            <th colspan="2" rowspan="2">TOTAL</th>
+            <th colspan="5">DISTRIBUTION WEIGHT</th>
+            <th colspan="4">REMARKS</th>
+          </tr>
+          <tr>
+            <th colspan="2">ADULT</th>
+            <th rowspan="2">CH</th>
+            <th rowspan="2">INF</th>
+            <th rowspan="2">CPT 1</th>
+            <th rowspan="2">CPT 2</th>
+            <th rowspan="2">CPT 3</th>
+            <th rowspan="2">CPT 4</th>
+            <th rowspan="2">CPT 5</th>
+            <th colspan="2">PAX</th>
+            <th colspan="2">PAD</th>
+          </tr>
+          <tr>
+            <th>M</th>
+            <th>F</th>
+            <th></th>
+            <th></th>
+            <th>C</th>
+            <th>Y</th>
+            <th>C</th>
+            <th>Y</th>
+          </tr>
+        </thead>
+        <tbody id="traffic_tbody">
+          <!-- Генерируется на 4 блока назначений (DEST 1..4) -->
+        </tbody>
+        <tfoot>
+          <!-- Строка итогов по всей коммерческой загрузке -->
+          <tr style="background: #fff; font-weight: bold; border-top: 1.5px solid #000;">
+            <td class="text-center font-bold" style="font-size: 8px;">TOTAL</td>
+            <td class="calc-val center" id="tot_pax_m"></td>
+            <td class="calc-val center" id="tot_pax_f"></td>
+            <td class="calc-val center" id="tot_pax_ch"></td>
+            <td class="calc-val center" id="tot_pax_inf"></td>
+            <td class="calc-val" id="tot_cabin_bag"></td>
+            <td colspan="2" class="calc-val font-bold" id="tot_cargo_deadload"></td>
+            <td class="calc-val" id="tot_cpt_1"></td>
+            <td class="calc-val" id="tot_cpt_2"></td>
+            <td class="calc-val" id="tot_cpt_3"></td>
+            <td class="calc-val" id="tot_cpt_4"></td>
+            <td class="calc-val" id="tot_cpt_5"></td>
+            <td class="calc-val center" id="tot_rem_pax_c"></td>
+            <td class="calc-val center" id="tot_rem_pax_y"></td>
+            <td class="calc-val center" id="tot_rem_pad_c"></td>
+            <td class="calc-val center" id="tot_rem_pad_y"></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <!-- 4. Нижний расчетный блок (полное 1-в-1 соответствие оригинальному бланку NWS) -->
+      <div class="lower-block-container">
+        
+        <!-- Левая колонка: Расчет весов самолета + 6 колонок отсеков (~44.8%) -->
+        <div class="lower-col-left">
+          <table class="lower-weights-table">
+            <colgroup>
+              <col style="width: 71.5%;">
+              <col style="width: 28.5%;">
+            </colgroup>
+            <tbody>
+              <!-- 1: PASSENGER WEIGHT (2 строки по 4.45 мм) -->
+              <tr>
+                <td rowspan="2" style="position: relative; vertical-align: top; padding: 1px 4px;">
+                  <div class="weight-label-cell" style="padding: 0 !important;">
+                    <span>PASSENGER WEIGHT</span>
+                  </div>
+                  <span style="position: absolute; right: 5px; bottom: 1px; font-size: 11px; font-weight: 900;">+</span>
+                </td>
+                <td>
+                  <div class="cpt-digit-grid" id="grid_pax_wt">
+                    <div class="cpt-digit-cell" id="pax_wt_d1"></div>
+                    <div class="cpt-digit-cell" id="pax_wt_d2"></div>
+                    <div class="cpt-digit-cell" id="pax_wt_d3"></div>
+                    <div class="cpt-digit-cell" id="pax_wt_d4"></div>
+                    <div class="cpt-digit-cell" id="pax_wt_d5"></div>
+                    <div class="cpt-digit-cell" id="pax_wt_d6"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cpt-digit-grid" id="grid_cabin_bag">
+                    <div class="cpt-digit-cell" id="cabin_bag_d1"></div>
+                    <div class="cpt-digit-cell" id="cabin_bag_d2"></div>
+                    <div class="cpt-digit-cell" id="cabin_bag_d3"></div>
+                    <div class="cpt-digit-cell" id="cabin_bag_d4"></div>
+                    <div class="cpt-digit-cell" id="cabin_bag_d5"></div>
+                    <div class="cpt-digit-cell" id="cabin_bag_d6"></div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 2: TOTAL TRAFFIC LOAD (2 строки по 4.45 мм) -->
+              <tr>
+                <td rowspan="2" style="position: relative; vertical-align: top; padding: 1px 4px;">
+                  <div class="weight-label-cell" style="padding: 0 !important;">
+                    <span>TOTAL TRAFFIC LOAD</span>
+                  </div>
+                  <span style="position: absolute; right: 5px; bottom: 1px; font-size: 11px; font-weight: 900;">=</span>
+                </td>
+                <td>
+                  <div class="cpt-digit-grid" id="grid_tot_tl">
+                    <div class="cpt-digit-cell" id="tot_tl_d1"></div>
+                    <div class="cpt-digit-cell" id="tot_tl_d2"></div>
+                    <div class="cpt-digit-cell" id="tot_tl_d3"></div>
+                    <div class="cpt-digit-cell" id="tot_tl_d4"></div>
+                    <div class="cpt-digit-cell" id="tot_tl_d5"></div>
+                    <div class="cpt-digit-cell" id="tot_tl_d6"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 3: DRY OPERATING WEIGHT (2 строки по 4.45 мм) -->
+              <tr>
+                <td rowspan="2" style="position: relative; vertical-align: top; padding: 1px 4px;">
+                  <div class="weight-label-cell" style="padding: 0 !important;">
+                    <span>DRY OPERATING WEIGHT</span>
+                  </div>
+                  <span style="position: absolute; right: 5px; bottom: 1px; font-size: 11px; font-weight: 900;">+</span>
+                </td>
+                <td>
+                  <div class="cpt-digit-grid" id="grid_dow">
+                    <div class="cpt-digit-cell" id="dow_d1"></div>
+                    <div class="cpt-digit-cell" id="dow_d2"></div>
+                    <div class="cpt-digit-cell" id="dow_d3"></div>
+                    <div class="cpt-digit-cell" id="dow_d4"></div>
+                    <div class="cpt-digit-cell" id="dow_d5"></div>
+                    <div class="cpt-digit-cell" id="dow_d6"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 4: ZERO FUEL WEIGHT (3 строки по 4.45 мм) -->
+              <tr>
+                <td rowspan="3" style="padding: 1px 3px; vertical-align: middle;">
+                  <div style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.45mm;">
+                      <span style="font-weight:700; font-size:7.5px;">ZERO FUEL WEIGHT</span>
+                      <span style="font-size:7px; font-weight:900; margin-right:6px;">LMC</span>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; align-items:center; height: 4.45mm;">
+                      <div class="lmc-sub-row">
+                        <span>+/&minus;</span>
+                        <div class="lmc-box-field"><input type="text" class="lmc-sub-input" id="lmc_zfw_inp1" oninput="calculate()"></div>
+                        <span>=</span>
+                        <div class="lmc-box-field" id="lmc_zfw_res1"></div>
+                      </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.45mm;">
+                      <div class="max-digits-wrap">
+                        <span class="max-label">MAX</span>
+                        <div class="digit-box-row">
+                          <div class="digit-box-sq" id="max_zfw_d1"></div>
+                          <div class="digit-box-sq" id="max_zfw_d2"></div>
+                          <div class="digit-box-sq" id="max_zfw_d3"></div>
+                          <div class="digit-box-sq" id="max_zfw_d4"></div>
+                          <div class="digit-box-sq" id="max_zfw_d5"></div>
+                          <div class="digit-box-sq" id="max_zfw_d6"></div>
+                        </div>
+                      </div>
+                      <div class="lmc-sub-row">
+                        <span>+/&minus;</span>
+                        <div class="lmc-box-field"><input type="text" class="lmc-sub-input" id="lmc_zfw_inp2" oninput="calculate()"></div>
+                        <span>=</span>
+                        <div class="lmc-box-field" id="lmc_zfw_res2"></div>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="cpt-digit-grid" id="grid_act_zfw">
+                    <div class="cpt-digit-cell" id="act_zfw_d1"></div>
+                    <div class="cpt-digit-cell" id="act_zfw_d2"></div>
+                    <div class="cpt-digit-cell" id="act_zfw_d3"></div>
+                    <div class="cpt-digit-cell" id="act_zfw_d4"></div>
+                    <div class="cpt-digit-cell" id="act_zfw_d5"></div>
+                    <div class="cpt-digit-cell" id="act_zfw_d6"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 5: TAKE-OFF FUEL (2 строки по 4.45 мм) -->
+              <tr>
+                <td rowspan="2" style="position: relative; vertical-align: top; padding: 1px 4px;">
+                  <div class="weight-label-cell" style="padding: 0 !important;">
+                    <span>TAKE-OFF FUEL</span>
+                  </div>
+                  <span style="position: absolute; right: 5px; bottom: 1px; font-size: 11px; font-weight: 900;">+</span>
+                </td>
+                <td>
+                  <div class="cpt-digit-grid" id="grid_to_fuel">
+                    <div class="cpt-digit-cell" id="to_fuel_d1"></div>
+                    <div class="cpt-digit-cell" id="to_fuel_d2"></div>
+                    <div class="cpt-digit-cell" id="to_fuel_d3"></div>
+                    <div class="cpt-digit-cell" id="to_fuel_d4"></div>
+                    <div class="cpt-digit-cell" id="to_fuel_d5"></div>
+                    <div class="cpt-digit-cell" id="to_fuel_d6"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 6: TAKE-OFF WEIGHT (3 строки по 4.45 мм) -->
+              <tr>
+                <td rowspan="3" style="padding: 1px 3px; vertical-align: middle;">
+                  <div style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.45mm;">
+                      <span style="font-weight:700; font-size:7.5px;">TAKE-OFF WEIGHT</span>
+                      <span style="font-size:7px; font-weight:900; margin-right:6px;">LMC</span>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; align-items:center; height: 4.45mm;">
+                      <div class="lmc-sub-row">
+                        <span>+/&minus;</span>
+                        <div class="lmc-box-field"><input type="text" class="lmc-sub-input" id="lmc_tow_inp1" oninput="calculate()"></div>
+                        <span>=</span>
+                        <div class="lmc-box-field" id="lmc_tow_res1"></div>
+                      </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.45mm;">
+                      <div class="max-digits-wrap">
+                        <span class="max-label">MAX</span>
+                        <div class="digit-box-row">
+                          <div class="digit-box-sq" id="max_tow_d1"></div>
+                          <div class="digit-box-sq" id="max_tow_d2"></div>
+                          <div class="digit-box-sq" id="max_tow_d3"></div>
+                          <div class="digit-box-sq" id="max_tow_d4"></div>
+                          <div class="digit-box-sq" id="max_tow_d5"></div>
+                          <div class="digit-box-sq" id="max_tow_d6"></div>
+                        </div>
+                      </div>
+                      <div class="lmc-sub-row">
+                        <span>+/&minus;</span>
+                        <div class="lmc-box-field"><input type="text" class="lmc-sub-input" id="lmc_tow_inp2" oninput="calculate()"></div>
+                        <span>=</span>
+                        <div class="lmc-box-field" id="lmc_tow_res2"></div>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="cpt-digit-grid" id="grid_act_tow">
+                    <div class="cpt-digit-cell" id="act_tow_d1"></div>
+                    <div class="cpt-digit-cell" id="act_tow_d2"></div>
+                    <div class="cpt-digit-cell" id="act_tow_d3"></div>
+                    <div class="cpt-digit-cell" id="act_tow_d4"></div>
+                    <div class="cpt-digit-cell" id="act_tow_d5"></div>
+                    <div class="cpt-digit-cell" id="act_tow_d6"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 7: TRIP FUEL (2 строки по 4.45 мм) -->
+              <tr>
+                <td rowspan="2" style="position: relative; vertical-align: top; padding: 1px 4px;">
+                  <div class="weight-label-cell" style="padding: 0 !important;">
+                    <span>TRIP FUEL</span>
+                  </div>
+                  <span style="position: absolute; right: 5px; bottom: 1px; font-size: 11px; font-weight: 900;">&minus;</span>
+                </td>
+                <td>
+                  <div class="cpt-digit-grid" id="grid_trip_fuel">
+                    <div class="cpt-digit-cell" id="trip_fuel_d1"></div>
+                    <div class="cpt-digit-cell" id="trip_fuel_d2"></div>
+                    <div class="cpt-digit-cell" id="trip_fuel_d3"></div>
+                    <div class="cpt-digit-cell" id="trip_fuel_d4"></div>
+                    <div class="cpt-digit-cell" id="trip_fuel_d5"></div>
+                    <div class="cpt-digit-cell" id="trip_fuel_d6"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 8: LANDING WEIGHT (3 строки по 4.45 мм) -->
+              <tr>
+                <td rowspan="3" style="padding: 1px 3px; vertical-align: middle;">
+                  <div style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.45mm;">
+                      <span style="font-weight:700; font-size:7.5px;">LANDING WEIGHT</span>
+                      <span style="font-size:7px; font-weight:900; margin-right:6px;">LMC</span>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; align-items:center; height: 4.45mm;">
+                      <div class="lmc-sub-row">
+                        <span>+/&minus;</span>
+                        <div class="lmc-box-field"><input type="text" class="lmc-sub-input" id="lmc_law_inp1" oninput="calculate()"></div>
+                        <span>=</span>
+                        <div class="lmc-box-field" id="lmc_law_res1"></div>
+                      </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.45mm;">
+                      <div class="max-digits-wrap">
+                        <span class="max-label">MAX</span>
+                        <div class="digit-box-row">
+                          <div class="digit-box-sq" id="max_law_d1"></div>
+                          <div class="digit-box-sq" id="max_law_d2"></div>
+                          <div class="digit-box-sq" id="max_law_d3"></div>
+                          <div class="digit-box-sq" id="max_law_d4"></div>
+                          <div class="digit-box-sq" id="max_law_d5"></div>
+                          <div class="digit-box-sq" id="max_law_d6"></div>
+                        </div>
+                      </div>
+                      <div class="lmc-sub-row">
+                        <span>+/&minus;</span>
+                        <div class="lmc-box-field"><input type="text" class="lmc-sub-input" id="lmc_law_inp2" oninput="calculate()"></div>
+                        <span>=</span>
+                        <div class="lmc-box-field" id="lmc_law_res2"></div>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="cpt-digit-grid" id="grid_act_law">
+                    <div class="cpt-digit-cell" id="act_law_d1"></div>
+                    <div class="cpt-digit-cell" id="act_law_d2"></div>
+                    <div class="cpt-digit-cell" id="act_law_d3"></div>
+                    <div class="cpt-digit-cell" id="act_law_d4"></div>
+                    <div class="cpt-digit-cell" id="act_law_d5"></div>
+                    <div class="cpt-digit-cell" id="act_law_d6"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 9: Пустые замыкающие строки сетки (2 строки по 4.45 мм) -->
+              <tr>
+                <td></td>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td></td>
+                <td>
+                  <div class="cpt-digit-grid">
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                    <div class="cpt-digit-cell"></div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Средняя колонка: Allowed Traffic Load, Underload, LMC (ровно 6 строк), вертикальная полоса (~30.5%) -->
+        <div class="lower-col-mid">
+          <div class="mid-content-wrap">
+            <!-- Верхняя часть: Underload calculation (6 строк по 4.45 мм) -->
+            <table class="underload-calc-table">
+              <colgroup>
+                <col style="width: 58%;">
+                <col style="width: 42%;">
+              </colgroup>
+              <tbody>
+                <!-- 1: ALLOWED TRAFFIC LOAD (2 строки по 4.45 мм) -->
+                <tr>
+                  <td rowspan="2">
+                    <div class="underload-label-cell">
+                      <span>ALLOWED TRAFFIC<br>LOAD</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cpt-digit-grid" id="grid_allowed_tl">
+                      <div class="cpt-digit-cell" id="all_tl_d1"></div>
+                      <div class="cpt-digit-cell" id="all_tl_d2"></div>
+                      <div class="cpt-digit-cell" id="all_tl_d3"></div>
+                      <div class="cpt-digit-cell" id="all_tl_d4"></div>
+                      <div class="cpt-digit-cell" id="all_tl_d5"></div>
+                      <div class="cpt-digit-cell" id="all_tl_d6"></div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="cpt-digit-grid">
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- 2: SUB TRAFFIC LOAD (-) (2 строки по 4.45 мм) -->
+                <tr>
+                  <td rowspan="2">
+                    <div class="underload-label-cell">
+                      <div style="display:flex; align-items:center; width:100%; justify-content:space-between; padding-right:2px;">
+                        <svg height="8" width="65%" style="overflow:visible;"><line x1="0" y1="4" x2="85%" y2="4" stroke="#000" stroke-width="1.2"/><polygon points="85%,1 98%,4 85%,7" fill="#000"/></svg>
+                        <span style="font-size:10px; font-weight:900;">&minus;</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cpt-digit-grid" id="grid_sub_tl">
+                      <div class="cpt-digit-cell" id="sub_tl_d1"></div>
+                      <div class="cpt-digit-cell" id="sub_tl_d2"></div>
+                      <div class="cpt-digit-cell" id="sub_tl_d3"></div>
+                      <div class="cpt-digit-cell" id="sub_tl_d4"></div>
+                      <div class="cpt-digit-cell" id="sub_tl_d5"></div>
+                      <div class="cpt-digit-cell" id="sub_tl_d6"></div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="cpt-digit-grid">
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- 3: UNDERLOAD BEFORE LMC (=) (2 строки по 4.45 мм) -->
+                <tr>
+                  <td rowspan="2">
+                    <div class="underload-label-cell" style="line-height:1.15;">
+                      <span>UNDERLOAD<br>BEFORE LMC</span>
+                      <span style="font-size:10px; font-weight:900;">=</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cpt-digit-grid" id="grid_underload">
+                      <div class="cpt-digit-cell" id="und_d1"></div>
+                      <div class="cpt-digit-cell" id="und_d2"></div>
+                      <div class="cpt-digit-cell" id="und_d3"></div>
+                      <div class="cpt-digit-cell" id="und_d4"></div>
+                      <div class="cpt-digit-cell" id="und_d5"></div>
+                      <div class="cpt-digit-cell" id="und_d6"></div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="cpt-digit-grid">
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                      <div class="cpt-digit-cell"></div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- Заголовок LMC -->
+            <div class="lmc-header-title">LAST MINUTE CHANGES</div>
+
+            <!-- Таблица LMC на ровно 6 строк (как в оригинале) -->
+            <table class="lmc-table">
+              <colgroup>
+                <col style="width: 17%;">
+                <col style="width: 33%;">
+                <col style="width: 15%;">
+                <col style="width: 11%;">
+                <col style="width: 24%;">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>DEST</th>
+                  <th>SPECIFICATION</th>
+                  <th>Cl/CPT</th>
+                  <th>+/-</th>
+                  <th>WEIGHT</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><input type="text" class="ls-input text-center" id="lmc_dest_1"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_spec_1"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_cpt_1"></td>
+                  <td class="text-center"><button type="button" class="lmc-sign-btn" id="lmc_btn_1" onclick="toggleLmcSign(1)">+</button><input type="hidden" id="lmc_sign_1" value="1"></td>
+                  <td><input type="number" class="ls-input text-right font-bold" id="lmc_wt_1" oninput="calculate()"></td>
+                </tr>
+                <tr>
+                  <td><input type="text" class="ls-input text-center" id="lmc_dest_2"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_spec_2"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_cpt_2"></td>
+                  <td class="text-center"><button type="button" class="lmc-sign-btn" id="lmc_btn_2" onclick="toggleLmcSign(2)">+</button><input type="hidden" id="lmc_sign_2" value="1"></td>
+                  <td><input type="number" class="ls-input text-right font-bold" id="lmc_wt_2" oninput="calculate()"></td>
+                </tr>
+                <tr>
+                  <td><input type="text" class="ls-input text-center" id="lmc_dest_3"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_spec_3"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_cpt_3"></td>
+                  <td class="text-center"><button type="button" class="lmc-sign-btn" id="lmc_btn_3" onclick="toggleLmcSign(3)">+</button><input type="hidden" id="lmc_sign_3" value="1"></td>
+                  <td><input type="number" class="ls-input text-right font-bold" id="lmc_wt_3" oninput="calculate()"></td>
+                </tr>
+                <tr>
+                  <td><input type="text" class="ls-input text-center" id="lmc_dest_4"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_spec_4"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_cpt_4"></td>
+                  <td class="text-center"><button type="button" class="lmc-sign-btn" id="lmc_btn_4" onclick="toggleLmcSign(4)">+</button><input type="hidden" id="lmc_sign_4" value="1"></td>
+                  <td><input type="number" class="ls-input text-right font-bold" id="lmc_wt_4" oninput="calculate()"></td>
+                </tr>
+                <tr>
+                  <td><input type="text" class="ls-input text-center" id="lmc_dest_5"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_spec_5"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_cpt_5"></td>
+                  <td class="text-center"><button type="button" class="lmc-sign-btn" id="lmc_btn_5" onclick="toggleLmcSign(5)">+</button><input type="hidden" id="lmc_sign_5" value="1"></td>
+                  <td><input type="number" class="ls-input text-right font-bold" id="lmc_wt_5" oninput="calculate()"></td>
+                </tr>
+                <tr>
+                  <td><input type="text" class="ls-input text-center" id="lmc_dest_6"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_spec_6"></td>
+                  <td><input type="text" class="ls-input text-center" id="lmc_cpt_6"></td>
+                  <td class="text-center"><button type="button" class="lmc-sign-btn" id="lmc_btn_6" onclick="toggleLmcSign(6)">+</button><input type="hidden" id="lmc_sign_6" value="1"></td>
+                  <td><input type="number" class="ls-input text-right font-bold" id="lmc_wt_6" oninput="calculate()"></td>
+                </tr>
+                <!-- Дополнительные строки сетки LMC (3 строки по 4.45 мм) -->
+                <tr>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+                <!-- LMC TOTAL +/- (2 строки по 4.45 мм = 8.9 мм) -->
+                <tr style="background:#fff; height: 8.9mm;">
+                  <td colspan="4" class="cell-label-sm font-bold" style="padding-left:3px; text-align:center;">LMC TOTAL &nbsp; +/&minus;</td>
+                  <td class="calc-val font-bold" id="disp_lmc_total" style="font-size:9.5px;"></td>
+                </tr>
+                <!-- Замыкающие пустые строки LMC (2 строки по 4.45 мм) -->
+                <tr>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Вертикальная полоса со стрелками CHECK LMC TOTAL WITH UNDERLOAD (1-в-1 по оригиналу) -->
+          <div class="check-lmc-strip">
+            <div style="height: 26.7mm; width: 100%; background: #e2e8f0; border-bottom: 1px solid #000; box-sizing: border-box;"></div>
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 2px 0; width: 100%; box-sizing: border-box;">
+              <span class="check-lmc-arrow">&uarr;</span>
+              <span class="check-lmc-text">CHECK LMC TOTAL WITH UNDERLOAD</span>
+              <span class="check-lmc-arrow">&darr;</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Правая колонка: Notes, Balance & Seating, Total Passengers, Сертификация, Подписи (~24.7%) -->
+        <div class="lower-col-right">
+          <!-- Notes (точно как в бланке NWS) -->
+          <div class="notes-box">
+            <div class="notes-header-text">Notes</div>
+            Adult (winter): <span id="lbl_wt_winter">80</span> kg &nbsp;|&nbsp; Adult (summer): <span id="lbl_wt_summer">75</span> kg<br>
+            Child: <span id="lbl_wt_child">30</span> kg &nbsp;|&nbsp; Infant: <span id="lbl_wt_infant">15</span> kg<br>
+            <span style="font-size: 6px; color: #111; line-height: 1.15; display: inline-block; margin-top: 1px;">
+              CREW BAGGAGE WEIGHT IS INCLUDED IN DOW, based on 20 kg per crew member.<br>
+              IF UNLOADED, CHANGES MUST BE REFLECTED IN LAST MINUTE CHANGES.
+            </span>
+          </div>
+
+          <!-- BALANCE & SEATING COND. (два чистых открытых прямоугольных поля без сетки) -->
+          <div class="balance-header-row">
+            <div class="balance-header-cell border-r-thick">BALANCE</div>
+            <div class="balance-header-cell">SEATING COND.</div>
+          </div>
+          <div class="balance-open-row">
+            <div class="balance-open-col border-r-thick">
+              <div class="balance-item-row">
+                <span class="balance-item-lbl">ZFW -</span>
+                <input type="text" class="balance-item-input" id="inp_balance_zfw">
+              </div>
+              <div class="balance-item-row">
+                <span class="balance-item-lbl">TOW -</span>
+                <input type="text" class="balance-item-input" id="inp_balance_tow">
+              </div>
+              <textarea class="balance-freeform" id="inp_balance_freeform" placeholder="" style="flex: 1;"></textarea>
+            </div>
+            <div class="balance-open-col">
+              <textarea class="balance-freeform" id="inp_seating_freeform" placeholder=""></textarea>
+            </div>
+          </div>
+
+          <!-- TOTAL PASSENGERS (с учетом младенцев/INF) -->
+          <div class="total-pax-box">
+            <div class="total-pax-label">TOTAL PASSENGERS</div>
+            <div class="total-pax-val" id="disp_total_passengers_count"></div>
+          </div>
+
+          <!-- Сертификационный текст -->
+          <div class="cert-text-box">
+            I certify that this aircraft is loaded in accordance with the current loading instructions.
+          </div>
+
+          <!-- Подписи ответственных лиц (Prepared by / Approved by) -->
+          <div class="signatures-block">
+            <div class="sig-col">
+              <span class="sig-title">PREPARED BY:</span>
+              <input type="text" class="sig-input" id="sign_prepared_by">
+            </div>
+            <div class="sig-col">
+              <span class="sig-title">APPROVED BY:</span>
+              <input type="text" class="sig-input" id="sign_approved_by">
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Модальное окно настроек весов пассажиров -->
+  <div class="modal-backdrop" id="settingsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Нормативы веса пассажиров (кг)</h3>
+        <button type="button" class="modal-close" onclick="closeSettingsModal()">&times;</button>
+      </div>
+      <div class="setting-row">
+        <label for="cfg_adult_summer">Взрослый (лето):</label>
+        <input type="number" id="cfg_adult_summer" value="75" onchange="updatePassengerWeightConfig()">
+      </div>
+      <div class="setting-row">
+        <label for="cfg_adult_winter">Взрослый (зима):</label>
+        <input type="number" id="cfg_adult_winter" value="80" onchange="updatePassengerWeightConfig()">
+      </div>
+      <div class="setting-row">
+        <label for="cfg_child">Ребенок (2-12 лет):</label>
+        <input type="number" id="cfg_child" value="30" onchange="updatePassengerWeightConfig()">
+      </div>
+      <div class="setting-row">
+        <label for="cfg_infant">Младенец (&lt; 2 лет):</label>
+        <input type="number" id="cfg_infant" value="15" onchange="updatePassengerWeightConfig()">
+      </div>
+      <div style="margin-top: 15px; text-align: right;">
+        <button type="button" class="btn btn-primary" onclick="closeSettingsModal()">Сохранить и закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Конфигурация стандартных весов пассажиров
+    const paxWeights = {
+      season: 'summer',
+      adult_summer: 75,
+      adult_winter: 80,
+      child: 30,
+      infant: 15
+    };
+
+    // Число блоков направлений
+    const NUM_DEST_BLOCKS = 4;
+    const CARGO_TYPES = ['TR', 'B', 'C', 'M', 'ULD', 'T'];
+
+    // Инициализация таблицы коммерческой загрузки
+    function initTrafficTable() {
+      const tbody = document.getElementById('traffic_tbody');
+      tbody.innerHTML = '';
+
+      for (let d = 1; d <= NUM_DEST_BLOCKS; d++) {
+        CARGO_TYPES.forEach((type, idx) => {
+          const tr = document.createElement('tr');
+          const isTotalRow = (type === 'T');
+          const isLastSubRow = (idx === CARGO_TYPES.length - 1);
+          const borderBottomClass = isLastSubRow ? ' border-b-thick' : '';
+
+          // 1. Первая колонка DEST (объединяет 6 подстрок)
+          if (idx === 0) {
+            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="text" class="ls-input text-center font-bold" id="dest_code_${d}"></td>`;
+            // PAX M, F, CH, INF
+            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-center" id="pax_m_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-center" id="pax_f_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-center" id="pax_ch_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-center" id="pax_inf_${d}" oninput="calculate()"></td>`;
+            // CABIN BAG
+            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-right" id="cabin_bag_${d}" oninput="calculate()"></td>`;
+          }
+
+          // 2. Метка подтипа груза: TR, B, C, M, ULD, T
+          const labelClass = isTotalRow ? 'sub-type-label sub-type-t' : 'sub-type-label';
+          tr.innerHTML += `<td class="${labelClass}${borderBottomClass}">${type}</td>`;
+
+          // 3. Значение TOTAL для строки данного типа или сумма T
+          if (isTotalRow) {
+            tr.innerHTML += `<td class="calc-val font-bold sub-type-t${borderBottomClass}" id="cargo_tot_${d}"></td>`;
+          } else {
+            tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-right" id="cargo_${type.toLowerCase()}_${d}" oninput="onCargoRowInput(${d}, '${type.toLowerCase()}')"></td>`;
+          }
+
+          // 4. Отсеки CPT 1..5
+          for (let c = 1; c <= 5; c++) {
+            if (isTotalRow) {
+              tr.innerHTML += `<td class="calc-val font-bold sub-type-t${borderBottomClass}" id="cpt_tot_${c}_${d}"></td>`;
+            } else {
+              tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-right" id="cpt_${c}_${type.toLowerCase()}_${d}" oninput="onCptInput(${d}, '${type.toLowerCase()}')"></td>`;
+            }
+          }
+
+          // 5. Ремарки PAX C, Y / PAD C, Y
+          if (idx === 0) {
+            tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_pax_c_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_pax_y_${d}" oninput="calculate()"></td>`;
+            tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_pad_c_${d}" oninput="calculate()"></td>`;
+            tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_pad_y_${d}" oninput="calculate()"></td>`;
+          } else {
+            tr.innerHTML += `<td class="${borderBottomClass}" style="background:#fff;"></td>`;
+            tr.innerHTML += `<td class="${borderBottomClass}" style="background:#fff;"></td>`;
+            tr.innerHTML += `<td class="${borderBottomClass}" style="background:#fff;"></td>`;
+            tr.innerHTML += `<td class="${borderBottomClass}" style="background:#fff;"></td>`;
+          }
+
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    // Автоматический расчет количества пассажиров экономического класса (Y = Adults + Child - Business C)
+    function onPaxInput(d) {
+      const m = numVal(`pax_m_${d}`);
+      const f = numVal(`pax_f_${d}`);
+      const ch = numVal(`pax_ch_${d}`);
+      const c = numVal(`rem_pax_c_${d}`);
+      const seated = m + f + ch;
+      const yInput = document.getElementById(`rem_pax_y_${d}`);
+      if (yInput) {
+        if (seated > 0 || c > 0) {
+          yInput.value = Math.max(0, seated - c);
+        } else {
+          yInput.value = '';
+        }
+      }
+      calculate();
+    }
+
+    // Переключение знака LMC (+ / -)
+    function toggleLmcSign(i) {
+      const hidden = document.getElementById(`lmc_sign_${i}`);
+      const btn = document.getElementById(`lmc_btn_${i}`);
+      if (!hidden || !btn) return;
+      const current = parseInt(hidden.value) || 1;
+      const next = (current === 1) ? -1 : 1;
+      hidden.value = next;
+      btn.textContent = (next === 1) ? '+' : '−';
+      calculate();
+    }
+
+    // Автоматическое суммирование CPT в строку TOTAL типа
+    function onCptInput(d, type) {
+      let cptSum = 0;
+      let anyCptEntered = false;
+      for (let c = 1; c <= 5; c++) {
+        const val = numVal(`cpt_${c}_${type}_${d}`);
+        if (val > 0) anyCptEntered = true;
+        cptSum += val;
+      }
+      if (anyCptEntered) {
+        document.getElementById(`cargo_${type}_${d}`).value = cptSum || '';
+      }
+      calculate();
+    }
+
+    function onCargoRowInput(d, type) {
+      calculate();
+    }
+
+    // Установка сезона
+    function setSeason(season) {
+      paxWeights.season = season;
+      saveConfigToStorage();
+      const btnSummer = document.getElementById('btnSeasonSummer');
+      const btnWinter = document.getElementById('btnSeasonWinter');
+      if (btnSummer) btnSummer.classList.toggle('active', season === 'summer');
+      if (btnWinter) btnWinter.classList.toggle('active', season === 'winter');
+      calculate();
+    }
+
+    function saveConfigToStorage() {
+      try {
+        localStorage.setItem('wb_loadsheet_season', paxWeights.season);
+        localStorage.setItem('wb_loadsheet_pax_weights', JSON.stringify({
+          adult_summer: paxWeights.adult_summer,
+          adult_winter: paxWeights.adult_winter,
+          child: paxWeights.child,
+          infant: paxWeights.infant
+        }));
+      } catch (e) {
+        console.warn('Ошибка сохранения в localStorage', e);
+      }
+    }
+
+    function loadConfigFromStorage() {
+      try {
+        const savedSeason = localStorage.getItem('wb_loadsheet_season');
+        const savedWeights = localStorage.getItem('wb_loadsheet_pax_weights');
+        if (savedWeights) {
+          const parsed = JSON.parse(savedWeights);
+          if (parsed.adult_summer) paxWeights.adult_summer = Number(parsed.adult_summer);
+          if (parsed.adult_winter) paxWeights.adult_winter = Number(parsed.adult_winter);
+          if (parsed.child) paxWeights.child = Number(parsed.child);
+          if (parsed.infant) paxWeights.infant = Number(parsed.infant);
+        }
+        if (savedSeason && (savedSeason === 'summer' || savedSeason === 'winter')) {
+          paxWeights.season = savedSeason;
+        }
+
+        const btnSummer = document.getElementById('btnSeasonSummer');
+        const btnWinter = document.getElementById('btnSeasonWinter');
+        if (btnSummer) {
+          btnSummer.classList.toggle('active', paxWeights.season === 'summer');
+          btnSummer.textContent = `Лето (Взр ${paxWeights.adult_summer} кг)`;
+        }
+        if (btnWinter) {
+          btnWinter.classList.toggle('active', paxWeights.season === 'winter');
+          btnWinter.textContent = `Зима (Взр ${paxWeights.adult_winter} кг)`;
+        }
+
+        const lblSummer = document.getElementById('lbl_wt_summer');
+        const lblWinter = document.getElementById('lbl_wt_winter');
+        const lblChild = document.getElementById('lbl_wt_child');
+        const lblInfant = document.getElementById('lbl_wt_infant');
+        if (lblSummer) lblSummer.textContent = paxWeights.adult_summer;
+        if (lblWinter) lblWinter.textContent = paxWeights.adult_winter;
+        if (lblChild) lblChild.textContent = paxWeights.child;
+        if (lblInfant) lblInfant.textContent = paxWeights.infant;
+      } catch (e) {
+        console.warn('Ошибка чтения из localStorage', e);
+      }
+    }
+
+    // Открытие/закрытие настроек весов
+    function openSettingsModal() {
+      document.getElementById('cfg_adult_summer').value = paxWeights.adult_summer;
+      document.getElementById('cfg_adult_winter').value = paxWeights.adult_winter;
+      document.getElementById('cfg_child').value = paxWeights.child;
+      document.getElementById('cfg_infant').value = paxWeights.infant;
+      document.getElementById('settingsModal').classList.add('active');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.remove('active');
+    }
+
+    function updatePassengerWeightConfig() {
+      paxWeights.adult_summer = parseFloat(document.getElementById('cfg_adult_summer').value) || 75;
+      paxWeights.adult_winter = parseFloat(document.getElementById('cfg_adult_winter').value) || 80;
+      paxWeights.child = parseFloat(document.getElementById('cfg_child').value) || 30;
+      paxWeights.infant = parseFloat(document.getElementById('cfg_infant').value) || 15;
+
+      const btnSummer = document.getElementById('btnSeasonSummer');
+      const btnWinter = document.getElementById('btnSeasonWinter');
+      if (btnSummer) btnSummer.textContent = `Лето (Взр ${paxWeights.adult_summer} кг)`;
+      if (btnWinter) btnWinter.textContent = `Зима (Взр ${paxWeights.adult_winter} кг)`;
+
+      document.getElementById('lbl_wt_summer').textContent = paxWeights.adult_summer;
+      document.getElementById('lbl_wt_winter').textContent = paxWeights.adult_winter;
+      document.getElementById('lbl_wt_child').textContent = paxWeights.child;
+      document.getElementById('lbl_wt_infant').textContent = paxWeights.infant;
+
+      saveConfigToStorage();
+      calculate();
+    }
+
+    function onDowDirectInput() {
+      calculate(false);
+    }
+
+    function numVal(id) {
+      const el = document.getElementById(id);
+      if (!el) return 0;
+      const val = parseFloat(el.value);
+      return isNaN(val) ? 0 : val;
+    }
+
+    function setTxt(id, val, formatNum = true, showZero = false) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (!showZero && (val === 0 || val === '0' || val === '' || val === null || isNaN(val))) {
+        el.textContent = '';
+        return;
+      }
+      if (formatNum && typeof val === 'number') {
+        el.textContent = Math.round(val);
+      } else {
+        el.textContent = val;
+      }
+    }
+
+    function setDigitCells(prefix, num) {
+      for (let i = 1; i <= 6; i++) {
+        const el = document.getElementById(`${prefix}${i}`);
+        if (el) el.textContent = '';
+      }
+      if (!num || isNaN(num) || num <= 0) return;
+      const str = Math.round(num).toString();
+      const padded = str.padStart(6, ' ');
+      for (let i = 1; i <= 6; i++) {
+        const el = document.getElementById(`${prefix}${i}`);
+        if (el && padded[i - 1] !== ' ') {
+          el.textContent = padded[i - 1];
+        }
+      }
+    }
+
+    function setSubLmc(inpId, resId, diffStr, adjVal) {
+      const inp = document.getElementById(inpId);
+      const res = document.getElementById(resId);
+      if (inp && !inp.dataset.manual) {
+        inp.value = diffStr;
+      }
+      if (res) {
+        res.textContent = adjVal ? Math.round(adjVal) : '';
+      }
+    }
+
+    function clearSubLmc(inpId, resId) {
+      const inp = document.getElementById(inpId);
+      const res = document.getElementById(resId);
+      if (inp && !inp.dataset.manual) {
+        inp.value = '';
+      }
+      if (res) {
+        res.textContent = '';
+      }
+    }
+
+    // ОСНОВНОЙ РАСЧЕТ ВЕСОВЫХ ХАРАКТЕРИСТИК САМОЛЕТА
+    function calculate(calcDowFromBasic = true) {
+      // 1. DOW расчет
+      const basicWeight = numVal('inp_basic_weight');
+      const crewWeight = numVal('inp_crew_weight');
+      const pantryWeight = numVal('inp_pantry_weight');
+
+      let dow = numVal('inp_dow');
+      if (calcDowFromBasic && (basicWeight > 0 || crewWeight > 0 || pantryWeight > 0)) {
+        dow = basicWeight + crewWeight + pantryWeight;
+        document.getElementById('inp_dow').value = dow ? Math.round(dow) : '';
+      }
+
+      // 2. Топливо
+      const takeoffFuel = numVal('inp_takeoff_fuel');
+      const tripFuel = numVal('inp_trip_fuel');
+
+      // Operating Weight = DOW + Take-Off Fuel
+      const operatingWeight = (dow > 0 || takeoffFuel > 0) ? (dow + takeoffFuel) : 0;
+      setTxt('disp_operating_weight', operatingWeight, true, false);
+      setTxt('disp_lim1_fuel', takeoffFuel, true, false);
+
+      // 3. Лимиты взлетной массы (1, 2, 3)
+      const maxZfw = numVal('inp_max_zfw');
+      const maxTow = numVal('inp_max_tow');
+      const maxLaw = numVal('inp_max_law');
+
+      // Лимит 1 = MAX ZFW + TAKE-OFF FUEL
+      const limit1 = maxZfw > 0 ? (maxZfw + takeoffFuel) : 0;
+      // Лимит 2 = MAX TOW
+      const limit2 = maxTow > 0 ? maxTow : 0;
+      // Лимит 3 = MAX LANDING + TRIP FUEL
+      const limit3 = maxLaw > 0 ? (maxLaw + tripFuel) : 0;
+
+      setTxt('disp_lim_1', limit1, true, false);
+      setTxt('disp_lim_3', limit3, true, false);
+
+      // Минимальное из доступных лимитов (Allowed TOW)
+      const validLimits = [limit1, limit2, limit3].filter(v => v > 0);
+      const allowedTow = validLimits.length > 0 ? Math.min(...validLimits) : 0;
+
+      // Определяем номер лимита (1, 2 или 3), который является наименьшим
+      let lowestLimIdx = 0;
+      if (allowedTow > 0) {
+        if (allowedTow === limit1) lowestLimIdx = 1;
+        else if (allowedTow === limit2) lowestLimIdx = 2;
+        else if (allowedTow === limit3) lowestLimIdx = 3;
+      }
+
+      // Предельная коммерческая загрузка (Allowed Traffic Load)
+      const allowedTrafficLoad = (allowedTow > 0 && operatingWeight > 0) ? (allowedTow - operatingWeight) : 0;
+
+      // Очищаем ячейки колонок 1, 2, 3 для WET OPERATING WEIGHT и ALLOWED TRAFFIC LOAD
+      setTxt('disp_wow_1', '');
+      setTxt('disp_wow_2', '');
+      setTxt('disp_wow_3', '');
+      setTxt('disp_atl_1', '');
+      setTxt('disp_atl_2', '');
+      setTxt('disp_atl_3', '');
+
+      // Отображаем значение в колонке наименьшего лимита (1, 2 или 3) с сохранением вертикальных разделителей
+      if (lowestLimIdx === 1) {
+        setTxt('disp_wow_1', operatingWeight, true, false);
+        setTxt('disp_atl_1', allowedTrafficLoad, true, false);
+      } else if (lowestLimIdx === 2) {
+        setTxt('disp_wow_2', operatingWeight, true, false);
+        setTxt('disp_atl_2', allowedTrafficLoad, true, false);
+      } else if (lowestLimIdx === 3) {
+        setTxt('disp_wow_3', operatingWeight, true, false);
+        setTxt('disp_atl_3', allowedTrafficLoad, true, false);
+      }
+
+      // 4. Сбор коммерческой загрузки
+      let sumPaxM = 0;
+      let sumPaxF = 0;
+      let sumPaxCh = 0;
+      let sumPaxInf = 0;
+      let sumCabinBag = 0;
+      let sumDeadload = 0;
+
+      let sumCpt = [0, 0, 0, 0, 0];
+      let sumRem = { pax_c: 0, pax_y: 0, pad_c: 0, pad_y: 0 };
+
+      for (let d = 1; d <= NUM_DEST_BLOCKS; d++) {
+        const m = numVal(`pax_m_${d}`);
+        const f = numVal(`pax_f_${d}`);
+        const ch = numVal(`pax_ch_${d}`);
+        const inf = numVal(`pax_inf_${d}`);
+        const cb = numVal(`cabin_bag_${d}`);
+
+        sumPaxM += m;
+        sumPaxF += f;
+        sumPaxCh += ch;
+        sumPaxInf += inf;
+        sumCabinBag += cb;
+
+        // Грузы TR, B, C, M, ULD
+        const tr = numVal(`cargo_tr_${d}`);
+        const b = numVal(`cargo_b_${d}`);
+        const c = numVal(`cargo_c_${d}`);
+        const mail = numVal(`cargo_m_${d}`);
+        const uld = numVal(`cargo_uld_${d}`);
+        const destDeadload = tr + b + c + mail + uld;
+        setTxt(`cargo_tot_${d}`, destDeadload, true, false);
+        sumDeadload += destDeadload;
+
+        // Итоги CPT 1..5
+        for (let cIdx = 1; cIdx <= 5; cIdx++) {
+          let cptDestSum = 0;
+          ['tr', 'b', 'c', 'm', 'uld'].forEach(t => {
+            cptDestSum += numVal(`cpt_${cIdx}_${t}_${d}`);
+          });
+          setTxt(`cpt_tot_${cIdx}_${d}`, cptDestSum, true, false);
+          sumCpt[cIdx - 1] += cptDestSum;
+        }
+
+        // Ремарки
+        sumRem.pax_c += numVal(`rem_pax_c_${d}`);
+        sumRem.pax_y += numVal(`rem_pax_y_${d}`);
+        sumRem.pad_c += numVal(`rem_pad_c_${d}`);
+        sumRem.pad_y += numVal(`rem_pad_y_${d}`);
+      }
+
+      // Заполнение итоговой строки таблицы загрузки
+      setTxt('tot_pax_m', sumPaxM, true, false);
+      setTxt('tot_pax_f', sumPaxF, true, false);
+      setTxt('tot_pax_ch', sumPaxCh, true, false);
+      setTxt('tot_pax_inf', sumPaxInf, true, false);
+      setTxt('tot_cabin_bag', sumCabinBag, true, false);
+      setTxt('tot_cargo_deadload', sumDeadload, true, false);
+
+      for (let cIdx = 1; cIdx <= 5; cIdx++) {
+        setTxt(`tot_cpt_${cIdx}`, sumCpt[cIdx - 1], true, false);
+      }
+      setTxt('tot_rem_pax_c', sumRem.pax_c, true, false);
+      setTxt('tot_rem_pax_y', sumRem.pax_y, true, false);
+      setTxt('tot_rem_pad_c', sumRem.pad_c, true, false);
+      setTxt('tot_rem_pad_y', sumRem.pad_y, true, false);
+
+      // Масса пассажиров
+      const adultStandardWeight = (paxWeights.season === 'winter') ? paxWeights.adult_winter : paxWeights.adult_summer;
+      const totalAdults = sumPaxM + sumPaxF;
+      const totalPaxWeight = (totalAdults * adultStandardWeight) + (sumPaxCh * paxWeights.child) + (sumPaxInf * paxWeights.infant);
+
+      // Общая фактическая коммерческая загрузка
+      const totalTrafficLoad = totalPaxWeight + sumCabinBag + sumDeadload;
+
+      // Остаток предельной загрузки (UNDERLOAD BEFORE LMC)
+      const underloadBeforeLmc = (allowedTrafficLoad > 0 || totalTrafficLoad > 0) ? (allowedTrafficLoad - totalTrafficLoad) : 0;
+
+      // 6. Фактические веса самолета
+      const hasTrafficOrDow = (dow > 0 || totalTrafficLoad > 0);
+      const actualZfw = hasTrafficOrDow ? (dow + totalTrafficLoad) : 0;
+      const actualTow = (actualZfw > 0 || takeoffFuel > 0) ? (actualZfw + takeoffFuel) : 0;
+      const actualLaw = (actualTow > 0 || tripFuel > 0) ? (actualTow - tripFuel) : 0;
+
+      // Заполнение 5-ячеичных блоков для цифр в нижней части
+      setDigitCells('pax_wt_d', totalPaxWeight);
+      setDigitCells('cabin_bag_d', sumCabinBag);
+      setDigitCells('tot_tl_d', totalTrafficLoad);
+      setDigitCells('dow_d', dow);
+      setDigitCells('act_zfw_d', actualZfw);
+      setDigitCells('max_zfw_d', maxZfw);
+      setDigitCells('to_fuel_d', takeoffFuel);
+      setDigitCells('act_tow_d', actualTow);
+      setDigitCells('max_tow_d', maxTow);
+      setDigitCells('trip_fuel_d', tripFuel);
+      setDigitCells('act_law_d', actualLaw);
+      setDigitCells('max_law_d', maxLaw);
+
+      // Блок Underload (Allowed TL - Total TL = Underload)
+      setDigitCells('all_tl_d', allowedTrafficLoad);
+      setDigitCells('sub_tl_d', totalTrafficLoad);
+      setDigitCells('und_d', underloadBeforeLmc);
+
+      // 7. Last Minute Changes (LMC - ровно 6 строк как в бланке)
+      let lmcTotal = 0;
+      let hasLmc = false;
+      for (let i = 1; i <= 6; i++) {
+        const signEl = document.getElementById(`lmc_sign_${i}`);
+        const sign = signEl ? (parseInt(signEl.value) || 1) : 1;
+        const wt = numVal(`lmc_wt_${i}`);
+        if (wt > 0) {
+          hasLmc = true;
+          lmcTotal += (sign * wt);
+        }
+      }
+
+      if (hasLmc) {
+        const lmcStr = (lmcTotal > 0 ? '+' : '') + lmcTotal;
+        setTxt('disp_lmc_total', lmcStr, false);
+      } else {
+        setTxt('disp_lmc_total', '', false);
+      }
+
+      // Скорректированные веса с учетом LMC
+      const adjZfw = actualZfw > 0 ? (actualZfw + lmcTotal) : 0;
+      const adjTow = actualTow > 0 ? (actualTow + lmcTotal) : 0;
+      const adjLaw = actualLaw > 0 ? (actualLaw + lmcTotal) : 0;
+
+      // Отображаем корректировку в строках ZFW, TOW, LAW
+      if (hasLmc) {
+        const signPrefix = lmcTotal > 0 ? '+' : '';
+        const lmcDiffStr = signPrefix + lmcTotal;
+
+        setSubLmc('lmc_zfw_inp1', 'lmc_zfw_res1', lmcDiffStr, adjZfw);
+        setSubLmc('lmc_tow_inp1', 'lmc_tow_res1', lmcDiffStr, adjTow);
+        setSubLmc('lmc_law_inp1', 'lmc_law_res1', lmcDiffStr, adjLaw);
+      } else {
+        clearSubLmc('lmc_zfw_inp1', 'lmc_zfw_res1');
+        clearSubLmc('lmc_tow_inp1', 'lmc_tow_res1');
+        clearSubLmc('lmc_law_inp1', 'lmc_law_res1');
+      }
+
+      // 8. Количество пассажиров: СТРОГО С УЧЕТОМ МЛАДЕНЦЕВ (С INF)
+      const totalAllPassengers = totalAdults + sumPaxCh + sumPaxInf;
+      setTxt('disp_total_passengers_count', totalAllPassengers, true, false);
+
+      // 9. Проверка лимитов и подсветка
+      validateLimits({
+        allowedTrafficLoad,
+        underloadBeforeLmc,
+        actualZfw,
+        maxZfw,
+        adjZfw,
+        actualTow,
+        allowedTow,
+        adjTow,
+        actualLaw,
+        maxLaw,
+        adjLaw
+      });
+    }
+
+    // Валидация весовых ограничений
+    function validateLimits(data) {
+      const badge = document.getElementById('statusBadge');
+      let errors = [];
+
+      // Проверка перегрузки по Underload
+      if (data.allowedTrafficLoad > 0 && data.underloadBeforeLmc < 0) {
+        errors.push(`Превышение предельной коммерческой загрузки на ${Math.abs(Math.round(data.underloadBeforeLmc))} кг`);
+      }
+
+      // Проверка Max ZFW
+      if (data.maxZfw > 0 && data.adjZfw > data.maxZfw) {
+        errors.push(`Превышен MAX ZFW (${data.adjZfw} > ${data.maxZfw})`);
+      }
+
+      // Проверка Max TOW
+      if (data.allowedTow > 0 && data.adjTow > data.allowedTow) {
+        errors.push(`Превышен ALLOWED TOW (${data.adjTow} > ${data.allowedTow})`);
+      }
+
+      // Проверка Max LAW
+      if (data.maxLaw > 0 && data.adjLaw > data.maxLaw) {
+        errors.push(`Превышен MAX LAW (${data.adjLaw} > ${data.maxLaw})`);
+      }
+
+      if (errors.length > 0) {
+        badge.className = 'status-badge danger';
+        badge.textContent = `⚠ ${errors[0]}`;
+        badge.title = errors.join('\n');
+      } else {
+        badge.className = 'status-badge';
+        badge.textContent = '✔ Все весовые лимиты в норме';
+        badge.title = '';
+      }
+    }
+
+    // Сброс всех полей бланка
+    function resetForm() {
+      if (!confirm('Вы действительно хотите очистить все поля бланка?')) {
+        return;
+      }
+      const inputs = document.querySelectorAll('input.ls-input, input.sig-input, input.lmc-sub-input, input.balance-item-input');
+      inputs.forEach(inp => {
+        inp.value = '';
+        delete inp.dataset.manual;
+      });
+      
+      const textareas = document.querySelectorAll('textarea');
+      textareas.forEach(t => t.value = '');
+
+      for (let i = 1; i <= 6; i++) {
+        const signEl = document.getElementById(`lmc_sign_${i}`);
+        if (signEl) signEl.value = '1';
+        const btn = document.getElementById(`lmc_btn_${i}`);
+        if (btn) btn.textContent = '+';
+      }
+
+      calculate();
+    }
+
+    function handleReturnBack() {
+      const returnUrl = sessionStorage.getItem('wb_loadsheet_return_url');
+      if (returnUrl) {
+        window.location.href = returnUrl;
+      } else if (window.history.length > 1) {
+        window.history.back();
+      }
+    }
+
+    function checkIncomingLoadsheetData() {
+      let data = {};
+
+      // 1. Чтение из localStorage (если передан большой JSON-объект)
+      try {
+        const stored = localStorage.getItem('wb_loadsheet_incoming');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object') {
+            data = { ...data, ...parsed };
+          }
+          localStorage.removeItem('wb_loadsheet_incoming');
+        }
+      } catch (err) {
+        console.warn('[Loadsheet] Ошибка чтения localStorage wb_loadsheet_incoming:', err);
+      }
+
+      // 2. Чтение из URLSearchParams (может дополнять или переопределять)
+      try {
+        const params = new URLSearchParams(window.location.search);
+        params.forEach((val, key) => {
+          if (val !== undefined && val !== null && val !== '') {
+            data[key] = val;
+          }
+        });
+      } catch (err) {
+        console.warn('[Loadsheet] Ошибка чтения query params:', err);
+      }
+
+      // 3. Обработка return_url для кнопки [ ↩ Назад ]
+      const returnUrl = data.return_url || sessionStorage.getItem('wb_loadsheet_return_url');
+      if (returnUrl) {
+        sessionStorage.setItem('wb_loadsheet_return_url', returnUrl);
+        const backBtn = document.getElementById('btnBackToOrigin');
+        if (backBtn) {
+          backBtn.style.display = 'inline-flex';
+        }
+      }
+
+      // Если нет входящих данных, выходим
+      if (Object.keys(data).length === 0) {
+        return;
+      }
+
+      // Helper для безопасной установки значений
+      const setInp = (id, val) => {
+        if (val === undefined || val === null || val === '') return;
+        const el = document.getElementById(id);
+        if (el) {
+          el.value = val;
+        }
+      };
+
+      // 4. Заполнение заголовка рейса
+      setInp('f_flight', data.flight || data.f_flight || data.flight_no || data.flight_number);
+      setInp('f_originator', data.originator || data.f_originator || 'DISPATCH');
+      setInp('f_acreg', data.acreg || data.ac_num || data.f_acreg || data.tail);
+      setInp('f_version', data.version || data.f_version || data.ac_config || data.layout);
+      setInp('f_captain', data.captain || data.f_captain);
+      setInp('f_crew', data.crew || data.f_crew);
+      setInp('f_from', data.from || data.f_from || data.dep);
+      setInp('f_to', data.to || data.f_to || data.arr);
+      
+      // Форматирование даты рейса (DD.MM.YYYY или DD.MM)
+      if (data.date || data.f_date || data.flight_date) {
+        let dStr = String(data.date || data.f_date || data.flight_date).trim();
+        if (dStr.includes('-')) {
+          const parts = dStr.split('-');
+          if (parts.length === 3) {
+            dStr = `${parts[2]}.${parts[1]}.${parts[0]}`;
+          }
+        }
+        setInp('f_date', dStr);
+      }
+      setInp('f_time', data.time || data.f_time || data.departure_time);
+
+      // 5. Заполнение топлива
+      setInp('inp_takeoff_fuel', data.to_fuel || data.takeoff_fuel || data.fuel_block || data.inp_takeoff_fuel);
+      setInp('inp_trip_fuel', data.trip_fuel || data.fuel_trip || data.inp_trip_fuel);
+
+      // 6. Заполнение весов (если переданы)
+      setInp('inp_dow', data.dow || data.inp_dow);
+      setInp('inp_max_zfw', data.max_zfw || data.inp_max_zfw);
+      setInp('inp_max_tow', data.max_tow || data.inp_max_tow || data.mtow);
+      setInp('inp_max_law', data.max_law || data.inp_max_law);
+
+      // 7. Коммерческая загрузка Destination 1
+      const toDest = data.to || data.f_to || data.arr || data.dest_1;
+      setInp('dest_code_1', toDest);
+
+      // Пассажиры: если переданы отдельно M, F, CH, INF
+      let hasPax = false;
+      if (data.pax_m !== undefined || data.pax_m_1 !== undefined) {
+        setInp('pax_m_1', data.pax_m !== undefined ? data.pax_m : data.pax_m_1);
+        hasPax = true;
+      }
+      if (data.pax_f !== undefined || data.pax_f_1 !== undefined) {
+        setInp('pax_f_1', data.pax_f !== undefined ? data.pax_f : data.pax_f_1);
+        hasPax = true;
+      }
+      if (data.pax_ch !== undefined || data.pax_ch_1 !== undefined) {
+        setInp('pax_ch_1', data.pax_ch !== undefined ? data.pax_ch : data.pax_ch_1);
+        hasPax = true;
+      }
+      if (data.pax_inf !== undefined || data.pax_inf_1 !== undefined) {
+        setInp('pax_inf_1', data.pax_inf !== undefined ? data.pax_inf : data.pax_inf_1);
+        hasPax = true;
+      }
+
+      // Если передано только общее число pax, а разбивки нет:
+      if (!hasPax && (data.pax || data.pax_total)) {
+        const totalPax = parseInt(data.pax || data.pax_total, 10);
+        if (!isNaN(totalPax) && totalPax > 0) {
+          const halfM = Math.ceil(totalPax / 2);
+          const halfF = totalPax - halfM;
+          setInp('pax_m_1', halfM);
+          setInp('pax_f_1', halfF);
+        }
+      }
+
+      setInp('cabin_bag_1', data.cabin_bag || data.cabin_bag_1 || data.cargo_cabin_bag_1);
+
+      // 8. Отсеки CPT 1..5
+      const cargoTypes = ['b', 'c', 'm', 'tr', 'uld'];
+      let touchedTypes = new Set();
+
+      for (let c = 1; c <= 5; c++) {
+        cargoTypes.forEach(type => {
+          const key = `cpt_${c}_${type}`;
+          const keyDest = `cpt_${c}_${type}_1`;
+          const val = data[key] !== undefined ? data[key] : data[keyDest];
+          if (val !== undefined && val !== null && val !== '') {
+            setInp(keyDest, val);
+            touchedTypes.add(type);
+          }
+        });
+      }
+
+      // Если переданы общие значения груза/почты без разбивки по отсекам:
+      if (data.cargo && !touchedTypes.has('c')) {
+        setInp('cpt_4_c_1', data.cargo);
+        touchedTypes.add('c');
+      }
+      if (data.mail && !touchedTypes.has('m')) {
+        setInp('cpt_4_m_1', data.mail);
+        touchedTypes.add('m');
+      }
+
+      // Пересчитываем строчные суммы в таблице коммерческой загрузки
+      touchedTypes.forEach(type => {
+        if (typeof onCptInput === 'function') {
+          onCptInput(1, type);
+        }
+      });
+      if (typeof onPaxInput === 'function') {
+        onPaxInput(1);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadConfigFromStorage();
+      initTrafficTable();
+      checkIncomingLoadsheetData();
+      calculate();
+    });
+  </script>
+</body>
+</html>

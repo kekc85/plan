@@ -669,6 +669,96 @@ def parse_pax_count(pax_str: str, load_list: list = None) -> str:
     return str(pax_str).strip()
 
 
+def parse_pax_details(pax_str: str, load_list: list = None) -> dict:
+    """
+    Детальный парсинг пассажиров:
+    pax_m (мужчины), pax_f (женщины), pax_ch (дети), pax_inf (младенцы), pax_total (всего).
+    """
+    res = {
+        "pax_m": "",
+        "pax_f": "",
+        "pax_ch": "",
+        "pax_inf": "",
+        "pax_total": ""
+    }
+    if load_list and isinstance(load_list, list) and len(load_list) > 0:
+        leg0 = load_list[0]
+        if isinstance(leg0, dict):
+            m = leg0.get("M") or leg0.get("Male") or leg0.get("Man")
+            w = leg0.get("W") or leg0.get("F") or leg0.get("Female") or leg0.get("Woman")
+            ch = leg0.get("CHD") or leg0.get("CH") or leg0.get("C")
+            inf = leg0.get("INF") or leg0.get("Inf") or leg0.get("I")
+            adt = leg0.get("ADT") or leg0.get("Adult") or leg0.get("A")
+
+            if m is not None or w is not None:
+                res["pax_m"] = str(int(m or 0)) if m is not None else ""
+                res["pax_f"] = str(int(w or 0)) if w is not None else ""
+            elif adt is not None:
+                adt_val = int(adt or 0)
+                m_val = (adt_val + 1) // 2
+                f_val = adt_val - m_val
+                res["pax_m"] = str(m_val) if m_val > 0 else ""
+                res["pax_f"] = str(f_val) if f_val > 0 else ""
+
+            if ch is not None:
+                res["pax_ch"] = str(int(ch or 0))
+            if inf is not None:
+                res["pax_inf"] = str(int(inf or 0))
+
+            tot_adt = int(res["pax_m"] or 0) + int(res["pax_f"] or 0)
+            tot_ch = int(res["pax_ch"] or 0)
+            if tot_adt + tot_ch > 0:
+                res["pax_total"] = str(tot_adt + tot_ch)
+                return res
+
+    if pax_str:
+        parts = [p.strip() for p in str(pax_str).split('/') if p.strip()]
+        if len(parts) >= 4:
+            res["pax_m"] = parts[0]
+            res["pax_f"] = parts[1]
+            res["pax_ch"] = parts[2]
+            res["pax_inf"] = parts[3]
+            try:
+                res["pax_total"] = str(int(parts[0]) + int(parts[1]) + int(parts[2]))
+            except ValueError:
+                pass
+        elif len(parts) == 3:
+            try:
+                adt_val = int(parts[0])
+                m_val = (adt_val + 1) // 2
+                f_val = adt_val - m_val
+                res["pax_m"] = str(m_val)
+                res["pax_f"] = str(f_val)
+                res["pax_ch"] = parts[1]
+                res["pax_inf"] = parts[2]
+                res["pax_total"] = str(adt_val + int(parts[1]))
+            except ValueError:
+                pass
+        elif len(parts) == 2:
+            try:
+                adt_val = int(parts[0])
+                m_val = (adt_val + 1) // 2
+                f_val = adt_val - m_val
+                res["pax_m"] = str(m_val)
+                res["pax_f"] = str(f_val)
+                res["pax_ch"] = parts[1]
+                res["pax_total"] = str(adt_val + int(parts[1]))
+            except ValueError:
+                pass
+        elif len(parts) == 1 and parts[0].isdigit():
+            try:
+                adt_val = int(parts[0])
+                m_val = (adt_val + 1) // 2
+                f_val = adt_val - m_val
+                res["pax_m"] = str(m_val)
+                res["pax_f"] = str(f_val)
+                res["pax_total"] = str(adt_val)
+            except ValueError:
+                pass
+
+    return res
+
+
 FLEET_TAIL_TO_TYPE = {
     # Airbus A330-200
     "73270": "332",
@@ -922,6 +1012,7 @@ def process_flights(
             ac_type = detect_plane_type(raw_type=raw_type, tail=tail_clean, layout=layout)
 
         pax_notes = parse_pax_count(pax_raw, load_list)
+        pax_details = parse_pax_details(pax_raw, load_list)
 
         # Парсинг телеграмм (FBL / FFM / UWS) для извлечения Груза (Cargo) и Почты (Mail)
         telex_data = telegrams.get(pf_id, {})
@@ -1061,7 +1152,12 @@ def process_flights(
             "tail": tail_clean,
             "ac_type": ac_type,
             "layout": layout,
+            "pax": pax_notes,
             "pax_notes": pax_notes,
+            "pax_m": pax_details.get("pax_m", ""),
+            "pax_f": pax_details.get("pax_f", ""),
+            "pax_ch": pax_details.get("pax_ch", ""),
+            "pax_inf": pax_details.get("pax_inf", ""),
             "crew": crew_str,
             "fuel": fuel_block,
             "fuel_block": fuel_block,

@@ -552,6 +552,27 @@ export default function Header({
               <span className="text-sm leading-none">🧳</span>
               <span className="tracking-tight font-sans">AeroBag</span>
             </button>
+
+            {/* Кнопка быстрого перехода в W&B Loadsheet (без выбора рейса) */}
+            <button
+              type="button"
+              onClick={() => {
+                const isTest = window.location.href.includes('plan_test') || 
+                               window.location.hostname === 'localhost' || 
+                               window.location.hostname === '127.0.0.1';
+                const targetLoadsheetUrl = isTest 
+                  ? 'https://boostandgo.ru/loadsheet_test/' 
+                  : 'https://boostandgo.ru/loadsheet/';
+                const params = new URLSearchParams();
+                params.set('return_url', window.location.href);
+                window.location.href = `${targetLoadsheetUrl}?${params.toString()}`;
+              }}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer border border-emerald-400/40 shrink-0"
+              title="Открыть центровочный график W&B Loadsheet (без привязки к рейсу)"
+            >
+              <span className="text-sm leading-none">📄</span>
+              <span className="tracking-tight font-sans">Loadsheet</span>
+            </button>
           </div>
 
           {/* Action Buttons Toolbar */}

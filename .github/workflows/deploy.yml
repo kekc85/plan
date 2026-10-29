@@ -51,16 +51,22 @@ jobs:
             VITE_BASE="/plan_test/"
             RAW_DIR="${{ secrets.BEGET_TEST_REMOTE_DIR }}"
             [ -z "$RAW_DIR" ] && RAW_DIR="boostandgo.ru/public_html/plan_test/"
+            LOADSHEET_RAW_DIR="boostandgo.ru/public_html/loadsheet_test/"
           else
             ENV_NAME="Production"
             VITE_BASE="/plan/"
             RAW_DIR="${{ secrets.BEGET_REMOTE_DIR }}"
             [ -z "$RAW_DIR" ] && RAW_DIR="boostandgo.ru/public_html/plan/"
+            LOADSHEET_RAW_DIR="boostandgo.ru/public_html/loadsheet/"
           fi
           
           # Clean FTP directory
           CLEAN_DIR=$(echo "$RAW_DIR" | tr -d '\r\n' | sed -e 's|^[[:space:]]*||' -e 's|[[:space:]]*$||')
           [[ "$CLEAN_DIR" != */ ]] && CLEAN_DIR="${CLEAN_DIR}/"
+
+          # Clean Loadsheet FTP directory
+          LOADSHEET_CLEAN_DIR=$(echo "$LOADSHEET_RAW_DIR" | tr -d '\r\n' | sed -e 's|^[[:space:]]*||' -e 's|[[:space:]]*$||')
+          [[ "$LOADSHEET_CLEAN_DIR" != */ ]] && LOADSHEET_CLEAN_DIR="${LOADSHEET_CLEAN_DIR}/"
           
           # Clean server address
           RAW_SERVER="${{ secrets.BEGET_FTP_SERVER }}"
@@ -70,11 +76,13 @@ jobs:
           echo "VITE_BASE=${VITE_BASE}" >> $GITHUB_ENV
           echo "CLEAN_SERVER=${CLEAN_SERVER}" >> $GITHUB_ENV
           echo "CLEAN_DIR=${CLEAN_DIR}" >> $GITHUB_ENV
+          echo "LOADSHEET_CLEAN_DIR=${LOADSHEET_CLEAN_DIR}" >> $GITHUB_ENV
           
           echo "Deploy Environment: ${ENV_NAME}"
           echo "Base URL: ${VITE_BASE}"
           echo "Target Server: ${CLEAN_SERVER}"
           echo "Target Directory: ${CLEAN_DIR}"
+          echo "Loadsheet Directory: ${LOADSHEET_CLEAN_DIR}"
 
       - name: Install Frontend Dependencies
         working-directory: web_app
@@ -103,3 +111,14 @@ jobs:
             **/db_config.php
             **/backups/**
             **/node_modules/**
+
+      - name: Sync Loadsheet to Beget
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.CLEAN_SERVER }}
+          username: ${{ secrets.BEGET_FTP_USERNAME }}
+          password: ${{ secrets.BEGET_FTP_PASSWORD }}
+          local-dir: ./loadsheet/
+          server-dir: ${{ env.LOADSHEET_CLEAN_DIR }}
+          protocol: ftp
+          log-level: verbose
