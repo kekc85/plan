@@ -12,11 +12,12 @@ import io
 import json
 import urllib.parse
 import time
+import tempfile
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 
-from fastapi import FastAPI, HTTPException, Depends, Body, Header, Request
+from fastapi import FastAPI, HTTPException, Depends, Body, Header, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -275,6 +276,11 @@ class CreateArchiveSnapshotRequest(BaseModel):
     reason: Optional[str] = "manual"
     flights: List[dict] = []
     shift_metadata: Optional[dict] = None
+
+
+class UpdateFleetWbRequest(BaseModel):
+    key: str
+    aircraft: Dict[str, Any]
 
 
 
@@ -936,6 +942,94 @@ def delete_archive(archive_id: int, admin: dict = Depends(require_admin)):
         user_id=admin["id"], username=admin["username"]
     )
     return {"success": True, "message": f"Архивный снимок #{archive_id} удален"}
+
+
+# --- 2.4. УПРАВЛЕНИЕ РЕЕСТРОМ ФЛОТА W&B (DOW / DOI) ---
+
+@app.get("/api/admin/fleet_wb")
+def get_fleet_wb_registry(user: dict = Depends(require_admin_or_moderator)):
+    """Получение полного реестра центровочных графиков флота W&B"""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    json_path = os.path.join(base_dir, "web_app", "src", "data", "fleet_wb.json")
+    if not os.path.exists(json_path):
+        json_path = os.path.join(base_dir, "web_app", "public", "data", "fleet_wb.json")
+    
+    if os.path.exists(json_path):
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {"success": True, "fleet": data}
+    return {"success": False, "fleet": {}}
+
+
+@app.post("/api/admin/fleet_wb/update")
+def update_fleet_wb_config(req: UpdateFleetWbRequest, user: dict = Depends(require_admin_or_moderator)):
+    """Обновление или добавление центровочной матрицы ВС"""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    json_paths = [
+        os.path.join(base_dir, "web_app", "src", "data", "fleet_wb.json"),
+        os.path.join(base_dir, "web_app", "public", "data", "fleet_wb.json"),
+        os.path.join(base_dir, "loadsheet", "fleet_wb.json")
+    ]
+    
+    primary_path = json_paths[0]
+    data = {}
+    if os.path.exists(primary_path):
+        with open(primary_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+    data[req.key] = req.aircraft
+    
+    for p in json_paths:
+        try:
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[ERROR] Не удалось записать fleet_wb в {p}: {e}")
+            
+    tail_no = req.aircraft.get("tail", req.key)
+    log_system_event(
+        "INFO", "fleet",
+        f"Пользователь '{user.get('username')}' обновил конфигурацию W&B ВС {req.key} (RA-{tail_no})",
+        user_id=user.get("id"), username=user.get("username")
+    )
+    return {"success": True, "key": req.key, "message": f"Конфигурация ВС {req.key} успешно сохранена"}
+
+
+@app.post("/api/admin/fleet_wb/upload")
+async def upload_wbr_pdf_file(
+    file: UploadFile = File(...),
+    user: dict = Depends(require_admin_or_moderator)
+):
+    """Парсинг и валидация загруженного официального PDF-графика WBR"""
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Поддерживаются только PDF-файлы центровочных графиков (WBR)")
+
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp_path = tmp.name
+        content = await file.read()
+        tmp.write(content)
+
+    try:
+        from scripts.parse_all_fleet_wb import parse_wbr_file
+        parsed = parse_wbr_file(tmp_path)
+        parsed["file"] = file.filename
+        
+        key = f"{parsed['tail']}_{parsed['operator']}"
+        if parsed.get("fly_kit_mode") in ["FAK_2AKE", "NO_FAK"]:
+            key = f"{key}_{parsed['fly_kit_mode']}"
+            
+        parsed["suggested_key"] = key
+        return {"success": True, "key": key, "parsed": parsed}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка разбора PDF-файла WBR: {str(e)}")
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except:
+                pass
 
 
 

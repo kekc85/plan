@@ -44,6 +44,10 @@ async function request(endpoint, options = {}) {
     ...(options.headers || {})
   };
 
+  if (options.body instanceof FormData) {
+    delete headers['Content-Type'];
+  }
+
   const response = await fetch(url, {
     cache: 'no-store',
     ...options,
@@ -352,3 +356,26 @@ export async function fetchFlightHistory(params = {}) {
   return request(`/flight/history${qStr ? `?${qStr}` : ''}`);
 }
 
+
+
+// --- УПРАВЛЕНИЕ РЕЕСТРОМ ФЛОТА W&B (DOW / DOI) ---
+
+export async function adminGetFleetWb() {
+  return request('/admin/fleet_wb');
+}
+
+export async function adminUpdateFleetWb(key, aircraft) {
+  return request('/admin/fleet_wb/update', {
+    method: 'POST',
+    body: JSON.stringify({ key, aircraft })
+  });
+}
+
+export async function adminUploadFleetWbr(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request('/admin/fleet_wb/upload', {
+    method: 'POST',
+    body: formData
+  });
+}

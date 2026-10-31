@@ -7,6 +7,7 @@ import {
   Bell, Archive, FileSpreadsheet, Calendar, CheckSquare, MessageSquare,
   ExternalLink, Plane, Layers, HelpCircle
 } from 'lucide-react';
+import FleetWbManager from './FleetWbManager';
 import { 
   adminListUsers, 
   adminCreateUser, 
@@ -612,6 +613,25 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
             {tgChatId && (
               <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" title="Настроен" />
             )}
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('fleet_wb');
+              setErrorMsg('');
+              setSuccessMsg('');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              activeTab === 'fleet_wb'
+                ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
+            }`}
+          >
+            <Plane className="w-3.5 h-3.5 text-sky-500" />
+            <span>Флот W&B</span>
+            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+              40
+            </span>
           </button>
         </div>
 
@@ -1637,6 +1657,13 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
           </div>
 
         </div>
+      )}
+
+      {/* ========================================================== */}
+      {/* ВКЛАДКА 5: ФЛОТ W&B (DOW / DOI) */}
+      {/* ========================================================== */}
+      {activeTab === 'fleet_wb' && (
+        <FleetWbManager />
       )}
 
         </div>

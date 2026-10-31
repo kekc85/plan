@@ -496,3 +496,4 @@
     5. Loadsheet (loadsheet/index.html): прием DOW и DOI, заполнение поля баланса, нормализация компоновки салона (Y215).
 
 - Релиз v1.0.198 (патч 2): Сквозной перенос DOW/DOI/кухни из AeroPlan в AeroBag и автономный расчет W&B прямо в Loadsheet.
+- Релиз v1.0.198 (патч 3): Визуальная панель «Флот W&B» в AdminModal (FleetWbManager.jsx). Сплит-просмотр 40 ВС, фильтры N4/EO/лизинг, интерактивный симулятор DOW/DOI с подсветкой матриц, редактирование предельных весов MZFW/MTOW/MLAW, валидатор и парсер загрузки WBR PDF в api_server.py (/api/admin/fleet_wb). Деплой dev (plan_test).
