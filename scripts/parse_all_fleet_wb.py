@@ -1,0 +1,320 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Парсер официальных отчётов Weight & Balance Report (WBR / DOW-DOI)
+для флота Nordwind Airlines (N4) и Ikar Airlines (EO).
+
+Считывает все PDF-файлы из папки DOW-DOI, извлекает параметры ВС:
+Бортовой номер (tail), оператор (N4 / EO), модель ВС, ревизия, дата, базовая масса и матрица [экипаж][кухня] -> {dow, doi}.
+Результаты сохраняются в web_app/public/data/fleet_wb.json и локальную SQLite базу plan.db.
+"""
+
+import os
+import glob
+import re
+import json
+import sqlite3
+import pdfplumber
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
+DOW_DOI_DIR = r"E:\ANTIGRAVITY\AVERAGO BAGGEGE WEIGH\DOW-DOI"
+OUTPUT_JSON = os.path.join(PROJECT_DIR, "web_app", "public", "data", "fleet_wb.json")
+SQLITE_DB = os.path.join(PROJECT_DIR, "plan.db")
+
+
+def normalize_tail(raw_tail):
+    """Приводит номер борта к 5-значному стандарту (например, 73271 или 02740)."""
+    clean = re.sub(r'[^0-9]', '', str(raw_tail or ''))
+    if len(clean) >= 5:
+        return clean[-5:]
+    return clean
+
+
+def parse_wbr_file(filepath):
+    """Универсальный парсер одного PDF-файла (Nordwind или Ikar)."""
+    fname = os.path.basename(filepath)
+    with pdfplumber.open(filepath) as pdf:
+        p0 = pdf.pages[0]
+        text = p0.extract_text() or ""
+        tables = p0.extract_tables()
+
+        is_ikar = "ikar" in text.lower() or "llc \"aircompany \"ikar\"" in text.lower() or "dnd" in fname.lower() or "e190" in fname.lower()
+        if "wbr_737-900_ra-7334" in fname.lower():
+            is_ikar = False
+        elif "dow_doi b739 ra7334" in fname.lower():
+            is_ikar = True
+
+        operator = "EO" if is_ikar else "N4"
+
+        # 1. Извлечение хвоста (tail)
+        tail_match = re.search(r'(?:Registration:?\s*(?:RA-?)?|RA-?)(\d{5})', text)
+        if not tail_match:
+            tail_match = re.search(r'(?:RA-?)?(\d{5})', fname)
+        tail = normalize_tail(tail_match.group(1) if tail_match else "UNKNOWN")
+
+        # 2. Модель ВС
+        model = "UNKNOWN"
+        m_match = re.search(r'Model:?\s*([A-Za-z0-9\-\s]+)', text)
+        if m_match:
+            model = m_match.group(1).split('\n')[0].strip()
+        elif "737-800" in fname or "738" in fname:
+            model = "B737-800"
+        elif "737-900" in fname or "739" in fname:
+            model = "B737-900ER"
+        elif "A321-NEO" in fname:
+            model = "A321-NEO"
+        elif "A321" in fname:
+            model = "A321-200"
+        elif "A332" in fname:
+            model = "A330-200"
+        elif "A333" in fname:
+            model = "A330-300"
+        elif "E190" in fname:
+            model = "ERJ 190-100"
+        elif "777-200" in fname or "B772" in fname:
+            model = "B777-200ER"
+        elif "777-300" in fname or "B773" in fname:
+            model = "B777-300ER"
+
+        # 3. Ревизия и дата
+        rev_match = re.search(r'Revision\s*(?:No\.?)?:?\s*([^\n]+)', text, re.I)
+        revision = rev_match.group(1).strip() if rev_match else ""
+        if not revision:
+            r_fname = re.search(r'rev_?(\d+)', fname, re.I)
+            if r_fname: revision = f"Rev {r_fname.group(1)}"
+        if not revision and "2026" in fname:
+            d_m = re.search(r'(20\d{6})', fname)
+            if d_m: revision = f"Rev {d_m.group(1)}"
+
+        date_match = re.search(r'Date:?\s*([^\n]+)', text)
+        date_val = date_match.group(1).strip() if date_match else ""
+        if not date_val:
+            d_fname = re.search(r'(20\d{6}|\d{2}[A-Za-z]{3}\d{2,4})', fname)
+            if d_fname: date_val = d_fname.group(1)
+
+        # 4. Базовый вес и базовый индекс
+        basic_wt = None
+        basic_idx = None
+        bw_m = re.search(r'(?:Basic Weight|Weight)\s*\n?(\d{5,6})', text, re.I)
+        if bw_m:
+            try: basic_wt = int(bw_m.group(1))
+            except: pass
+
+        bi_m = re.search(r'Index\s*\n?([0-9]+[,\.][0-9]{2})', text, re.I)
+        if bi_m:
+            try: basic_idx = float(bi_m.group(1).replace(',', '.'))
+            except: pass
+
+        # 5. Признак аптечки (Fly Kit) для файлов NoFAK / FAK
+        fly_kit_mode = "STANDARD"
+        if "nofak" in fname.lower():
+            fly_kit_mode = "NO_FAK"
+        elif "fak2ake" in fname.lower():
+            fly_kit_mode = "FAK_2AKE"
+
+        matrix = {}
+
+        # ----------------------------------------------------
+        # ПАРСИНГ NORDWIND ТАБЛИЦЫ
+        # ----------------------------------------------------
+        if not is_ikar and len(tables) >= 2:
+            table = tables[1]
+            header_row_idx = -1
+            pantry_codes = []
+
+            for r_idx, row in enumerate(table[:5]):
+                clean_cells = [str(c).strip() for c in row if c and str(c).strip()]
+                letters = [c for c in clean_cells if len(c) == 1 and c in "ABDEFGK"]
+                if len(letters) >= 2:
+                    header_row_idx = r_idx
+                    for c_idx, cell in enumerate(row):
+                        val = str(cell).strip() if cell else ""
+                        if val and val in "ABDEFGK":
+                            pantry_codes.append((c_idx, val))
+                    break
+
+            for r_idx in range(header_row_idx + 1, len(table)):
+                row = table[r_idx]
+                if not row or not row[0]: continue
+                crew_str = str(row[0]).replace('*', '').strip()
+                if not re.match(r'^\d+/\d+', crew_str): continue
+
+                matrix[crew_str] = {}
+                for p_col_idx, p_code in pantry_codes:
+                    dow_val = None
+                    doi_val = None
+                    if p_col_idx < len(row) and row[p_col_idx]:
+                        try:
+                            dow_val = int(float(str(row[p_col_idx]).replace(' ', '').replace(',', '.')))
+                        except: pass
+                    if p_col_idx + 1 < len(row) and row[p_col_idx + 1]:
+                        try:
+                            doi_val = float(str(row[p_col_idx + 1]).replace(' ', '').replace(',', '.'))
+                        except: pass
+                    if dow_val is not None:
+                        matrix[crew_str][p_code] = {
+                            "dow": dow_val,
+                            "doi": doi_val
+                        }
+
+        # ----------------------------------------------------
+        # ПАРСИНГ IKAR ТАБЛИЦЫ
+        # ----------------------------------------------------
+        elif is_ikar and len(tables) >= 2:
+            table = tables[1]
+            header_row_idx = -1
+            header_row = None
+
+            for r_idx, row in enumerate(table[:6]):
+                clean = [str(c).strip() for c in row if c]
+                if 'Crew' in clean and any(p in clean for p in ['A', 'B', 'E', 'C', 'D']):
+                    header_row_idx = r_idx
+                    header_row = row
+                    break
+
+            if header_row:
+                # Список кухонь в первом блоке (Including Fly Kit)
+                p_codes = []
+                for c_idx in range(1, len(header_row)):
+                    p = str(header_row[c_idx]).strip()
+                    if p and p in "ABCDEFGK":
+                        p_codes.append((c_idx, p))
+                    # Для B739/E190 первый блок заканчивается на E
+                    if len(p_codes) >= 3 and p == 'E':
+                        break
+
+                r_idx = header_row_idx + 1
+                while r_idx < len(table):
+                    row_wt = table[r_idx]
+                    row_idx = table[r_idx + 1] if r_idx + 1 < len(table) else None
+
+                    if not row_wt or not row_wt[0]:
+                        r_idx += 1
+                        continue
+
+                    crew_str = str(row_wt[0]).strip()
+                    if not re.match(r'^\d+/\d+', crew_str):
+                        r_idx += 1
+                        continue
+
+                    matrix[crew_str] = {}
+                    for c_idx, p_code in p_codes:
+                        dow_val = None
+                        doi_val = None
+                        if c_idx < len(row_wt) and row_wt[c_idx]:
+                            cell_str = str(row_wt[c_idx]).replace(' ', '').replace(',', '.')
+                            # Если ячейка содержит 'weight' (например, для 2/0 кухни A), пропускаем
+                            if 'weight' not in cell_str.lower():
+                                try: dow_val = int(float(cell_str))
+                                except: pass
+
+                        if row_idx and c_idx < len(row_idx) and row_idx[c_idx]:
+                            cell_idx_str = str(row_idx[c_idx]).replace(' ', '').replace(',', '.')
+                            if 'index' not in cell_idx_str.lower():
+                                try: doi_val = float(cell_idx_str)
+                                except: pass
+
+                        if dow_val is not None:
+                            matrix[crew_str][p_code] = {
+                                "dow": dow_val,
+                                "doi": doi_val
+                            }
+
+                    # Переходим к следующему блоку экипажа (шаг 3 строки: weight, index, MAC)
+                    r_idx += 3
+
+        return {
+            "file": fname,
+            "operator": operator,
+            "tail": tail,
+            "model": model,
+            "revision": revision,
+            "date": date_val,
+            "basic_weight": basic_wt,
+            "basic_index": basic_idx,
+            "fly_kit_mode": fly_kit_mode,
+            "crew_count": len(matrix),
+            "pantry_codes": list(next(iter(matrix.values())).keys()) if matrix else [],
+            "matrix": matrix
+        }
+
+
+def main():
+    print(f"Поиск PDF-файлов в папке: {DOW_DOI_DIR}")
+    files = sorted(glob.glob(os.path.join(DOW_DOI_DIR, "*.pdf")))
+    print(f"Найдено файлов: {len(files)}")
+
+    fleet_dict = {}
+
+    for f in files:
+        res = parse_wbr_file(f)
+        tail = res['tail']
+        operator = res['operator']
+        fly_mode = res['fly_kit_mode']
+
+        # Ключ в реестре: tail_operator[_flymode]
+        # Для стандартных бортов (например 73271_N4, 02740_EO)
+        # Для 73343: будут 73343_N4 и 73343_EO
+        # Для 73344: будут 73344_N4 и 73344_EO
+        key = f"{tail}_{operator}"
+        if fly_mode != "STANDARD":
+            key += f"_{fly_mode}"
+
+        fleet_dict[key] = res
+        p_str = ','.join(res['pantry_codes'])
+        print(f"  [OK] {key:18} | Модель: {res['model'][:14]:14} | Экипажей: {res['crew_count']:2} | Кухни: {p_str:10} | {res['file'][:30]}")
+
+    # Сохраняем в JSON
+    os.makedirs(os.path.dirname(OUTPUT_JSON), exist_ok=True)
+    with open(OUTPUT_JSON, 'w', encoding='utf-8') as out_f:
+        json.dump(fleet_dict, out_f, ensure_ascii=False, indent=2)
+    print(f"\n[УСПЕХ] JSON-реестр W&B сохранен: {OUTPUT_JSON} (Всего конфигураций: {len(fleet_dict)})")
+
+    # Сохраняем в SQLite plan.db
+    if os.path.exists(SQLITE_DB):
+        conn = sqlite3.connect(SQLITE_DB)
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS plan_fleet_wb (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                config_key TEXT UNIQUE,
+                tail TEXT,
+                operator TEXT,
+                model TEXT,
+                revision TEXT,
+                rev_date TEXT,
+                basic_weight INTEGER,
+                basic_index REAL,
+                fly_kit_mode TEXT,
+                pantry_codes TEXT,
+                matrix_json TEXT,
+                updated_at TEXT
+            )
+        """)
+        for key, item in fleet_dict.items():
+            p_str = ','.join(item['pantry_codes'])
+            c.execute("""
+                INSERT OR REPLACE INTO plan_fleet_wb
+                (config_key, tail, operator, model, revision, rev_date, basic_weight, basic_index, fly_kit_mode, pantry_codes, matrix_json, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            """, (
+                key,
+                item['tail'],
+                item['operator'],
+                item['model'],
+                item['revision'],
+                item['date'],
+                item['basic_weight'],
+                item['basic_index'],
+                item['fly_kit_mode'],
+                p_str,
+                json.dumps(item['matrix'], ensure_ascii=False)
+            ))
+        conn.commit()
+        conn.close()
+        print(f"[УСПЕХ] SQLite таблица plan_fleet_wb обновлена в {SQLITE_DB}")
+
+
+if __name__ == "__main__":
+    main()

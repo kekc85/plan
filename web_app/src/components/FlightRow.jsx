@@ -18,6 +18,7 @@ import {
   detectPlaneType
 } from '../utils/validators';
 import { getSafeUnreadChanges, TRACKED_AVIABIT_FIELDS } from '../utils/deltaSync';
+import { lookupFleetWb } from '../utils/fleetWbLookup';
 import { 
   getDisplayFlightTimes, 
   convertUtcToMsk, 
@@ -78,6 +79,23 @@ function FlightRow({
     const updates = { [field]: value };
     if (field === 'crew') {
       updates.crew_manual = true;
+    }
+    if (field === 'dow') {
+      updates.dow_manual = true;
+    }
+    if (field === 'doi') {
+      updates.doi_manual = true;
+    }
+    // Автоматический пересчет DOW и DOI при изменении экипажа или кухни
+    if (field === 'crew' || field === 'galley') {
+      if (!flight.dow_manual) {
+        const simulated = { ...flight, ...updates };
+        const wb = lookupFleetWb(simulated);
+        if (wb && wb.success) {
+          updates.dow = String(wb.dow);
+          updates.doi = String(wb.doi);
+        }
+      }
     }
     // При ручном редактировании поля диспетчером автоматически снимаем подсветку с этого поля
     if (unread[field] && onAcknowledgeField) {
@@ -189,6 +207,14 @@ function FlightRow({
     if (!flight.ac_type) {
       const detected = detectPlaneType({ ...flight, ac_num: formatted });
       if (detected) updates.ac_type = detected;
+    }
+    if (!flight.dow_manual) {
+      const simulated = { ...flight, ...updates };
+      const wb = lookupFleetWb(simulated);
+      if (wb && wb.success) {
+        updates.dow = String(wb.dow);
+        updates.doi = String(wb.doi);
+      }
     }
     onUpdateFlight(flight.id, updates);
   };
@@ -364,6 +390,8 @@ function FlightRow({
     if (flight.pax_inf) params.set('pax_inf', flight.pax_inf);
     if (flight.cargo) params.set('cargo', flight.cargo);
     if (flight.mail) params.set('mail', flight.mail);
+    if (flight.dow) params.set('dow', flight.dow);
+    if (flight.doi) params.set('doi', flight.doi);
     params.set('return_url', window.location.href);
 
     // Прямой переход в этой же вкладке: 100% надежность без блокировок Chrome
@@ -456,6 +484,8 @@ function FlightRow({
     if (pax) params.set('pax', pax);
     if (flight.cargo) params.set('cargo', flight.cargo);
     if (flight.mail) params.set('mail', flight.mail);
+    if (flight.dow) params.set('dow', flight.dow);
+    if (flight.doi) params.set('doi', flight.doi);
 
     params.set('return_url', window.location.href);
 
@@ -1100,6 +1130,8 @@ function FlightRow({
                   <option value="D">D</option>
                   <option value="F">F</option>
                   <option value="E">E</option>
+                  <option value="G">G</option>
+                  <option value="K">K</option>
                 </select>
               </div>
             </div>

@@ -2734,15 +2734,22 @@
       let versionVal = String(data.version || data.f_version || data.ac_config || data.layout || '').trim();
       const modelToLayout = {
         'B737-900': 'Y215',
+        'B737-900ER': 'Y215',
+        '737-900': 'Y215',
         'B739': 'Y215',
         '739': 'Y215',
         'B737-800': 'Y189',
+        '737-800': 'Y189',
         'B738': 'Y189',
         '738': 'Y189',
         'A321': 'Y220',
+        'A321-200': 'Y220',
+        'A321-231': 'Y220',
         'A321-NEO': 'Y218',
         '321': 'Y220',
         'E190': 'Y110',
+        'ERJ 190': 'Y110',
+        'ERJ-190': 'Y110',
         '190': 'Y110',
         'A330-200': 'Y365',
         'A332': 'Y365',
@@ -2751,14 +2758,21 @@
         'A333': 'Y379',
         '333': 'Y379',
         'B777-200': 'Y440',
+        'B777-200ER': 'Y440',
         'B772': 'Y440',
         '772': 'Y440',
         'B777-300': 'Y486',
+        'B777-300ER': 'Y486',
         'B773': 'Y486',
         '773': 'Y486'
       };
-      if (modelToLayout[versionVal]) {
-        versionVal = modelToLayout[versionVal];
+      const normV = versionVal.toUpperCase().replace(/\s+/g, '');
+      for (const [k, v] of Object.entries(modelToLayout)) {
+        const normK = k.toUpperCase().replace(/\s+/g, '');
+        if (normV === normK || normV.includes(normK)) {
+          versionVal = v;
+          break;
+        }
       }
       setInp('f_version', versionVal);
       setInp('f_captain', data.captain || data.f_captain);
@@ -2798,11 +2812,19 @@
         if (cleanTripFuel) setInp('inp_trip_fuel', cleanTripFuel);
       }
 
-      // 6. Заполнение весов (если переданы)
+      // 6. Заполнение весов (DOW, DOI, лимиты)
       setInp('inp_dow', data.dow || data.inp_dow);
       setInp('inp_max_zfw', data.max_zfw || data.inp_max_zfw);
       setInp('inp_max_tow', data.max_tow || data.inp_max_tow || data.mtow);
       setInp('inp_max_law', data.max_law || data.inp_max_law);
+
+      if (data.doi || data.inp_doi) {
+        const cleanDoi = String(data.doi || data.inp_doi).trim();
+        const freeformEl = document.getElementById('inp_balance_freeform');
+        if (freeformEl && !freeformEl.value.includes('DOI:')) {
+          freeformEl.value = freeformEl.value ? (freeformEl.value + '\nDOI: ' + cleanDoi) : ('DOI: ' + cleanDoi);
+        }
+      }
 
       // 7. Коммерческая загрузка Destination 1
       const toDest = data.to || data.f_to || data.arr || data.dest_1;

@@ -6,6 +6,8 @@
  * для визуальной подсветки до явного подтверждения диспетчером.
  */
 
+import { lookupFleetWb } from './fleetWbLookup';
+
 // Поля, которые контролируются и обновляются из AviaBit
 export const TRACKED_AVIABIT_FIELDS = [
   'time',
@@ -401,14 +403,23 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
       // Совершенно новый рейс, добавленный в расписание AviaBit
       newFlightsCount++;
       const flightId = inc.id || `flight_${flNum || 'fl'}_${flDate || ''}_${(inc.time || '').replace(':', '')}_${Math.random().toString(36).substr(2, 6)}`;
-      mergedFlights.push({
+      const newFlightObj = {
         ...inc,
         id: flightId,
+        galley: inc.galley || 'D',
         is_new_flight: true,
         unread_changes: {
           _is_new: { old: null, new: true, ts: Date.now() }
         }
-      });
+      };
+      if (!newFlightObj.dow || !newFlightObj.doi) {
+        const wb = lookupFleetWb(newFlightObj);
+        if (wb && wb.success) {
+          newFlightObj.dow = String(wb.dow);
+          newFlightObj.doi = String(wb.doi);
+        }
+      }
+      mergedFlights.push(newFlightObj);
       continue;
     }
 
@@ -463,6 +474,15 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
         merged[field] = old[field];
       }
     });
+
+    // Авто-определение DOW и DOI из официальных W&B матриц флота
+    if (!old.dow_manual && (!merged.dow || !merged.doi || changes.ac_num || changes.crew)) {
+      const wb = lookupFleetWb(merged);
+      if (wb && wb.success) {
+        merged.dow = String(wb.dow);
+        merged.doi = String(wb.doi);
+      }
+    }
 
     // 2.1. Если экипаж был введен/изменен вручную диспетчером — сохраняем его и не перезаписываем из AviaBit
     if (old.crew_manual) {
