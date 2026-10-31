@@ -494,3 +494,5 @@
     3. Утилита fleetWbLookup.js: модуль точного детерминированного поиска DOW/DOI по (борт, оператор, экипаж, кухня).
     4. AeroPlan (FlightRow.jsx, deltaSync.js): автоматическое заполнение DOW/DOI при изменении параметров рейса и передача &dow=&doi= в Loadsheet.
     5. Loadsheet (loadsheet/index.html): прием DOW и DOI, заполнение поля баланса, нормализация компоновки салона (Y215).
+
+- Релиз v1.0.198 (патч 2): Сквозной перенос DOW/DOI/кухни из AeroPlan в AeroBag и автономный расчет W&B прямо в Loadsheet.
