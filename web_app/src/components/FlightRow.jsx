@@ -392,6 +392,7 @@ function FlightRow({
     if (flight.mail) params.set('mail', flight.mail);
     if (flight.dow) params.set('dow', flight.dow);
     if (flight.doi) params.set('doi', flight.doi);
+    if (flight.galley) params.set('galley', flight.galley);
     params.set('return_url', window.location.href);
 
     // Прямой переход в этой же вкладке: 100% надежность без блокировок Chrome
@@ -486,6 +487,7 @@ function FlightRow({
     if (flight.mail) params.set('mail', flight.mail);
     if (flight.dow) params.set('dow', flight.dow);
     if (flight.doi) params.set('doi', flight.doi);
+    if (flight.galley) params.set('galley', flight.galley);
 
     params.set('return_url', window.location.href);
 
