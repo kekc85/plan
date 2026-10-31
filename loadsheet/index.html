@@ -2826,6 +2826,59 @@
         }
       }
 
+      // Автономный расчет DOW и DOI из базы центровок флота если они не были переданы явно
+      const curDow = document.getElementById('inp_dow')?.value;
+      if (!curDow || !data.doi) {
+        const curTail = String(data.acreg || data.ac_num || data.f_acreg || data.tail || '').toUpperCase().replace(/^(RA|РА)[-\s]?/i, '').replace(/\D/g, '').trim();
+        const curFlightStr = String(data.flight || data.f_flight || '').toUpperCase().trim();
+        let curOp = '';
+        if (/^(EO|KAR|ИК|ЕО)/i.test(curFlightStr)) curOp = 'EO';
+        else if (/^(N4|NWS|СВ|Н4)/i.test(curFlightStr)) curOp = 'N4';
+
+        let cParts = String(data.crew || data.f_crew || '').split(/[\/\-\s]+/).filter(Boolean);
+        let curCrew = cParts.length >= 2 ? (parseInt(cParts[0], 10) + '/' + parseInt(cParts[1], 10)) : (cParts.length === 1 ? (parseInt(cParts[0], 10) + '/0') : '');
+        let curGalley = String(data.galley || 'D').toUpperCase().trim() || 'D';
+
+        if (curTail && curCrew) {
+          fetch('fleet_wb.json')
+            .then(r => r.json())
+            .then(wbData => {
+              let configKey = null;
+              if (curOp && wbData[curTail + '_' + curOp]) {
+                configKey = curTail + '_' + curOp;
+              } else if (curOp && wbData[curTail + '_' + curOp + '_FAK_2AKE']) {
+                configKey = curTail + '_' + curOp + '_FAK_2AKE';
+              } else {
+                const candidates = Object.keys(wbData).filter(k => k.startsWith(curTail + '_'));
+                if (candidates.length === 1) configKey = candidates[0];
+                else if (candidates.length > 1) {
+                  if (curOp) configKey = candidates.find(k => k.includes('_' + curOp)) || candidates[0];
+                  else configKey = candidates.find(k => k.includes('_N4')) || candidates[0];
+                }
+              }
+
+              if (configKey && wbData[configKey] && wbData[configKey].matrix) {
+                const cfg = wbData[configKey];
+                const row = cfg.matrix[curCrew];
+                if (row) {
+                  const cell = row[curGalley] || (cfg.pantry_codes && row[cfg.pantry_codes[0]]);
+                  if (cell) {
+                    if (!document.getElementById('inp_dow').value) {
+                      setInp('inp_dow', cell.dow);
+                      calculate();
+                    }
+                    const freeformEl = document.getElementById('inp_balance_freeform');
+                    if (freeformEl && !freeformEl.value.includes('DOI:')) {
+                      freeformEl.value = freeformEl.value ? (freeformEl.value + '\nDOI: ' + cell.doi) : ('DOI: ' + cell.doi);
+                    }
+                  }
+                }
+              }
+            })
+            .catch(e => console.warn('[Loadsheet] Error fetching fleet_wb.json:', e));
+        }
+      }
+
       // 7. Коммерческая загрузка Destination 1
       const toDest = data.to || data.f_to || data.arr || data.dest_1;
       setInp('dest_code_1', toDest);
