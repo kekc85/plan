@@ -20,6 +20,13 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
 DOW_DOI_DIR = r"E:\ANTIGRAVITY\AVERAGO BAGGEGE WEIGH\DOW-DOI"
 OUTPUT_JSON = os.path.join(PROJECT_DIR, "web_app", "public", "data", "fleet_wb.json")
+OUTPUT_JSONS = [
+    os.path.join(PROJECT_DIR, "web_app", "src", "data", "fleet_wb.json"),
+    os.path.join(PROJECT_DIR, "web_app", "public", "data", "fleet_wb.json"),
+    os.path.join(PROJECT_DIR, "loadsheet", "fleet_wb.json"),
+    r"C:\Users\kekc85\.gemini\antigravity\worktrees\AVERAGO BAGGEGE WEIGH\add_test_address_config\fleet_wb.json",
+    r"C:\Users\kekc85\.gemini\antigravity\worktrees\AVERAGO BAGGEGE WEIGH\add_test_address_config\loadsheet\fleet_wb.json"
+]
 SQLITE_DB = os.path.join(PROJECT_DIR, "plan.db")
 
 
@@ -96,15 +103,36 @@ def parse_wbr_file(filepath):
         # 4. Базовый вес и базовый индекс
         basic_wt = None
         basic_idx = None
-        bw_m = re.search(r'(?:Basic Weight|Weight)\s*\n?(\d{5,6})', text, re.I)
-        if bw_m:
-            try: basic_wt = int(bw_m.group(1))
-            except: pass
 
-        bi_m = re.search(r'Index\s*\n?([0-9]+[,\.][0-9]{2})', text, re.I)
-        if bi_m:
-            try: basic_idx = float(bi_m.group(1).replace(',', '.'))
-            except: pass
+        # Проверка таблицы шапки (для Nordwind / WBR)
+        if len(tables) > 0 and tables[0]:
+            t0 = tables[0]
+            for r_idx, row in enumerate(t0):
+                if any('Basic' in str(c) for c in row if c):
+                    if r_idx + 1 < len(t0):
+                        next_row = t0[r_idx + 1]
+                        vals = [str(c).strip() for c in next_row if c and str(c).strip()]
+                        for v in vals:
+                            clean_v = v.replace(' ', '')
+                            if re.match(r'^\d{5,6}$', clean_v) and basic_wt is None:
+                                try: basic_wt = int(clean_v)
+                                except: pass
+                            elif re.match(r'^\d+[,\.]\d{1,2}$', clean_v) and basic_idx is None:
+                                try: basic_idx = float(clean_v.replace(',', '.'))
+                                except: pass
+
+        # Резервный поиск по тексту (для Ikar / DOW-DOI)
+        if basic_wt is None:
+            bw_m = re.search(r'(?:Basic Weight|Weight)\s*\n?(\d{5,6})', text, re.I)
+            if bw_m:
+                try: basic_wt = int(bw_m.group(1))
+                except: pass
+
+        if basic_idx is None:
+            bi_m = re.search(r'Index\s*\n?([0-9]+[,\.][0-9]{2})', text, re.I)
+            if bi_m:
+                try: basic_idx = float(bi_m.group(1).replace(',', '.'))
+                except: pass
 
         # 5. Признак аптечки (Fly Kit) для файлов NoFAK / FAK
         fly_kit_mode = "STANDARD"
@@ -265,11 +293,15 @@ def main():
         p_str = ','.join(res['pantry_codes'])
         print(f"  [OK] {key:18} | Модель: {res['model'][:14]:14} | Экипажей: {res['crew_count']:2} | Кухни: {p_str:10} | {res['file'][:30]}")
 
-    # Сохраняем в JSON
-    os.makedirs(os.path.dirname(OUTPUT_JSON), exist_ok=True)
-    with open(OUTPUT_JSON, 'w', encoding='utf-8') as out_f:
-        json.dump(fleet_dict, out_f, ensure_ascii=False, indent=2)
-    print(f"\n[УСПЕХ] JSON-реестр W&B сохранен: {OUTPUT_JSON} (Всего конфигураций: {len(fleet_dict)})")
+    # Сохраняем в JSON (во все рабочие директории)
+    for p in OUTPUT_JSONS:
+        try:
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, 'w', encoding='utf-8') as out_f:
+                json.dump(fleet_dict, out_f, ensure_ascii=False, indent=2)
+            print(f"[УСПЕХ] Обновлен JSON: {p}")
+        except Exception as e:
+            print(f"[SKIP] Не удалось записать {p}: {e}")
 
     # Сохраняем в SQLite plan.db
     if os.path.exists(SQLITE_DB):

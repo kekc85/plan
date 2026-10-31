@@ -450,12 +450,22 @@ export default function FleetWbManager() {
 
                     {/* Базовый вес и индекс */}
                     <div className="text-right font-mono text-[11px]">
-                      <span className="font-bold text-slate-800 dark:text-slate-200">
-                        {item.basic_weight ? `${item.basic_weight.toLocaleString()} кг` : '—'}
-                      </span>
-                      <span className="text-slate-400 ml-1.5">
-                        ({item.basic_index !== undefined ? item.basic_index : '—'})
-                      </span>
+                      {item.basic_weight ? (
+                        <>
+                          <span className="font-bold text-slate-800 dark:text-slate-200">
+                            {item.basic_weight.toLocaleString()} кг
+                          </span>
+                          {item.basic_index !== undefined && item.basic_index !== null && (
+                            <span className="text-slate-400 ml-1.5">
+                              ({item.basic_index})
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-slate-400 text-[10px]">
+                          {item.matrix?.['0/0'] ? '0/0 в матрице' : 'По матрице W&B'}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -514,8 +524,10 @@ export default function FleetWbManager() {
                 <div className="text-right">
                   <div className="text-[10px] uppercase font-bold text-slate-400">Basic Weight / Index</div>
                   <div className="font-mono font-black text-sm text-sky-600 dark:text-sky-400">
-                    {currentAircraft.basic_weight ? `${currentAircraft.basic_weight.toLocaleString()} кг` : '—'} 
-                    <span className="text-slate-400 font-normal ml-1">/ {currentAircraft.basic_index || '—'}</span>
+                    {currentAircraft.basic_weight ? `${currentAircraft.basic_weight.toLocaleString()} кг` : <span className="text-slate-400 font-medium text-xs">В матрице W&B</span>} 
+                    {currentAircraft.basic_index !== undefined && currentAircraft.basic_index !== null && (
+                      <span className="text-slate-400 font-normal ml-1">/ {currentAircraft.basic_index}</span>
+                    )}
                   </div>
                 </div>
               </div>
