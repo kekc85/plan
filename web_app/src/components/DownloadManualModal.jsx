@@ -560,7 +560,7 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                 <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-850 p-3 flex flex-col justify-between">
                   <div>
                     <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 block mb-2 uppercase">
-                      Сводная ведомость центровки (Balance / Underload):
+                      Сводка центровки и весов (Balance / Underload):
                     </span>
                     <img 
                       src={loadsheetEnvelopeImg} 
@@ -570,7 +570,7 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                     />
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
-                    Взлетная и посадочная центровка наглядно наносятся на график. Зеленый цвет подтверждает безопасность полета.
+                    Расчет предельного резерва коммерческой загрузки (Underload Before LMC) и балансировочных индексов DOI, ZFW и TOW.
                   </p>
                 </div>
 
