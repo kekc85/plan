@@ -8,6 +8,11 @@
     "date": "2026/03/25",
     "basic_weight": 44932,
     "basic_index": 56.37,
+    "max_weights": {
+      "mtow": 85139,
+      "mlaw": 71350,
+      "mzfw": 67721
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 12,
     "pantry_codes": [
@@ -186,6 +191,11 @@
     "date": "2026/01/01",
     "basic_weight": 44634,
     "basic_index": 55.93,
+    "max_weights": {
+      "mtow": 85139,
+      "mlaw": 71350,
+      "mzfw": 67721
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 12,
     "pantry_codes": [
@@ -364,6 +374,11 @@
     "date": "2025/04/25",
     "basic_weight": 141863,
     "basic_index": null,
+    "max_weights": {
+      "mtow": 294835,
+      "mlaw": 208652,
+      "mzfw": 195044
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 9,
     "pantry_codes": [
@@ -541,6 +556,11 @@
     "date": "2023/11/25",
     "basic_weight": 29000,
     "basic_index": 68.44,
+    "max_weights": {
+      "mtow": 50300,
+      "mlaw": 43000,
+      "mzfw": 40800
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 8,
     "pantry_codes": [
@@ -663,6 +683,11 @@
     "date": "2026/02/27",
     "basic_weight": 28764,
     "basic_index": 69.24,
+    "max_weights": {
+      "mtow": 50300,
+      "mlaw": 43000,
+      "mzfw": 40800
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 8,
     "pantry_codes": [
@@ -785,6 +810,11 @@
     "date": "2025/12/25",
     "basic_weight": 28769,
     "basic_index": 68.73,
+    "max_weights": {
+      "mtow": 50300,
+      "mlaw": 43000,
+      "mzfw": 40800
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 8,
     "pantry_codes": [
@@ -907,6 +937,11 @@
     "date": "2026/03/30",
     "basic_weight": 28925,
     "basic_index": 68.72,
+    "max_weights": {
+      "mtow": 50300,
+      "mlaw": 43000,
+      "mzfw": 40800
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 8,
     "pantry_codes": [
@@ -1029,6 +1064,11 @@
     "date": "2026/02/28",
     "basic_weight": null,
     "basic_index": null,
+    "max_weights": {
+      "mtow": 286670,
+      "mlaw": 208652,
+      "mzfw": 195044
+    },
     "fly_kit_mode": "FAK_2AKE",
     "crew_count": 10,
     "pantry_codes": [
@@ -1270,6 +1310,11 @@
     "date": "2025/04/25",
     "basic_weight": 142437,
     "basic_index": null,
+    "max_weights": {
+      "mtow": 294835,
+      "mlaw": 208652,
+      "mzfw": 195044
+    },
     "fly_kit_mode": "FAK_2AKE",
     "crew_count": 9,
     "pantry_codes": [
@@ -1484,6 +1529,11 @@
     "date": "2025/04/25",
     "basic_weight": 141273,
     "basic_index": null,
+    "max_weights": {
+      "mtow": 294835,
+      "mlaw": 208652,
+      "mzfw": 195044
+    },
     "fly_kit_mode": "NO_FAK",
     "crew_count": 9,
     "pantry_codes": [
@@ -1698,6 +1748,11 @@
     "date": "2026/02/28",
     "basic_weight": null,
     "basic_index": null,
+    "max_weights": {
+      "mtow": 286670,
+      "mlaw": 208652,
+      "mzfw": 195044
+    },
     "fly_kit_mode": "NO_FAK",
     "crew_count": 10,
     "pantry_codes": [
@@ -1939,6 +1994,11 @@
     "date": "15-Oct-26",
     "basic_weight": 41369,
     "basic_index": 46.04,
+    "max_weights": {
+      "mtow": 79015,
+      "mlaw": 66360,
+      "mzfw": 62731
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 11,
     "pantry_codes": [
@@ -2292,6 +2352,11 @@
     "date": "17-Oct-26",
     "basic_weight": 40762,
     "basic_index": 45.33,
+    "max_weights": {
+      "mtow": 73508,
+      "mlaw": 65317,
+      "mzfw": 61688
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 16,
     "pantry_codes": [
@@ -2795,6 +2860,11 @@
     "date": "15-Oct-26",
     "basic_weight": 40821,
     "basic_index": 41.0,
+    "max_weights": {
+      "mtow": 73508,
+      "mlaw": 65317,
+      "mzfw": 61688
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 16,
     "pantry_codes": [
@@ -3298,6 +3368,11 @@
     "date": "15-Oct-26",
     "basic_weight": 41005,
     "basic_index": 47.03,
+    "max_weights": {
+      "mtow": 79000,
+      "mlaw": 66360,
+      "mzfw": 62731
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 16,
     "pantry_codes": [
@@ -3801,6 +3876,11 @@
     "date": "15-Oct-26",
     "basic_weight": 41764,
     "basic_index": 44.65,
+    "max_weights": {
+      "mtow": 79015,
+      "mlaw": 66360,
+      "mzfw": 62731
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 16,
     "pantry_codes": [
@@ -4304,6 +4384,11 @@
     "date": "15-Oct-26",
     "basic_weight": 41195,
     "basic_index": 45.19,
+    "max_weights": {
+      "mtow": 79015,
+      "mlaw": 66360,
+      "mzfw": 62731
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 16,
     "pantry_codes": [
@@ -4807,6 +4892,11 @@
     "date": "17-Oct-26",
     "basic_weight": 40794,
     "basic_index": 46.36,
+    "max_weights": {
+      "mtow": 79000,
+      "mlaw": 66360,
+      "mzfw": 62731
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 16,
     "pantry_codes": [
@@ -5310,6 +5400,11 @@
     "date": "15-Oct-26",
     "basic_weight": 40689,
     "basic_index": 43.67,
+    "max_weights": {
+      "mtow": 79000,
+      "mlaw": 66360,
+      "mzfw": 62731
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 11,
     "pantry_codes": [
@@ -5663,6 +5758,11 @@
     "date": "15-Oct-26",
     "basic_weight": 41044,
     "basic_index": 46.48,
+    "max_weights": {
+      "mtow": 79000,
+      "mlaw": 66360,
+      "mzfw": 62731
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 16,
     "pantry_codes": [
@@ -6166,6 +6266,11 @@
     "date": "15-Oct-26",
     "basic_weight": 41907,
     "basic_index": 46.23,
+    "max_weights": {
+      "mtow": 78925,
+      "mlaw": 65770,
+      "mzfw": 62731
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 11,
     "pantry_codes": [
@@ -6519,6 +6624,11 @@
     "date": "15-Oct-26",
     "basic_weight": 41288,
     "basic_index": 44.36,
+    "max_weights": {
+      "mtow": 79015,
+      "mlaw": 66360,
+      "mzfw": 62731
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 11,
     "pantry_codes": [
@@ -6872,6 +6982,11 @@
     "date": "15-Oct-26",
     "basic_weight": 43595,
     "basic_index": 54.47,
+    "max_weights": {
+      "mtow": 85139,
+      "mlaw": 71350,
+      "mzfw": 67721
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 15,
     "pantry_codes": [
@@ -7101,6 +7216,11 @@
     "date": "15-Oct-26",
     "basic_weight": 43296,
     "basic_index": 55.4,
+    "max_weights": {
+      "mtow": 85139,
+      "mlaw": 71350,
+      "mzfw": 67721
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 15,
     "pantry_codes": [
@@ -7330,6 +7450,11 @@
     "date": "28-Nov-2023",
     "basic_weight": null,
     "basic_index": null,
+    "max_weights": {
+      "mtow": 294835,
+      "mlaw": 208652,
+      "mzfw": 195044
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 22,
     "pantry_codes": [
@@ -7835,6 +7960,11 @@
     "date": "26-Dec-2023",
     "basic_weight": null,
     "basic_index": null,
+    "max_weights": {
+      "mtow": 294835,
+      "mlaw": 208652,
+      "mzfw": 195044
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 22,
     "pantry_codes": [
@@ -8340,6 +8470,11 @@
     "date": "14-Sep-2023",
     "basic_weight": null,
     "basic_index": null,
+    "max_weights": {
+      "mtow": 344548,
+      "mlaw": 251290,
+      "mzfw": 237682
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 31,
     "pantry_codes": [
@@ -9043,6 +9178,11 @@
     "date": "01-Jan-2026",
     "basic_weight": null,
     "basic_index": null,
+    "max_weights": {
+      "mtow": 344548,
+      "mlaw": 251290,
+      "mzfw": 237682
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 28,
     "pantry_codes": [
@@ -9680,6 +9820,11 @@
     "date": "01-Apr-2025",
     "basic_weight": 50066,
     "basic_index": 36.53,
+    "max_weights": {
+      "mtow": 93500,
+      "mlaw": 79200,
+      "mzfw": 75600
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 19,
     "pantry_codes": [
@@ -10273,6 +10418,11 @@
     "date": "01-Apr-2025",
     "basic_weight": 50112,
     "basic_index": 37.92,
+    "max_weights": {
+      "mtow": 93500,
+      "mlaw": 79200,
+      "mzfw": 75600
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 19,
     "pantry_codes": [
@@ -10866,6 +11016,11 @@
     "date": "30-OCT-2026",
     "basic_weight": 47001,
     "basic_index": 32.47,
+    "max_weights": {
+      "mtow": 89000,
+      "mlaw": 75500,
+      "mzfw": 71500
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 22,
     "pantry_codes": [
@@ -11549,6 +11704,11 @@
     "date": "30-OCT-2026",
     "basic_weight": 48820,
     "basic_index": 32.84,
+    "max_weights": {
+      "mtow": 89000,
+      "mlaw": 75500,
+      "mzfw": 71500
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 22,
     "pantry_codes": [
@@ -12232,6 +12392,11 @@
     "date": "30-OCT-2026",
     "basic_weight": 48594,
     "basic_index": 35.97,
+    "max_weights": {
+      "mtow": 89000,
+      "mlaw": 77800,
+      "mzfw": 73800
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 19,
     "pantry_codes": [
@@ -12825,6 +12990,11 @@
     "date": "30-OCT-2026",
     "basic_weight": 48002,
     "basic_index": 34.64,
+    "max_weights": {
+      "mtow": 89000,
+      "mlaw": 77800,
+      "mzfw": 73800
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 22,
     "pantry_codes": [
@@ -13508,6 +13678,11 @@
     "date": "30-OCT-2026",
     "basic_weight": 46788,
     "basic_index": 36.34,
+    "max_weights": {
+      "mtow": 89000,
+      "mlaw": 75500,
+      "mzfw": 71500
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 22,
     "pantry_codes": [
@@ -14191,6 +14366,11 @@
     "date": "01-OCT-2026",
     "basic_weight": 118411,
     "basic_index": 105.73,
+    "max_weights": {
+      "mtow": 233000,
+      "mlaw": 180000,
+      "mzfw": 168000
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 22,
     "pantry_codes": [
@@ -14696,6 +14876,11 @@
     "date": "01-OCT-2026",
     "basic_weight": 118088,
     "basic_index": 116.77,
+    "max_weights": {
+      "mtow": 233000,
+      "mlaw": 182000,
+      "mzfw": 170000
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 16,
     "pantry_codes": [
@@ -15069,6 +15254,11 @@
     "date": "01-July-2025",
     "basic_weight": 123608,
     "basic_index": 91.97,
+    "max_weights": {
+      "mtow": 235000,
+      "mlaw": 187000,
+      "mzfw": 173000
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 28,
     "pantry_codes": [
@@ -15706,6 +15896,11 @@
     "date": "13-Nov-2025",
     "basic_weight": 123670,
     "basic_index": 96.71,
+    "max_weights": {
+      "mtow": 235000,
+      "mlaw": 187000,
+      "mzfw": 173000
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 28,
     "pantry_codes": [
@@ -16343,6 +16538,11 @@
     "date": "15-Oct-2025",
     "basic_weight": 123061,
     "basic_index": 93.83,
+    "max_weights": {
+      "mtow": 235000,
+      "mlaw": 187000,
+      "mzfw": 173000
+    },
     "fly_kit_mode": "STANDARD",
     "crew_count": 28,
     "pantry_codes": [

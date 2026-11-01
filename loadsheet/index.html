@@ -2826,9 +2826,10 @@
         }
       }
 
-      // Автономный расчет DOW и DOI из базы центровок флота если они не были переданы явно
+      // Автономный расчет DOW, DOI и предельных весов из базы центровок флота
       const curDow = document.getElementById('inp_dow')?.value;
-      if (!curDow || !data.doi) {
+      const curMaxTow = document.getElementById('inp_max_tow')?.value;
+      if (!curDow || !data.doi || !curMaxTow) {
         const curTail = String(data.acreg || data.ac_num || data.f_acreg || data.tail || '').toUpperCase().replace(/^(RA|РА)[-\s]?/i, '').replace(/\D/g, '').trim();
         const curFlightStr = String(data.flight || data.f_flight || '').toUpperCase().trim();
         let curOp = '';
@@ -2857,21 +2858,45 @@
                 }
               }
 
-              if (configKey && wbData[configKey] && wbData[configKey].matrix) {
+              if (configKey && wbData[configKey]) {
                 const cfg = wbData[configKey];
-                const row = cfg.matrix[curCrew];
-                if (row) {
-                  const cell = row[curGalley] || (cfg.pantry_codes && row[cfg.pantry_codes[0]]);
-                  if (cell) {
-                    if (!document.getElementById('inp_dow').value) {
-                      setInp('inp_dow', cell.dow);
-                      calculate();
-                    }
-                    const freeformEl = document.getElementById('inp_balance_freeform');
-                    if (freeformEl && !freeformEl.value.includes('DOI:')) {
-                      freeformEl.value = freeformEl.value ? (freeformEl.value + '\nDOI: ' + cell.doi) : ('DOI: ' + cell.doi);
+                let needRecalc = false;
+
+                // Авто-подстановка официальных предельных весов (MZFW, MTOW, MLAW)
+                if (cfg.max_weights) {
+                  if (!document.getElementById('inp_max_zfw').value && cfg.max_weights.mzfw) {
+                    setInp('inp_max_zfw', cfg.max_weights.mzfw);
+                    needRecalc = true;
+                  }
+                  if (!document.getElementById('inp_max_tow').value && cfg.max_weights.mtow) {
+                    setInp('inp_max_tow', cfg.max_weights.mtow);
+                    needRecalc = true;
+                  }
+                  if (!document.getElementById('inp_max_law').value && cfg.max_weights.mlaw) {
+                    setInp('inp_max_law', cfg.max_weights.mlaw);
+                    needRecalc = true;
+                  }
+                }
+
+                if (cfg.matrix && curCrew) {
+                  const row = cfg.matrix[curCrew];
+                  if (row) {
+                    const cell = row[curGalley] || (cfg.pantry_codes && row[cfg.pantry_codes[0]]);
+                    if (cell) {
+                      if (!document.getElementById('inp_dow').value) {
+                        setInp('inp_dow', cell.dow);
+                        needRecalc = true;
+                      }
+                      const freeformEl = document.getElementById('inp_balance_freeform');
+                      if (freeformEl && !freeformEl.value.includes('DOI:')) {
+                        freeformEl.value = freeformEl.value ? (freeformEl.value + '\nDOI: ' + cell.doi) : ('DOI: ' + cell.doi);
+                      }
                     }
                   }
+                }
+
+                if (needRecalc) {
+                  calculate();
                 }
               }
             })

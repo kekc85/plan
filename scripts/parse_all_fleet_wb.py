@@ -29,6 +29,64 @@ OUTPUT_JSONS = [
 ]
 SQLITE_DB = os.path.join(PROJECT_DIR, "plan.db")
 
+# Официальные структурные предельные веса ВС (MTOW, MLAW / MLW, MZFW)
+MAX_WEIGHTS_MAP = {
+    # A321-200 (CEO)
+    "73271": {"mtow": 89000, "mlaw": 75500, "mzfw": 71500},
+    "73273": {"mtow": 89000, "mlaw": 75500, "mzfw": 71500},
+    "73324": {"mtow": 89000, "mlaw": 77800, "mzfw": 73800},
+    "73325": {"mtow": 89000, "mlaw": 77800, "mzfw": 73800},
+    "73326": {"mtow": 89000, "mlaw": 75500, "mzfw": 71500},
+
+    # A330-200
+    "73270": {"mtow": 233000, "mlaw": 180000, "mzfw": 168000},
+    "73328": {"mtow": 233000, "mlaw": 182000, "mzfw": 170000},
+
+    # A330-300
+    "73848": {"mtow": 235000, "mlaw": 187000, "mzfw": 173000},
+    "73849": {"mtow": 235000, "mlaw": 187000, "mzfw": 173000},
+    "73850": {"mtow": 235000, "mlaw": 187000, "mzfw": 173000},
+
+    # A321-253 (NEO)
+    "73322": {"mtow": 93500, "mlaw": 79200, "mzfw": 75600},
+    "73323": {"mtow": 93500, "mlaw": 79200, "mzfw": 75600},
+
+    # B737-800
+    "73269": {"mtow": 79015, "mlaw": 66360, "mzfw": 62731},
+    "73321": {"mtow": 79015, "mlaw": 66360, "mzfw": 62731},
+    "73311": {"mtow": 73508, "mlaw": 65317, "mzfw": 61688},
+    "73312": {"mtow": 73508, "mlaw": 65317, "mzfw": 61688},
+    "73313": {"mtow": 79000, "mlaw": 66360, "mzfw": 62731},
+    "73316": {"mtow": 79000, "mlaw": 66360, "mzfw": 62731},
+    "73317": {"mtow": 79000, "mlaw": 66360, "mzfw": 62731},
+    "73314": {"mtow": 79015, "mlaw": 66360, "mzfw": 62731},
+    "73315": {"mtow": 79015, "mlaw": 66360, "mzfw": 62731},
+    "73318": {"mtow": 79000, "mlaw": 66360, "mzfw": 62731},
+    "73319": {"mtow": 78925, "mlaw": 65770, "mzfw": 62731},
+
+    # B737-900 (в т.ч. мокрый лизинг 73343, 73344)
+    "73343": {"mtow": 85139, "mlaw": 71350, "mzfw": 67721},
+    "73344": {"mtow": 85139, "mlaw": 71350, "mzfw": 67721},
+
+    # B777-200ER (Nordwind)
+    "73340": {"mtow": 294835, "mlaw": 208652, "mzfw": 195044},
+    "73341": {"mtow": 294835, "mlaw": 208652, "mzfw": 195044},
+
+    # B777-300ER (Nordwind)
+    "73342": {"mtow": 344548, "mlaw": 251290, "mzfw": 237682},
+    "73847": {"mtow": 344548, "mlaw": 251290, "mzfw": 237682},
+
+    # B777-200 (Ikar)
+    "73272": {"mtow": 294835, "mlaw": 208652, "mzfw": 195044},
+    "73347": {"mtow": 286670, "mlaw": 208652, "mzfw": 195044},
+
+    # Embraer 190 (Ikar)
+    "02739": {"mtow": 50300, "mlaw": 43000, "mzfw": 40800},
+    "02740": {"mtow": 50300, "mlaw": 43000, "mzfw": 40800},
+    "02741": {"mtow": 50300, "mlaw": 43000, "mzfw": 40800},
+    "02743": {"mtow": 50300, "mlaw": 43000, "mzfw": 40800},
+}
+
 
 def normalize_tail(raw_tail):
     """Приводит номер борта к 5-значному стандарту (например, 73271 или 02740)."""
@@ -252,6 +310,8 @@ def parse_wbr_file(filepath):
                     # Переходим к следующему блоку экипажа (шаг 3 строки: weight, index, MAC)
                     r_idx += 3
 
+        mw = MAX_WEIGHTS_MAP.get(tail, {"mtow": None, "mlaw": None, "mzfw": None})
+
         return {
             "file": fname,
             "operator": operator,
@@ -261,6 +321,7 @@ def parse_wbr_file(filepath):
             "date": date_val,
             "basic_weight": basic_wt,
             "basic_index": basic_idx,
+            "max_weights": mw,
             "fly_kit_mode": fly_kit_mode,
             "crew_count": len(matrix),
             "pantry_codes": list(next(iter(matrix.values())).keys()) if matrix else [],
@@ -318,18 +379,30 @@ def main():
                 rev_date TEXT,
                 basic_weight INTEGER,
                 basic_index REAL,
+                mtow INTEGER,
+                mlaw INTEGER,
+                mzfw INTEGER,
                 fly_kit_mode TEXT,
                 pantry_codes TEXT,
                 matrix_json TEXT,
                 updated_at TEXT
             )
         """)
+
+        # Безопасная миграция колонок предельных весов если таблица уже существовала
+        c.execute("PRAGMA table_info(plan_fleet_wb)")
+        existing_cols = [row[1] for row in c.fetchall()]
+        for col, col_type in [('mtow', 'INTEGER'), ('mlaw', 'INTEGER'), ('mzfw', 'INTEGER')]:
+            if col not in existing_cols:
+                c.execute(f"ALTER TABLE plan_fleet_wb ADD COLUMN {col} {col_type}")
+
         for key, item in fleet_dict.items():
             p_str = ','.join(item['pantry_codes'])
+            mw = item.get('max_weights', {})
             c.execute("""
                 INSERT OR REPLACE INTO plan_fleet_wb
-                (config_key, tail, operator, model, revision, rev_date, basic_weight, basic_index, fly_kit_mode, pantry_codes, matrix_json, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                (config_key, tail, operator, model, revision, rev_date, basic_weight, basic_index, mtow, mlaw, mzfw, fly_kit_mode, pantry_codes, matrix_json, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
             """, (
                 key,
                 item['tail'],
@@ -339,6 +412,9 @@ def main():
                 item['date'],
                 item['basic_weight'],
                 item['basic_index'],
+                mw.get('mtow'),
+                mw.get('mlaw'),
+                mw.get('mzfw'),
                 item['fly_kit_mode'],
                 p_str,
                 json.dumps(item['matrix'], ensure_ascii=False)
