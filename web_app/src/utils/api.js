@@ -11,6 +11,9 @@ function getApiBaseUrl() {
       return '/api';
     }
     const path = window.location.pathname;
+    if (path.includes('/plan_2')) {
+      return '/plan_2/api';
+    }
     if (path.includes('/plan_test')) {
       return '/plan_test/api';
     }
@@ -405,3 +408,20 @@ export async function adminResetAviabitSession() {
     method: 'POST'
   });
 }
+// --- Эндпоинты для работы с общей базой рейсов AeroBag ---
+export async function fetchAeroBagFlights(params = {}) {
+  const query = new URLSearchParams();
+  if (params.date) query.set('date', params.date);
+  if (params.flight) query.set('flight', params.flight);
+  if (params.limit) query.set('limit', String(params.limit));
+  const qs = query.toString();
+  return request(qs ? ('/aerobag/flights?' + qs) : '/aerobag/flights');
+}
+
+export async function saveAeroBagFlights(flights) {
+  return request('/aerobag/flights', {
+    method: 'POST',
+    body: JSON.stringify({ flights })
+  });
+}
+

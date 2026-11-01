@@ -6,6 +6,7 @@ on:
       - main
       - production
       - dev
+      - plan_2
   workflow_dispatch:
     inputs:
       target_env:
@@ -17,6 +18,7 @@ on:
           - auto
           - production
           - test
+          - plan_2
 
 jobs:
   build-and-deploy:
@@ -41,12 +43,12 @@ jobs:
           BRANCH="${GITHUB_REF_NAME}"
           DISPATCH_CHOICE="${{ github.event.inputs.target_env }}"
           
-          IS_TEST=false
-          if [ "$DISPATCH_CHOICE" = "test" ] || [ "$BRANCH" = "dev" ]; then
-            IS_TEST=true
-          fi
-          
-          if [ "$IS_TEST" = true ]; then
+          if [ "$DISPATCH_CHOICE" = "plan_2" ] || [ "$BRANCH" = "plan_2" ]; then
+            ENV_NAME="Plan2"
+            VITE_BASE="/plan_2/"
+            RAW_DIR="boostandgo.ru/public_html/plan_2/"
+            LOADSHEET_RAW_DIR="boostandgo.ru/public_html/loadsheet/"
+          elif [ "$DISPATCH_CHOICE" = "test" ] || [ "$BRANCH" = "dev" ]; then
             ENV_NAME="Test"
             VITE_BASE="/plan_test/"
             RAW_DIR="${{ secrets.BEGET_TEST_REMOTE_DIR }}"

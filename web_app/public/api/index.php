@@ -60,6 +60,28 @@ if (!defined('DB_USER')) define('DB_USER', getenv('DB_USER') ?: ($_ENV['DB_USER'
 if (!defined('DB_PASS')) define('DB_PASS', getenv('DB_PASSWORD') ?: ($_ENV['DB_PASSWORD'] ?? ''));
 if (!defined('JWT_SECRET')) define('JWT_SECRET', getenv('PLAN_JWT_SECRET') ?: ($_ENV['PLAN_JWT_SECRET'] ?? 'aeroplan_wb_secret_beget_2026_andrey'));
 
+function getAerobagDb() {
+    static $abPdo = null;
+    if ($abPdo === null) {
+        $abUser = getenv('AEROBAG_DB_USER') ?: ($_ENV['AEROBAG_DB_USER'] ?? 'kekc8584_aerobag');
+        $abPass = getenv('AEROBAG_DB_PASS') ?: ($_ENV['AEROBAG_DB_PASS'] ?? 'NW_lc_2026');
+        $abName = getenv('AEROBAG_DB_NAME') ?: ($_ENV['AEROBAG_DB_NAME'] ?? 'kekc8584_aerobag');
+        $abHost = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? 'localhost');
+        $abPort = (int)(getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? 3306));
+        try {
+            $dsn = "mysql:host={$abHost};port={$abPort};dbname={$abName};charset=utf8mb4";
+            $abPdo = new PDO($dsn, $abUser, $abPass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false
+            ]);
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+    return $abPdo;
+}
+
 function getDb() {
     static $pdo = null;
     if ($pdo === null) {
@@ -1010,6 +1032,144 @@ if ($route === '/shift/version') {
 // ----------------------------------------------------
 // ЭНДПОИНТ: /shift/current
 // ----------------------------------------------------
+// ----------------------------------------------------
+// Роут: /aerobag/flights (Общая база рейсов AeroBag для plan_2)
+// ----------------------------------------------------
+if ($route === '/aerobag/flights') {
+    $abDb = getAerobagDb();
+    if (!$abDb) {
+        echo json_encode(['success' => false, 'error' => 'База данных AeroBag недоступна']);
+        exit;
+    }
+    
+    $method = $_SERVER['REQUEST_METHOD'];
+    
+    if ($method === 'GET') {
+        $limit = isset($_GET['limit']) ? min(500, max(1, (int)$_GET['limit'])) : 100;
+        $date = trim($_GET['date'] ?? '');
+        $flightNo = trim($_GET['flight'] ?? '');
+        
+        $sql = "SELECT * FROM flights WHERE 1=1";
+        $params = [];
+        if (!empty($date)) {
+            $sql .= " AND flight_date = ?";
+            $params[] = $date;
+        }
+        if (!empty($flightNo)) {
+            $sql .= " AND flight_no LIKE ?";
+            $params[] = "%" . $flightNo . "%";
+        }
+        $sql .= " ORDER BY flight_date DESC, created_at DESC LIMIT " . $limit;
+        
+        $stmt = $abDb->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+        
+        $flights = [];
+        foreach ($rows as $r) {
+            $flights[] = [
+                'id' => $r['id'],
+                'airline' => $r['airline'],
+                'flight_no' => $r['flight_no'],
+                'date' => $r['flight_date'],
+                'from' => $r['airport_from'],
+                'to' => $r['airport_to'],
+                'men' => (int)$r['men'],
+                'women' => (int)$r['women'],
+                'rb' => (int)$r['rb'],
+                'rm' => (int)$r['rm'],
+                'pax' => (int)$r['pax'],
+                'bag_pcs' => (int)$r['bag_pcs'],
+                'bag_weight' => (float)$r['bag_weight'],
+                'hb_weight' => (float)$r['hb_weight'],
+                'source' => $r['source'],
+                'active' => (bool)$r['active']
+            ];
+        }
+        echo json_encode(['success' => true, 'flights' => $flights, 'total' => count($flights)]);
+        exit;
+    }
+    
+    if ($method === 'POST') {
+        $input = getJsonInput();
+        $flightsData = is_array($input) ? ($input['flights'] ?? $input) : [];
+        if (!is_array($flightsData) || empty($flightsData)) {
+            echo json_encode(['success' => false, 'error' => 'Нет данных для сохранения']);
+            exit;
+        }
+        if (isset($flightsData['flight_no']) || isset($flightsData['flight'])) {
+            $flightsData = [$flightsData];
+        }
+        
+        $sql = "INSERT INTO flights (
+                    id, airline, flight_no, flight_date, airport_from, airport_to, 
+                    men, women, rb, rm, pax, bag_pcs, bag_weight, hb_weight, source, active
+                ) VALUES (
+                    :id, :airline, :flight_no, :flight_date, :airport_from, :airport_to, 
+                    :men, :women, :rb, :rm, :pax, :bag_pcs, :bag_weight, :hb_weight, :source, :active
+                )
+                ON DUPLICATE KEY UPDATE 
+                    airline = VALUES(airline),
+                    men = VALUES(men),
+                    women = VALUES(women),
+                    rb = VALUES(rb),
+                    rm = VALUES(rm),
+                    pax = VALUES(pax),
+                    bag_pcs = VALUES(bag_pcs),
+                    bag_weight = VALUES(bag_weight),
+                    hb_weight = VALUES(hb_weight),
+                    source = VALUES(source),
+                    active = VALUES(active)";
+                    
+        $stmt = $abDb->prepare($sql);
+        $savedCount = 0;
+        
+        foreach ($flightsData as $f) {
+            $fltNo = trim($f['flight_no'] ?? $f['flight'] ?? '');
+            if (!$fltNo) continue;
+            
+            $id = $f['id'] ?? ('fl_' . time() . '_' . rand(1000, 9999));
+            $airline = $f['airline'] ?? (str_starts_with($fltNo, 'N4') ? 'NWS' : 'KAR');
+            $date = $f['date'] ?? $f['flight_date'] ?? date('Y-m-d');
+            $from = strtoupper(trim($f['from'] ?? ''));
+            $to = strtoupper(trim($f['to'] ?? ''));
+            $men = (int)($f['men'] ?? $f['pax_m'] ?? 0);
+            $women = (int)($f['women'] ?? $f['pax_f'] ?? 0);
+            $rb = (int)($f['rb'] ?? $f['pax_ch'] ?? 0);
+            $rm = (int)($f['rm'] ?? $f['pax_inf'] ?? 0);
+            $pax = (int)($f['pax'] ?? ($men + $women + $rb));
+            $bagPcs = (int)($f['bag_pcs'] ?? 0);
+            $bagWt = (float)($f['bag_weight'] ?? $f['baggage'] ?? 0);
+            $hbWt = (float)($f['hb_weight'] ?? 0);
+            $source = $f['source'] ?? 'plan_2';
+            $active = isset($f['active']) ? (int)$f['active'] : 1;
+            
+            $stmt->execute([
+                ':id' => $id,
+                ':airline' => $airline,
+                ':flight_no' => $fltNo,
+                ':flight_date' => $date,
+                ':airport_from' => $from,
+                ':airport_to' => $to,
+                ':men' => $men,
+                ':women' => $women,
+                ':rb' => $rb,
+                ':rm' => $rm,
+                ':pax' => $pax,
+                ':bag_pcs' => $bagPcs,
+                ':bag_weight' => $bagWt,
+                ':hb_weight' => $hbWt,
+                ':source' => $source,
+                ':active' => $active
+            ]);
+            $savedCount++;
+        }
+        
+        echo json_encode(['success' => true, 'saved_count' => $savedCount]);
+        exit;
+    }
+}
+
 if ($route === '/shift/current') {
     $db = getDb();
     $stmt = $db->query("SELECT * FROM plan_shifts WHERE status = 'active' ORDER BY id DESC LIMIT 1");

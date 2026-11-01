@@ -364,9 +364,10 @@ function FlightRow({
       }
     }
 
-    const isTest = window.location.href.includes('plan_test') || 
+    const isPlan2 = window.location.href.includes('plan_2');
+    const isTest = !isPlan2 && (window.location.href.includes('plan_test') || 
                    window.location.hostname === 'localhost' || 
-                   window.location.hostname === '127.0.0.1';
+                   window.location.hostname === '127.0.0.1');
     
     const targetAeroBagUrl = isTest 
       ? 'https://boostandgo.ru/aerobag-test/' 
@@ -479,9 +480,10 @@ function FlightRow({
       }
     }
 
-    const isTest = window.location.href.includes('plan_test') || 
+    const isPlan2 = window.location.href.includes('plan_2');
+    const isTest = !isPlan2 && (window.location.href.includes('plan_test') || 
                    window.location.hostname === 'localhost' || 
-                   window.location.hostname === '127.0.0.1';
+                   window.location.hostname === '127.0.0.1');
     
     const targetLoadsheetUrl = isTest 
       ? 'https://boostandgo.ru/loadsheet_test/' 
