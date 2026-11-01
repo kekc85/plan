@@ -12,7 +12,6 @@ import { lookupFleetWb, getAircraftMtow } from './fleetWbLookup';
 export const TRACKED_AVIABIT_FIELDS = [
   'time',
   'flight_date',
-  'release_time',
   'ac_num',
   'ac_type',
   'ac_config',
@@ -221,6 +220,80 @@ export function getFlightKeyVariants(flight) {
  * @param {Object} incomingFlight - свежие данные из AviaBit
  * @returns {Object} объект изменений { [fieldName]: { old, new, ts } }
  */
+/**
+ * Сравнивает значения поля с учетом семантики типов:
+ * - Для pax_ch, pax_inf: null, undefined, '', '0', 0 - эквивалентны (0 человек).
+ * - Для time: '9:20' и '09:20' эквивалентны.
+ * - Для ac_num: 'RA-73850' и '73850' эквивалентны.
+ * - Для route_airports: 'REN - SVO' и 'REN-SVO' эквивалентны.
+ * - Для cargo, mail: '0' и '' эквивалентны (нет коммерческого груза).
+ */
+export function areFieldValuesEqual(field, valA, valB) {
+  const normA = normalizeVal(valA);
+  const normB = normalizeVal(valB);
+
+  // Точное совпадение строк
+  if (normA === normB) return true;
+
+  // 1. Дети и младенцы (pax_ch, pax_inf): 0 и пустая строка семантически равны
+  if (field === 'pax_ch' || field === 'pax_inf') {
+    const numA = parseInt(normA || '0', 10);
+    const numB = parseInt(normB || '0', 10);
+    return numA === numB;
+  }
+
+  // 2. Время (time): '9:20' == '09:20'
+  if (field === 'time') {
+    const padTime = (t) => {
+      if (!t || !t.includes(':')) return t;
+      const [h, m] = t.split(':');
+      return `${h.padStart(2, '0')}:${(m || '00').padStart(2, '0')}`;
+    };
+    return padTime(normA) === padTime(normB);
+  }
+
+  // 3. Бортовой номер (ac_num): 'RA-73850' == '73850'
+  if (field === 'ac_num') {
+    const cleanNum = (n) => String(n).toUpperCase().replace(/^RA[-\s]?/i, '').trim();
+    return cleanNum(normA) === cleanNum(normB);
+  }
+
+  // 4. Аэропорты маршрута (route_airports): 'REN - SVO' == 'REN-SVO'
+  if (field === 'route_airports') {
+    const cleanAirports = (a) => String(a).toUpperCase().replace(/\s*-\s*/g, '-').trim();
+    return cleanAirports(normA) === cleanAirports(normB);
+  }
+
+  // 5. Груз и почта (cargo, mail): пустая строка и 0 считаются отсутствием груза
+  if (field === 'cargo' || field === 'mail') {
+    if ((normA === '' || normA === '0') && (normB === '' || normB === '0')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Формирует понятную русскоязычную подсказку со списком всех изменений для рейса
+ */
+export function formatFlightChangesTooltip(flightOrUnread) {
+  const unread = flightOrUnread?.unread_changes ? getSafeUnreadChanges(flightOrUnread) : (flightOrUnread || {});
+  const keys = Object.keys(unread).filter(k => TRACKED_AVIABIT_FIELDS.includes(k) || k === '_is_new');
+  if (keys.length === 0) return '';
+
+  const lines = keys.map(k => {
+    if (k === '_is_new') return '• Новый рейс добавлен в план';
+    const label = FIELD_LABELS[k] || k;
+    const item = unread[k];
+    const oldV = (item?.old !== undefined && item?.old !== null && item?.old !== '') ? item.old : '—';
+    const newV = (item?.new !== undefined && item?.new !== null && item?.new !== '') ? item.new : '—';
+    return `• ${label}: ${oldV} → ${newV}`;
+  });
+
+  return `Изменения в рейсе (${keys.length}):\n${lines.join('\n')}\n(Нажмите для подтверждения)`;
+}
+
 export function detectFlightChanges(oldFlight, incomingFlight) {
   const changes = {};
   if (!oldFlight || !incomingFlight) return changes;
@@ -228,26 +301,41 @@ export function detectFlightChanges(oldFlight, incomingFlight) {
   const existingUnread = oldFlight.unread_changes || {};
 
   TRACKED_AVIABIT_FIELDS.forEach(field => {
-    // Если экипаж был изменен диспетчером вручную, не детектируем изменения из AviaBit
+    // Если экипаж был изменен вручную диспетчером, не перезаписываем его из AviaBit
     if (field === 'crew' && oldFlight.crew_manual) {
       return;
     }
 
-    const oldVal = normalizeVal(oldFlight[field]);
-    const newVal = normalizeVal(incomingFlight[field]);
+    const rawOld = oldFlight[field];
+    const rawNew = incomingFlight[field];
 
-    // Если значение изменилось в новом ответе AviaBit
-    if (newVal !== '' && oldVal !== newVal) {
-      // Если по этому полю уже висела неподтвержденная подсветка, сохраняем исходное старое значение
-      const prevOld = existingUnread[field]?.old !== undefined ? existingUnread[field].old : oldVal;
+    const oldVal = normalizeVal(rawOld);
+    const newVal = normalizeVal(rawNew);
+
+    // Новое значение пустое в AviaBit — не считаем изменением
+    if (newVal === '') {
+      if (existingUnread[field]) {
+        changes[field] = existingUnread[field];
+      }
+      return;
+    }
+
+    // Проверяем семантическое равенство
+    const isEqual = areFieldValuesEqual(field, rawOld, rawNew);
+
+    if (!isEqual) {
+      // Для детей/младенцев: если старое значение не было задано ('') и пришел 0 — это не изменение
+      if ((field === 'pax_ch' || field === 'pax_inf') && (oldVal === '' || oldVal === '0') && parseInt(newVal, 10) === 0) {
+        return;
+      }
+      const prevOld = existingUnread[field]?.old !== undefined ? existingUnread[field].old : (oldVal || '—');
       changes[field] = {
-        old: prevOld || '—',
+        old: prevOld,
         new: newVal,
         ts: Date.now()
       };
     } else if (existingUnread[field]) {
-      // Если значение совпадает с текущим, но у диспетчера висит неподтвержденное старое изменение,
-      // сохраняем его пока диспетчер не нажмет подтверждение
+      // Поле не изменилось с прошлого раза, но ранее было непрочитано диспетчером
       changes[field] = existingUnread[field];
     }
   });

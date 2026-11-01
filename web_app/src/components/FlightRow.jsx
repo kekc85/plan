@@ -17,7 +17,7 @@ import {
   normalizePlaneType,
   detectPlaneType
 } from '../utils/validators';
-import { getSafeUnreadChanges, TRACKED_AVIABIT_FIELDS } from '../utils/deltaSync';
+import { getSafeUnreadChanges, TRACKED_AVIABIT_FIELDS, formatFlightChangesTooltip } from '../utils/deltaSync';
 import { lookupFleetWb, getAircraftMtow } from '../utils/fleetWbLookup';
 import { 
   getDisplayFlightTimes, 
@@ -65,7 +65,7 @@ function FlightRow({
   // Непрочитанные изменения
   const unread = getSafeUnreadChanges(flight);
   const unreadCount = Object.keys(unread).filter(
-    k => (TRACKED_AVIABIT_FIELDS.includes(k) && k !== 'release_time') || k === '_is_new'
+    k => TRACKED_AVIABIT_FIELDS.includes(k) || k === '_is_new'
   ).length;
   const hasUnreadChanges = unreadCount > 0 || !!flight.is_new_flight;
   const isChanged = (field) => !!unread[field];
@@ -1039,22 +1039,43 @@ function FlightRow({
             placeholder="0"
             maxLength={10}
             title={(() => {
-              const ch = flight.pax_ch || (flight.pax?.includes('/') ? flight.pax.split('/')[1] : null) || (flight.notes?.match(/(\d+)\s*(?:РБ|Рб|рб)/i)?.[1]) || '0';
-              const inf = flight.pax_inf || (flight.pax?.includes('/') && flight.pax.split('/').length > 2 ? flight.pax.split('/')[2] : null) || (flight.notes?.match(/(\d+)\s*(?:РМ|Рм|рм)/i)?.[1]) || '0';
+              const ch = flight.pax_ch || (flight.pax?.includes('/') ? flight.pax.split('/')[1] : null) || (flight.notes?.match(/(\d+)\s*(?:рб|дети|дет|CHD|chd)/i)?.[1]) || '0';
+              const inf = flight.pax_inf || (flight.pax?.includes('/') && flight.pax.split('/').length > 2 ? flight.pax.split('/')[2] : null) || (flight.notes?.match(/(\d+)\s*(?:рм|млад|INF|inf)/i)?.[1]) || '0';
               return `Пассажиры (PAX): ${flight.pax || 0} (РБ: ${ch}, РМ: ${inf})`;
             })()}
-            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-11 text-center font-mono font-black text-sm text-slate-950 dark:text-white outline-none cursor-text ${getChangedStyle('pax')}`}
+            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-11 text-center font-mono font-black text-sm text-slate-950 dark:text-white outline-none cursor-text ${
+              getChangedStyle('pax') || ((isChanged('pax_ch') || isChanged('pax_inf')) ? 'ring-2 ring-amber-400/80 bg-amber-50 dark:bg-amber-950/40' : '')
+            }`}
           />
           {(() => {
-            const ch = flight.pax_ch || (flight.pax?.includes('/') ? flight.pax.split('/')[1] : null) || (flight.notes?.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd)/i)?.[1]) || '';
-            const inf = flight.pax_inf || (flight.pax?.includes('/') && flight.pax.split('/').length > 2 ? flight.pax.split('/')[2] : null) || (flight.notes?.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf)/i)?.[1]) || '';
+            const ch = flight.pax_ch || (flight.pax?.includes('/') ? flight.pax.split('/')[1] : null) || (flight.notes?.match(/(\d+)\s*(?:рб|дети|дет|CHD|chd)/i)?.[1]) || '';
+            const inf = flight.pax_inf || (flight.pax?.includes('/') && flight.pax.split('/').length > 2 ? flight.pax.split('/')[2] : null) || (flight.notes?.match(/(\d+)\s*(?:рм|млад|INF|inf)/i)?.[1]) || '';
             const numCh = parseInt(ch, 10) || 0;
             const numInf = parseInt(inf, 10) || 0;
-            if (numCh <= 0 && numInf <= 0) return null;
+            const hasChOrInf = numCh > 0 || numInf > 0;
+            const isChChanged = isChanged('pax_ch');
+            const isInfChanged = isChanged('pax_inf');
+
+            if (!hasChOrInf && !isChChanged && !isInfChanged) return null;
+
             return (
-              <span className="text-[8px] font-bold text-sky-600 dark:text-sky-400 tracking-tight leading-none mt-0.5" title={`Дети: ${numCh} РБ, Младенцы: ${numInf} РМ`}>
-                {numCh > 0 ? `${numCh}рб` : ''}{numCh > 0 && numInf > 0 ? ' ' : ''}{numInf > 0 ? `${numInf}рм` : ''}
-              </span>
+              <div className="flex flex-col items-center mt-0.5 gap-0.5">
+                {hasChOrInf && (
+                  <span className={`text-[8px] tracking-tight leading-none px-1 py-0.2 rounded ${
+                    (isChChanged || isInfChanged)
+                      ? 'bg-amber-100 dark:bg-amber-950/90 text-amber-950 dark:text-amber-200 border border-amber-400 font-black'
+                      : 'text-sky-600 dark:text-sky-400 font-bold'
+                  }`} title={`Дети: ${numCh} рб, Младенцы: ${numInf} рм`}>
+                    {numCh > 0 ? `${numCh}рб` : ''}{numCh > 0 && numInf > 0 ? ' ' : ''}{numInf > 0 ? `${numInf}рм` : ''}
+                  </span>
+                )}
+                {isChChanged && (
+                  <ChangeBadge change={unread.pax_ch} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'pax_ch')} />
+                )}
+                {isInfChanged && (
+                  <ChangeBadge change={unread.pax_inf} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'pax_inf')} />
+                )}
+              </div>
             );
           })()}
           <ChangeBadge change={unread.pax} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'pax')} />
