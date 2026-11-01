@@ -43,6 +43,7 @@ import {
 } from './utils/api';
 import {
   smartMergeWithDelta,
+  syncAeroBagFlightTimes,
   getFlightKey,
   getFlightKeyVariants,
   getDeletionKeyVariants,
@@ -420,6 +421,7 @@ export default function App() {
   // Auto-save to LocalStorage AND Database API (debounced)
   useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY}_flights`, JSON.stringify(flights));
+    syncAeroBagFlightTimes(flights);
     localStorage.setItem(`${STORAGE_KEY}_info`, JSON.stringify(shiftInfo));
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
@@ -894,7 +896,9 @@ export default function App() {
             setTimeout(() => setChangeToast(null), 8000);
           }
 
-          return sortFlightsChronologically(mergedFlights.map(normalizeFlight));
+          const normalized = sortFlightsChronologically(mergedFlights.map(normalizeFlight));
+          syncAeroBagFlightTimes(normalized);
+          return normalized;
         });
       }
 

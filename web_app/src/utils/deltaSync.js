@@ -688,3 +688,116 @@ export function countUnreadChanges(flights = []) {
     return sum + visibleCount;
   }, 0);
 }
+
+/**
+ * Сквозная синхронизация времени вылета рейсов из AeroPlan в AeroBag.
+ * Обновляет ТОЛЬКО dep_time в predictionsHistory всех пользователей в LocalStorage
+ * и автоматически сортирует записи по времени вылета.
+ */
+export function syncAeroBagFlightTimes(flights = []) {
+  if (typeof window === 'undefined' || !window.localStorage || !Array.isArray(flights) || flights.length === 0) {
+    return 0;
+  }
+
+  let totalUpdated = 0;
+
+  try {
+    const targetKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('averago_predictions_history_')) {
+        targetKeys.push(key);
+      }
+    }
+
+    if (targetKeys.length === 0) return 0;
+
+    const normalizeTime = (t) => {
+      if (!t) return '';
+      const c = String(t).trim().replace(/[^\d:]/g, '');
+      if (c.includes(':')) {
+        const parts = c.split(':');
+        const h = Math.max(0, Math.min(23, parseInt(parts[0], 10) || 0));
+        const m = Math.max(0, Math.min(59, parseInt(parts[1], 10) || 0));
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+      return c;
+    };
+
+    const extractDigits = (val) => {
+      if (!val) return '';
+      const m = String(val).replace(/\D/g, '');
+      return m ? String(parseInt(m, 10)) : '';
+    };
+
+    targetKeys.forEach(storageKey => {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return;
+        let history = JSON.parse(raw);
+        if (!Array.isArray(history) || history.length === 0) return;
+
+        let keyUpdated = false;
+
+        history.forEach(p => {
+          const pDigits = extractDigits(p.flight_no);
+          if (!pDigits) return;
+          const pDateNorm = normalizeFlightDate(p.flight_date || p.calc_date);
+
+          const match = flights.find(f => {
+            const fDigits = extractDigits(f.flight);
+            if (fDigits !== pDigits) return false;
+            const fDateNorm = normalizeFlightDate(f.flight_date);
+            if (pDateNorm && fDateNorm && pDateNorm !== fDateNorm) return false;
+            return true;
+          });
+
+          if (match) {
+            const newTime = normalizeTime(match.time || match.departure_time);
+            const oldTime = normalizeTime(p.dep_time);
+            if (newTime && newTime !== oldTime) {
+              p.dep_time = newTime;
+              keyUpdated = true;
+              totalUpdated++;
+            }
+          }
+        });
+
+        if (keyUpdated) {
+          // Сортировка по времени вылета (от меньшего к большему)
+          history.sort((a, b) => {
+            const timeA = normalizeTime(a.dep_time);
+            const timeB = normalizeTime(b.dep_time);
+            if (!timeA && !timeB) return new Date(b.calc_date || 0) - new Date(a.calc_date || 0);
+            if (!timeA) return 1;
+            if (!timeB) return -1;
+
+            const dateA = a.flight_date ? String(a.flight_date).split('T')[0] : '';
+            const dateB = b.flight_date ? String(b.flight_date).split('T')[0] : '';
+            if (dateA && dateB && dateA !== dateB) {
+              const dateCmp = dateA.localeCompare(dateB);
+              if (dateCmp !== 0) return dateCmp;
+            }
+
+            const [hA, mA] = timeA.split(':').map(n => parseInt(n, 10) || 0);
+            const [hB, mB] = timeB.split(':').map(n => parseInt(n, 10) || 0);
+            const minsA = hA * 60 + mA;
+            const minsB = hB * 60 + mB;
+            if (minsA !== minsB) return minsA - minsB;
+            return String(a.flight_no).localeCompare(String(b.flight_no));
+          });
+
+          localStorage.setItem(storageKey, JSON.stringify(history));
+        }
+      } catch (err) {
+        console.warn(`[AeroPlan] Ошибка синхронизации времен в ${storageKey}:`, err);
+      }
+    });
+
+  } catch (globalErr) {
+    console.warn('[AeroPlan] Ошибка в syncAeroBagFlightTimes:', globalErr);
+  }
+
+  return totalUpdated;
+}
+
