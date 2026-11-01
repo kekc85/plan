@@ -5,6 +5,17 @@ import {
   Clock, ShieldCheck, Sparkles, ExternalLink, Printer, Eye
 } from 'lucide-react';
 
+import planScreenImg from '../assets/manual/plan_screen.png';
+import planHeaderImg from '../assets/manual/plan_header.png';
+import rowScreenImg from '../assets/manual/row_screen.png';
+import aerobagScreenImg from '../assets/manual/aerobag_screen.png';
+import aerobagSidebarImg from '../assets/manual/aerobag_sidebar.png';
+import aerobagCalcImg from '../assets/manual/aerobag_calc.png';
+import loadsheetScreenImg from '../assets/manual/loadsheet_screen.png';
+import loadsheetLimitsImg from '../assets/manual/loadsheet_limits.png';
+import loadsheetEnvelopeImg from '../assets/manual/loadsheet_envelope.png';
+
+
 export default function DownloadManualModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isDownloading, setIsDownloading] = useState(false);
@@ -155,9 +166,9 @@ export default function DownloadManualModal({ isOpen, onClose }) {
 
               {/* Главный скриншот системы */}
               <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm bg-slate-50 dark:bg-slate-800">
-                <div className="relative group cursor-pointer" onClick={() => setSelectedImage(basePath + 'img/manual/plan_screen.png')}>
+                <div className="relative group cursor-pointer" onClick={() => setSelectedImage(planScreenImg)}>
                   <img 
-                    src={basePath + 'img/manual/plan_screen.png'} 
+                    src={planScreenImg} 
                     alt="AeroPlan Full Overview" 
                     className="w-full object-cover max-h-[380px] group-hover:opacity-95 transition-opacity"
                   />
@@ -293,9 +304,10 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                 </span>
                 <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-slate-850">
                   <img 
-                    src={basePath + 'img/manual/plan_header.png'} 
+                    src={planHeaderImg} 
                     alt="AeroPlan Header" 
-                    className="w-full object-cover max-h-[140px]"
+                    onClick={() => setSelectedImage(planHeaderImg)} 
+                    className="w-full object-cover max-h-[140px] cursor-pointer hover:opacity-95 transition-opacity"
                   />
                   <div className="p-3 text-xs text-slate-600 dark:text-slate-300 border-t border-slate-200 dark:border-slate-700 space-y-1">
                     <p>• <strong>Даты смены и диспетчер:</strong> фиксируют границы дежурства.</p>
@@ -313,9 +325,10 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                 </span>
                 <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-slate-850">
                   <img 
-                    src={basePath + 'img/manual/row_screen.png'} 
+                    src={rowScreenImg} 
                     alt="AeroPlan Flight Row" 
-                    className="w-full object-cover max-h-[110px]"
+                    onClick={() => setSelectedImage(rowScreenImg)} 
+                    className="w-full object-cover max-h-[110px] cursor-pointer hover:opacity-95 transition-opacity"
                   />
                   <div className="p-3 text-xs text-slate-600 dark:text-slate-300 border-t border-slate-200 dark:border-slate-700 space-y-1">
                     <p>• <strong>Маршрут и статус ВС:</strong> город, трасса (REN-SVO) и оперативный статус («Вылет REN 16:04»).</p>
@@ -412,9 +425,10 @@ export default function DownloadManualModal({ isOpen, onClose }) {
               {/* 1. Скриншот AeroBag общий */}
               <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-slate-850">
                 <img 
-                  src={basePath + 'img/manual/aerobag_screen.png'} 
+                  src={aerobagScreenImg} 
                   alt="AeroBag Full Screen" 
-                  className="w-full object-cover max-h-[380px]"
+                  onClick={() => setSelectedImage(aerobagScreenImg)} 
+                  className="w-full object-cover max-h-[380px] cursor-pointer hover:opacity-95 transition-opacity"
                 />
                 <div className="p-3 text-xs text-slate-500 dark:text-slate-400 italic text-center border-t border-slate-200 dark:border-slate-700">
                   Общий вид AeroBag: боковая панель рейсов слева, калькулятор средней массы и отсеки лайнера.
@@ -430,9 +444,10 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                       Боковой список рейсов смены:
                     </span>
                     <img 
-                      src={basePath + 'img/manual/aerobag_sidebar.png'} 
+                      src={aerobagSidebarImg} 
                       alt="AeroBag Sidebar" 
-                      className="w-full object-cover max-h-[220px] rounded-lg border border-slate-200 dark:border-slate-700"
+                      onClick={() => setSelectedImage(aerobagSidebarImg)} 
+                      className="w-full object-contain bg-slate-900 max-h-[220px] rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-95 transition-opacity"
                     />
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
@@ -446,9 +461,10 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                       Калькулятор и отсеки багажа:
                     </span>
                     <img 
-                      src={basePath + 'img/manual/aerobag_calc.png'} 
+                      src={aerobagCalcImg} 
                       alt="AeroBag Calculation" 
-                      className="w-full object-cover max-h-[220px] rounded-lg border border-slate-200 dark:border-slate-700"
+                      onClick={() => setSelectedImage(aerobagCalcImg)} 
+                      className="w-full object-contain bg-slate-900 max-h-[220px] rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-95 transition-opacity"
                     />
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
@@ -511,9 +527,10 @@ export default function DownloadManualModal({ isOpen, onClose }) {
               {/* 1. Скриншот полного бланка */}
               <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-slate-850">
                 <img 
-                  src={basePath + 'img/manual/loadsheet_screen.png'} 
+                  src={loadsheetScreenImg} 
                   alt="W&B Loadsheet Blank" 
-                  className="w-full object-cover max-h-[380px]"
+                  onClick={() => setSelectedImage(loadsheetScreenImg)} 
+                  className="w-full object-cover max-h-[380px] cursor-pointer hover:opacity-95 transition-opacity"
                 />
                 <div className="p-3 text-xs text-slate-500 dark:text-slate-400 italic text-center border-t border-slate-200 dark:border-slate-700">
                   Полный бланк центровки W&B Loadsheet: расчет весовых лимитов, пассажирские зоны, отсеки и центровочная трапеция.
@@ -529,9 +546,10 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                       Расчет взлетных лимитов (1, 2, 3):
                     </span>
                     <img 
-                      src={basePath + 'img/manual/loadsheet_limits.png'} 
+                      src={loadsheetLimitsImg} 
                       alt="Loadsheet Take-off limits" 
-                      className="w-full object-cover max-h-[140px] rounded-lg border border-slate-200 dark:border-slate-700"
+                      onClick={() => setSelectedImage(loadsheetLimitsImg)} 
+                      className="w-full object-cover max-h-[140px] rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-95 transition-opacity"
                     />
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
@@ -545,9 +563,10 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                       Центровочный график (% MAC):
                     </span>
                     <img 
-                      src={basePath + 'img/manual/loadsheet_envelope.png'} 
+                      src={loadsheetEnvelopeImg} 
                       alt="Loadsheet Trim Envelope" 
-                      className="w-full object-cover max-h-[140px] rounded-lg border border-slate-200 dark:border-slate-700"
+                      onClick={() => setSelectedImage(loadsheetEnvelopeImg)} 
+                      className="w-full object-cover max-h-[140px] rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-95 transition-opacity"
                     />
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
