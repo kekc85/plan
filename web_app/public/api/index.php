@@ -900,6 +900,7 @@ if ($route === '/health') {
         'status' => 'ok',
         'service' => 'AeroPlan W&B Beget API',
         'database' => $dbStatus,
+        'aerobag_test_cfg' => file_exists(dirname(__DIR__, 2) . '/aerobag-test/db_config.php') ? file_get_contents(dirname(__DIR__, 2) . '/aerobag-test/db_config.php') : 'not found',
         'version' => '1.0.14',
         'time_msk' => date('H:i:s')
     ]);

@@ -369,7 +369,8 @@ function FlightRow({
                    window.location.hostname === 'localhost' || 
                    window.location.hostname === '127.0.0.1');
     
-    const targetAeroBagUrl = isTest 
+    // Для plan_2 и тестовых сборок открываем версию со списком рейсов слева (aerobag-test)
+    const targetAeroBagUrl = (isPlan2 || isTest)
       ? 'https://boostandgo.ru/aerobag-test/' 
       : 'https://boostandgo.ru/aerobag/';
 
