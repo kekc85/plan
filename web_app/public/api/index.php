@@ -27,7 +27,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // 1. КОНФИГУРАЦИЯ БАЗЫ ДАННЫХ MYSQL (BEGET)
 // ----------------------------------------------------
 // Подключение изолированной конфигурации базы данных Beget (если существует)
-$configPaths = [__DIR__ . '/db_config.php', dirname(__DIR__) . '/db_config.php', __DIR__ . '/../db_config.php'];
+$configPaths = [
+    __DIR__ . '/db_config.php',
+    dirname(__DIR__) . '/db_config.php',
+    __DIR__ . '/../db_config.php',
+    dirname(__DIR__, 2) . '/plan/api/db_config.php',
+    dirname(__DIR__, 2) . '/plan/db_config.php',
+    ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/plan/api/db_config.php',
+    ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/plan/db_config.php',
+];
 foreach ($configPaths as $cfgFile) {
     if (file_exists($cfgFile)) {
         require_once $cfgFile;
@@ -57,7 +65,7 @@ if (!defined('DB_HOST')) define('DB_HOST', getenv('DB_HOST') ?: ($_ENV['DB_HOST'
 if (!defined('DB_PORT')) define('DB_PORT', (int)(getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? 3306)));
 if (!defined('DB_NAME')) define('DB_NAME', getenv('DB_NAME') ?: ($_ENV['DB_NAME'] ?? 'kekc8584_plan'));
 if (!defined('DB_USER')) define('DB_USER', getenv('DB_USER') ?: ($_ENV['DB_USER'] ?? 'kekc8584_plan'));
-if (!defined('DB_PASS')) define('DB_PASS', getenv('DB_PASSWORD') ?: ($_ENV['DB_PASSWORD'] ?? ''));
+if (!defined('DB_PASS')) define('DB_PASS', getenv('DB_PASSWORD') ?: ($_ENV['DB_PASSWORD'] ?? 'bTe&R3xCLmiH'));
 if (!defined('JWT_SECRET')) define('JWT_SECRET', getenv('PLAN_JWT_SECRET') ?: ($_ENV['PLAN_JWT_SECRET'] ?? 'aeroplan_wb_secret_beget_2026_andrey'));
 
 function getAerobagDb() {
@@ -865,12 +873,15 @@ $uri = $_SERVER['REQUEST_URI'] ?? '';
 $path = parse_url($uri, PHP_URL_PATH) ?? '';
 
 $route = '';
-if (preg_match('#/(?:plan/)?api(?:/|$)(.*)#', $path, $m)) {
+if (preg_match('#/(?:plan_2|plan_test|plan)?/?api(?:/|$)(.*)#', $path, $m)) {
     $route = '/' . trim($m[1], '/');
 } elseif (preg_match('#/api(?:/|$)(.*)#', $path, $m)) {
     $route = '/' . trim($m[1], '/');
 } else {
     $route = '/' . trim($path, '/');
+}
+if (($route === '' || $route === '/index.php' || $route === '/') && isset($_GET['route'])) {
+    $route = '/' . trim($_GET['route'], '/');
 }
 
 if ($route === '/' || $route === '') $route = '/health';
