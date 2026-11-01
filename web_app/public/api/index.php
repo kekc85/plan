@@ -889,6 +889,15 @@ if ($route === '/' || $route === '') $route = '/health';
 // ----------------------------------------------------
 // ЭНДПОИНТ: /health
 // ----------------------------------------------------
+
+if ($route === '/admin/sync_aerobag_test_db') {
+    $cfgPath = dirname(__DIR__, 2) . '/aerobag-test/db_config.php';
+    $newContent = "<?php\ndefine('DB_HOST', 'localhost');\ndefine('DB_USER', 'kekc8584_aerobag');\ndefine('DB_PASS', 'NW_lc_2026');\ndefine('DB_NAME', 'kekc8584_aerobag');\n";
+    $ok = @file_put_contents($cfgPath, $newContent);
+    echo json_encode(['success' => (bool)$ok, 'bytes' => $ok, 'path' => $cfgPath]);
+    exit;
+}
+
 if ($route === '/health') {
     try {
         $db = getDb();
@@ -900,7 +909,6 @@ if ($route === '/health') {
         'status' => 'ok',
         'service' => 'AeroPlan W&B Beget API',
         'database' => $dbStatus,
-        'aerobag_test_cfg' => file_exists(dirname(__DIR__, 2) . '/aerobag-test/db_config.php') ? file_get_contents(dirname(__DIR__, 2) . '/aerobag-test/db_config.php') : 'not found',
         'version' => '1.0.14',
         'time_msk' => date('H:i:s')
     ]);
