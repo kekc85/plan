@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { 
   X, BookOpen, Download, Plane, Luggage, FileSpreadsheet, 
   HelpCircle, ArrowRight, CheckCircle2, ChevronRight, Layers, 
-  Clock, ShieldCheck, Sparkles, ExternalLink, Printer
+  Clock, ShieldCheck, Sparkles, ExternalLink, Printer, Eye
 } from 'lucide-react';
 
 export default function DownloadManualModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   if (!isOpen) return null;
 
@@ -49,16 +50,16 @@ export default function DownloadManualModal({ isOpen, onClose }) {
 
   const tabs = [
     { id: 'overview', label: '1. Обзор комплекса', icon: Layers },
-    { id: 'aeroplan', label: '2. AeroPlan (План)', icon: Plane },
-    { id: 'aerobag', label: '3. AeroBag (Багаж)', icon: Luggage },
-    { id: 'loadsheet', label: '4. Loadsheet (Центровка)', icon: FileSpreadsheet },
+    { id: 'aeroplan', label: '2. AeroPlan (Суточный план)', icon: Plane },
+    { id: 'aerobag', label: '3. AeroBag (Багаж и отсеки)', icon: Luggage },
+    { id: 'loadsheet', label: '4. W&B Loadsheet (Центровка)', icon: FileSpreadsheet },
     { id: 'workflow', label: '5. Пример по шагам', icon: ArrowRight },
     { id: 'faq', label: '6. Частые вопросы', icon: HelpCircle },
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-2 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-6xl h-[92vh] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-6xl h-[94vh] flex flex-col overflow-hidden">
         
         {/* Шапка модального окна */}
         <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-sky-50 via-indigo-50/50 to-white dark:from-slate-900 dark:via-slate-850 dark:to-slate-900 shrink-0">
@@ -71,12 +72,9 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                 <h3 className="font-black text-base text-slate-900 dark:text-slate-100 leading-tight">
                   Руководство пользователя AeroPlan 2.0
                 </h3>
-                <span className="px-2 py-0.5 text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300 rounded-full border border-sky-300 dark:border-sky-700">
-                  plan_2
-                </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Практическая инструкция диспетчера группы центровки (AeroPlan + AeroBag + Loadsheet)
+                Иллюстрированное практическое руководство диспетчера группы центровки
               </p>
             </div>
           </div>
@@ -115,7 +113,7 @@ export default function DownloadManualModal({ isOpen, onClose }) {
         )}
 
         {/* Навигационные вкладки */}
-        <div className="flex items-center gap-1 px-6 pt-2 bg-slate-100/70 dark:bg-slate-855/60 border-b border-slate-200 dark:border-slate-800 overflow-x-auto shrink-0 scrollbar-none">
+        <div className="flex items-center gap-1 px-6 pt-2 bg-slate-100/70 dark:bg-slate-850/60 border-b border-slate-200 dark:border-slate-800 overflow-x-auto shrink-0 scrollbar-none">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -124,7 +122,7 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-t-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer border-t border-x ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer border-t border-x ${
                   isActive
                     ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 border-slate-200 dark:border-slate-800 shadow-sm relative -bottom-[1px]'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 border-transparent'
@@ -148,17 +146,36 @@ export default function DownloadManualModal({ isOpen, onClose }) {
               <div className="bg-gradient-to-br from-sky-50 to-indigo-50/60 dark:from-slate-850 dark:to-slate-800 p-5 rounded-2xl border border-sky-100 dark:border-slate-700/60 shadow-sm">
                 <h4 className="text-lg font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-sky-600 dark:text-sky-400" />
-                  Добро пожаловать в единую систему AeroPlan 2.0 (plan_2)
+                  Единая система управления центровкой AeroPlan 2.0
                 </h4>
                 <p className="text-slate-600 dark:text-slate-300 text-sm">
-                  Система разработана для диспетчеров группы центровки и объединяет в одну экосистему суточный план полетов, расчет коммерческой загрузки багажа и центровочные графики. Все три приложения используют <strong>общую базу данных</strong>: данные обновляются везде синхронно, исключая двойную рутинную работу.
+                  Комплекс объединяет суточный план полетов, расчет коммерческой загрузки багажа и центровочные графики в неразрывную рабочую среду. Все модули работают на <strong>общей оперативной базе данных</strong>: данные обновляются синхронно, исключая двойной рутинный ввод.
                 </p>
+              </div>
+
+              {/* Главный скриншот системы */}
+              <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm bg-slate-50 dark:bg-slate-800">
+                <div className="relative group cursor-pointer" onClick={() => setSelectedImage(basePath + 'img/manual/plan_screen.png')}>
+                  <img 
+                    src={basePath + 'img/manual/plan_screen.png'} 
+                    alt="AeroPlan Full Overview" 
+                    className="w-full object-cover max-h-[380px] group-hover:opacity-95 transition-opacity"
+                  />
+                  <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-slate-900/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <span className="px-3 py-1.5 bg-slate-900/80 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 backdrop-blur-sm">
+                      <Eye className="w-3.5 h-3.5" /> Нажмите для увеличения
+                    </span>
+                  </div>
+                </div>
+                <div className="p-3 bg-white dark:bg-slate-850 text-xs text-slate-500 dark:text-slate-400 italic text-center border-t border-slate-200 dark:border-slate-700">
+                  Общий рабочий стол AeroPlan: суточный график, статусы движения самолетов, таймер готовности и кнопки перехода.
+                </div>
               </div>
 
               {/* Схема взаимодействия */}
               <div className="border border-slate-200 dark:border-slate-700/80 rounded-2xl p-5 bg-white dark:bg-slate-850 shadow-sm">
                 <h5 className="font-extrabold text-sm text-slate-900 dark:text-white mb-4 uppercase tracking-wider text-sky-700 dark:text-sky-400">
-                  Схема сквозной работы приложений:
+                  Схема сквозной работы модулей:
                 </h5>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   
@@ -169,9 +186,9 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                         <span>1. AeroPlan</span>
                       </div>
                       <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
-                        <p>• Электронный суточный план смены</p>
-                        <p>• Контроль вылетов (светофор за -40 мин)</p>
-                        <p>• Пассажиры (включая детей РБ и младенцев РМ)</p>
+                        <p>• Суточный план рейсов смены</p>
+                        <p>• Контроль вылетов (-40 минут)</p>
+                        <p>• Пассажиры (дети РБ и младенцы РМ)</p>
                         <p>• Авто-подстановка взлетного веса MTOW</p>
                       </div>
                     </div>
@@ -187,14 +204,14 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                         <span>2. AeroBag</span>
                       </div>
                       <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
-                        <p>• Список всех рейсов смены слева</p>
+                        <p>• Боковой список всех рейсов смены</p>
                         <p>• Расчет средней массы багажа</p>
-                        <p>• Кнопка «Перенести в Preliminary»</p>
-                        <p>• Быстрая Tab-навигация по отсекам</p>
+                        <p>• Перенос в Preliminary в 1 клик</p>
+                        <p>• Навигация клавишей Tab по отсекам</p>
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-indigo-200/60 dark:border-indigo-800/40 text-[11px] font-bold text-indigo-700 dark:text-indigo-400">
-                      Открытие в 1 клик из плана
+                      Вызов в 1 клик из плана
                     </div>
                   </div>
 
@@ -207,12 +224,12 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                       <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
                         <p>• Официальный бланк ведомости (А4)</p>
                         <p>• Расчет пределов взлета (Zero/TO/Landing)</p>
-                        <p>• Расчет графика центровки (% MAC)</p>
-                        <p>• Печать и отправка телеграмм LIR/LDM</p>
+                        <p>• Центровочный график (% MAC)</p>
+                        <p>• Отправка телеграмм LIR / LDM</p>
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-emerald-200/60 dark:border-emerald-800/40 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                      Все данные рейса передаются сами
+                      Данные подставляются сами
                     </div>
                   </div>
 
@@ -222,28 +239,28 @@ export default function DownloadManualModal({ isOpen, onClose }) {
               {/* Главные преимущества */}
               <div className="space-y-3">
                 <h5 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                  Ключевые преимущества версии plan_2:
+                  Ключевые преимущества для диспетчера:
                 </h5>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-200 dark:border-slate-700 flex items-start gap-2.5">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700 flex items-start gap-2.5">
                     <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
                     <div>
                       <strong>Защита ручных правок:</strong> если диспетчер изменил MTOW или экипаж руками, система запоминает это и фоновая синхронизация никогда не перетрет введенное значение.
                     </div>
                   </div>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-200 dark:border-slate-700 flex items-start gap-2.5">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700 flex items-start gap-2.5">
                     <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
                     <div>
                       <strong>Сохранение детей и младенцев:</strong> данные о детях (РБ) и младенцах (РМ) надежно защищены от стирания и автоматически передаются в графы CH и INF в центровку.
                     </div>
                   </div>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-200 dark:border-slate-700 flex items-start gap-2.5">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700 flex items-start gap-2.5">
                     <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
                     <div>
                       <strong>Боковой список рейсов в AeroBag:</strong> можно переключаться между рейсами смены прямо в AeroBag без необходимости возвращаться в суточный план.
                     </div>
                   </div>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-200 dark:border-slate-700 flex items-start gap-2.5">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700 flex items-start gap-2.5">
                     <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
                     <div>
                       <strong>Автоматический выбор наименьшего лимита взлета:</strong> в Loadsheet программа сама сравнивает ограничения по Zero Fuel, Take-Off и Landing Fuel и выделяет безопасный лимит.
@@ -265,26 +282,55 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                   AeroPlan: Электронный суточный план смены
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Основное окно управления сменой по адресу <code className="text-sky-600 font-mono font-bold">https://boostandgo.ru/plan_2/</code>
+                  Главный экран смены, где диспетчер ведет оперативный контроль рейсов
                 </p>
               </div>
 
-              {/* Скриншот AeroPlan */}
-              <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
-                <img 
-                  src={basePath + 'img/manual/plan_screen.png'} 
-                  alt="AeroPlan Interface" 
-                  className="w-full object-cover max-h-[460px]"
-                />
-                <div className="p-3 bg-slate-50 dark:bg-slate-850 text-xs text-slate-500 dark:text-slate-400 italic text-center border-t border-slate-200 dark:border-slate-700">
-                  Главный экран AeroPlan: суточный план смены, статусы ВС, кнопки быстрого вызова AeroBag/Loadsheet и чеклисты.
+              {/* 1. Скриншот шапки */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  1. Шапка плана смены и оперативные часы:
+                </span>
+                <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-slate-850">
+                  <img 
+                    src={basePath + 'img/manual/plan_header.png'} 
+                    alt="AeroPlan Header" 
+                    className="w-full object-cover max-h-[140px]"
+                  />
+                  <div className="p-3 text-xs text-slate-600 dark:text-slate-300 border-t border-slate-200 dark:border-slate-700 space-y-1">
+                    <p>• <strong>Даты смены и диспетчер:</strong> фиксируют границы дежурства.</p>
+                    <p>• <strong>Часы MSK / UTC:</strong> переключают отображение времени во всем плане.</p>
+                    <p>• <strong>Сводные счетчики:</strong> «Рейсов в плане», «Подготовлено», «LIR отправлено» — наглядный индикатор готовности всей смены.</p>
+                    <p>• <strong>Быстрый переход:</strong> кнопки [AeroBag] и [Loadsheet] в шапке для оперативного доступа.</p>
+                  </div>
                 </div>
               </div>
 
-              {/* Описание колонок плана */}
+              {/* 2. Скриншот строки рейса крупным планом */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  2. Строка рейса крупным планом:
+                </span>
+                <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-slate-850">
+                  <img 
+                    src={basePath + 'img/manual/row_screen.png'} 
+                    alt="AeroPlan Flight Row" 
+                    className="w-full object-cover max-h-[110px]"
+                  />
+                  <div className="p-3 text-xs text-slate-600 dark:text-slate-300 border-t border-slate-200 dark:border-slate-700 space-y-1">
+                    <p>• <strong>Маршрут и статус ВС:</strong> город, трасса (REN-SVO) и оперативный статус («Вылет REN 16:04»).</p>
+                    <p>• <strong>Время (-40 мин):</strong> при приближении к вылету плашка подсвечивается бирюзовым сигналом.</p>
+                    <p>• <strong>Пассажиры (PAX):</strong> крупное число 193 и синяя строка <strong>14рб 1рм</strong> (14 детей, 1 младенец).</p>
+                    <p>• <strong>MTOW:</strong> автоматически подставляется 89000 кг (для A321). При ручной правке значение блокируется от стирания.</p>
+                    <p>• <strong>Топливо и веса:</strong> Block 10900, Trip 5700, Taxi 200, DOW 48424, DOI 36, Кухня F.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Таблица колонок плана */}
               <div className="space-y-3">
                 <h5 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                  Разбор колонок суточного плана:
+                  Подробное назначение всех колонок суточного плана:
                 </h5>
                 <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden text-xs">
                   <table className="w-full border-collapse">
@@ -346,18 +392,6 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {/* Скриншот строки рейса */}
-              <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
-                <img 
-                  src={basePath + 'img/manual/row_screen.png'} 
-                  alt="Flight Row Detail" 
-                  className="w-full object-cover"
-                />
-                <div className="p-3 bg-slate-50 dark:bg-slate-850 text-xs text-slate-500 dark:text-slate-400 italic text-center border-t border-slate-200 dark:border-slate-700">
-                  Строка рейса N4078: число пассажиров 193 с синей строкой детей (14рб 1рм) и ячейка максимального взлетного веса MTOW.
-                </div>
-              </div>
-
             </div>
           )}
 
@@ -371,34 +405,71 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                   AeroBag: Расчет коммерческой загрузки и багажа
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Трехколоночный интерфейс с боковым списком рейсов смены
+                  Современный трехколоночный интерфейс с боковой панелью рейсов
                 </p>
               </div>
 
-              {/* Скриншот AeroBag */}
-              <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+              {/* 1. Скриншот AeroBag общий */}
+              <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-slate-850">
                 <img 
                   src={basePath + 'img/manual/aerobag_screen.png'} 
-                  alt="AeroBag Interface" 
-                  className="w-full object-cover max-h-[460px]"
+                  alt="AeroBag Full Screen" 
+                  className="w-full object-cover max-h-[380px]"
                 />
-                <div className="p-3 bg-slate-50 dark:bg-slate-850 text-xs text-slate-500 dark:text-slate-400 italic text-center border-t border-slate-200 dark:border-slate-700">
-                  Интерфейс AeroBag: панель рейсов смены слева, калькулятор средней массы и таблица багажных отсеков ВС.
+                <div className="p-3 text-xs text-slate-500 dark:text-slate-400 italic text-center border-t border-slate-200 dark:border-slate-700">
+                  Общий вид AeroBag: боковая панель рейсов слева, калькулятор средней массы и отсеки лайнера.
                 </div>
+              </div>
+
+              {/* 2. Двойной блок скриншотов деталей AeroBag */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-850 p-3 flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-sky-700 dark:text-sky-400 block mb-2 uppercase">
+                      Боковой список рейсов смены:
+                    </span>
+                    <img 
+                      src={basePath + 'img/manual/aerobag_sidebar.png'} 
+                      alt="AeroBag Sidebar" 
+                      className="w-full object-cover max-h-[220px] rounded-lg border border-slate-200 dark:border-slate-700"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
+                    Все рейсы смены под рукой. Клик по рейсу моментально загружает его параметры без выхода из модуля.
+                  </p>
+                </div>
+
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-850 p-3 flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400 block mb-2 uppercase">
+                      Калькулятор и отсеки багажа:
+                    </span>
+                    <img 
+                      src={basePath + 'img/manual/aerobag_calc.png'} 
+                      alt="AeroBag Calculation" 
+                      className="w-full object-cover max-h-[220px] rounded-lg border border-slate-200 dark:border-slate-700"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
+                    Кнопка <strong>«Перенести в Preliminary»</strong> заносит багаж в CPT 1, 3, 4. Клавиша <kbd className="px-1 bg-slate-100 dark:bg-slate-700 rounded font-mono font-bold">Tab</kbd> быстро переключает поля.
+                  </p>
+                </div>
+
               </div>
 
               <div className="space-y-4">
                 <h5 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                  Как работать в AeroBag по шагам:
+                  Пошаговый алгоритм работы в AeroBag:
                 </h5>
 
                 <div className="space-y-3 text-xs">
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700">
                     <strong className="text-sky-700 dark:text-sky-400 block mb-1">1. Выбор рейса из списка слева</strong>
                     В левой колонке перечислены все рейсы смены, отсортированные по времени вылета. Чтобы переключиться на нужный рейс, просто кликните по нему — центральная таблица загрузки и отсеки сразу откроются для этого рейса.
                   </div>
 
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700">
                     <strong className="text-sky-700 dark:text-sky-400 block mb-1">2. Ввод количества сданного багажа</strong>
                     В центральной колонке введите число мест сданного багажа. Программа автоматически рассчитает среднюю массу с учетом взрослых пассажиров, детей и нормы сезона (лето/зима).
                   </div>
@@ -413,9 +484,9 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                     Сразу после переноса фокус ввода прыгает в первую строку отсека. Нажимая клавишу <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 font-mono font-bold">Tab</kbd>, диспетчер быстро перемещается по ячейкам: <em>Тип загрузки → Места → Вес → Следующий отсек</em> без использования мышки.
                   </div>
 
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700">
                     <strong className="text-sky-700 dark:text-sky-400 block mb-1">5. Возврат в суточный план</strong>
-                    Нажмите стрелку «Назад в AeroPlan» в левом верхнем углу. Вы вернетесь точно в рабочий суточный план plan_2 с сохранением всех внесенных правок.
+                    Нажмите стрелку «Назад в AeroPlan» в левом верхнем углу. Вы вернетесь точно в рабочий суточный план с сохранением всех внесенных правок.
                   </div>
                 </div>
               </div>
@@ -433,20 +504,57 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                   W&B Loadsheet: Центровочный график и ведомость
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Официальный центровочный бланк международного формата (А4)
+                  Официальный центровочный бланк международного стандарта А4
                 </p>
               </div>
 
-              {/* Скриншот Loadsheet */}
-              <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+              {/* 1. Скриншот полного бланка */}
+              <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-slate-850">
                 <img 
                   src={basePath + 'img/manual/loadsheet_screen.png'} 
-                  alt="W&B Loadsheet" 
-                  className="w-full object-cover max-h-[480px]"
+                  alt="W&B Loadsheet Blank" 
+                  className="w-full object-cover max-h-[380px]"
                 />
-                <div className="p-3 bg-slate-50 dark:bg-slate-850 text-xs text-slate-500 dark:text-slate-400 italic text-center border-t border-slate-200 dark:border-slate-700">
-                  Бланк W&B Loadsheet: шапка рейса, расчет трех взлетных лимитов, распределение по багажникам и центровочная трапеция.
+                <div className="p-3 text-xs text-slate-500 dark:text-slate-400 italic text-center border-t border-slate-200 dark:border-slate-700">
+                  Полный бланк центровки W&B Loadsheet: расчет весовых лимитов, пассажирские зоны, отсеки и центровочная трапеция.
                 </div>
+              </div>
+
+              {/* 2. Двойной блок деталей Loadsheet */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-850 p-3 flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-sky-700 dark:text-sky-400 block mb-2 uppercase">
+                      Расчет взлетных лимитов (1, 2, 3):
+                    </span>
+                    <img 
+                      src={basePath + 'img/manual/loadsheet_limits.png'} 
+                      alt="Loadsheet Take-off limits" 
+                      className="w-full object-cover max-h-[140px] rounded-lg border border-slate-200 dark:border-slate-700"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
+                    Автоматический расчет трех лимитов взлета (Zero Fuel, Take-Off, Landing). Программа сама выделяет наименьший допустимый предел.
+                  </p>
+                </div>
+
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-850 p-3 flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 block mb-2 uppercase">
+                      Центровочный график (% MAC):
+                    </span>
+                    <img 
+                      src={basePath + 'img/manual/loadsheet_envelope.png'} 
+                      alt="Loadsheet Trim Envelope" 
+                      className="w-full object-cover max-h-[140px] rounded-lg border border-slate-200 dark:border-slate-700"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
+                    Взлетная и посадочная центровка наглядно наносятся на график. Зеленый цвет подтверждает безопасность полета.
+                  </p>
+                </div>
+
               </div>
 
               <div className="space-y-4">
@@ -455,22 +563,22 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                 </h5>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700">
                     <strong className="text-sky-700 dark:text-sky-400 block mb-1">Бесшовная передача из плана</strong>
                     При переходе из AeroPlan в бланке уже стоят: рейс, дата, направление, регистрация ВС, экипаж, пассажиры (взрослые, дети в CH, младенцы в INF), топливо Block/Trip и базовые веса DOW/DOI.
                   </div>
 
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700">
                     <strong className="text-sky-700 dark:text-sky-400 block mb-1">Расчет взлетных лимитов (1, 2, 3)</strong>
                     Система одновременно рассчитывает три предела: 1) по весу без топлива, 2) по максимальному взлетному весу, 3) по посадочному весу с учетом Trip Fuel. Автоматически выбирается наименьший безопасный предел!
                   </div>
 
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700">
                     <strong className="text-sky-700 dark:text-sky-400 block mb-1">Распределение по отсекам (CPT 1..5)</strong>
                     Коммерческая загрузка (багаж, груз, почта) разносится по физическим багажникам самолета с контролем предельной нагрузки на пол отсека.
                   </div>
 
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700">
                     <strong className="text-sky-700 dark:text-sky-400 block mb-1">Центровочный график (% MAC)</strong>
                     Наглядный график показывает взлетную и посадочную центровку в % САХ. Зеленая зона подтверждает нахождение внутри коридора безопасности авиакомпании.
                   </div>
@@ -509,7 +617,7 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                       Шаг 1: Контроль в плане (AeroPlan)
                     </strong>
                     <p className="text-slate-600 dark:text-slate-300">
-                      Открываем <code className="font-mono text-sky-600">https://boostandgo.ru/plan_2/</code>. Находим строку рейса N4078 (Оренбург — Москва).
+                      Открываем суточный план. Находим строку рейса N4078 (Оренбург — Москва).
                     </p>
                     <p className="text-slate-600 dark:text-slate-300">
                       Борт <strong>73326</strong> — система сама подставила базовый вес DOW = 48424, индекс DOI = 36.0, кухню F и взлетный вес MTOW = 89000 кг. В ячейке пассажиров видим: <strong>193</strong> человека, а под цифрой синяя подсказка: <strong>14рб 1рм</strong> (14 детей и 1 младенец).
@@ -587,7 +695,7 @@ export default function DownloadManualModal({ isOpen, onClose }) {
               </div>
 
               <div className="space-y-3">
-                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                <div className="p-4 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
                   <div className="font-bold text-sm text-sky-700 dark:text-sky-400">
                     Что делать, если заменили самолет (изменился бортовой номер)?
                   </div>
@@ -596,7 +704,7 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                <div className="p-4 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
                   <div className="font-bold text-sm text-sky-700 dark:text-sky-400">
                     Как ограничить MTOW вручную при короткой полосе или жаре?
                   </div>
@@ -605,7 +713,7 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                <div className="p-4 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
                   <div className="font-bold text-sm text-sky-700 dark:text-sky-400">
                     Куда делись дети, если в графе PAX стоит просто число?
                   </div>
@@ -614,12 +722,12 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                <div className="p-4 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
                   <div className="font-bold text-sm text-sky-700 dark:text-sky-400">
                     Как вернуться в суточный план, если случайно закрыли вкладку?
                   </div>
                   <div className="text-slate-600 dark:text-slate-300">
-                    Главная ссылка комплекса всегда одна: <a href="https://boostandgo.ru/plan_2/" className="text-sky-600 underline font-mono font-bold" target="_blank" rel="noreferrer">https://boostandgo.ru/plan_2/</a>. Все данные непрерывно сохраняются в базе данных и сразу отобразятся в актуальном состоянии при открытии страницы.
+                    Главная ссылка комплекса всегда одна. Все данные непрерывно сохраняются в базе данных и сразу отобразятся в актуальном состоянии при открытии страницы.
                   </div>
                 </div>
               </div>
@@ -631,7 +739,7 @@ export default function DownloadManualModal({ isOpen, onClose }) {
         {/* Подвал модального окна */}
         <div className="px-6 py-3 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs shrink-0">
           <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-[11px]">
-            <span>💡 Совет: Чтобы распечатать или отправить инструкцию коллегам, используйте кнопку «Скачать в Word (.docx)».</span>
+            <span>💡 Совет: Чтобы распечатать или отправить памятку коллегам, используйте кнопку «Скачать в Word (.docx)».</span>
           </div>
 
           <button
@@ -644,6 +752,25 @@ export default function DownloadManualModal({ isOpen, onClose }) {
         </div>
 
       </div>
+
+      {/* Окно полноразмерного просмотра скриншотов */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-60 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-5xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl border border-white/20">
+            <img src={selectedImage} alt="Enlarged Screenshot" className="max-w-full max-h-[85vh] object-contain" />
+            <button 
+              onClick={() => setSelectedImage(null)}
+              className="absolute top-3 right-3 p-2 bg-black/60 hover:bg-black/90 text-white rounded-full transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
