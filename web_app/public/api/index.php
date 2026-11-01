@@ -1055,6 +1055,37 @@ if ($route === '/shift/current') {
     $flights = [];
 
     foreach ($rawFlights as $r) {
+        $rPax = (string)($r['pax'] ?? '');
+        $rM = (string)($r['pax_m'] ?? '');
+        $rF = (string)($r['pax_f'] ?? '');
+        $rCh = (string)($r['pax_ch'] ?? '');
+        $rInf = (string)($r['pax_inf'] ?? '');
+
+        // Авто-извлечение детей если в БД колонки пустые
+        if ($rCh === '' && $rInf === '') {
+            if (strpos($rPax, '/') !== false) {
+                $pp = explode('/', $rPax);
+                $adt = (int)$pp[0];
+                $cVal = isset($pp[1]) ? (int)$pp[1] : 0;
+                $iVal = isset($pp[2]) ? (int)$pp[2] : 0;
+                if ($cVal > 0) $rCh = (string)$cVal;
+                if ($iVal > 0) $rInf = (string)$iVal;
+                if ($rM === '' && $rF === '' && $adt > 0) {
+                    $mVal = (int)ceil($adt / 2);
+                    $fVal = $adt - $mVal;
+                    $rM = (string)$mVal;
+                    $rF = (string)$fVal;
+                }
+            } elseif (!empty($r['notes'])) {
+                if (preg_match('/(\d+)\s*(?:РБ|Рб|рб|CHD|chd)/iu', $r['notes'], $mCh)) {
+                    $rCh = (string)(int)$mCh[1];
+                }
+                if (preg_match('/(\d+)\s*(?:РМ|Рм|рм|INF|inf)/iu', $r['notes'], $mInf)) {
+                    $rInf = (string)(int)$mInf[1];
+                }
+            }
+        }
+
         $flItem = [
             'id' => (string)$r['id'],
             'flight' => (string)($r['flight_number'] ?? ''),
@@ -1066,11 +1097,11 @@ if ($route === '/shift/current') {
             'ac_num' => (string)($r['ac_num'] ?? ''),
             'ac_type' => (string)($r['ac_type'] ?? ''),
             'ac_config' => (string)($r['ac_config'] ?? ''),
-            'pax' => (string)($r['pax'] ?? ''),
-            'pax_m' => (string)($r['pax_m'] ?? ''),
-            'pax_f' => (string)($r['pax_f'] ?? ''),
-            'pax_ch' => (string)($r['pax_ch'] ?? ''),
-            'pax_inf' => (string)($r['pax_inf'] ?? ''),
+            'pax' => $rPax,
+            'pax_m' => $rM,
+            'pax_f' => $rF,
+            'pax_ch' => $rCh,
+            'pax_inf' => $rInf,
             'crew' => (string)($r['crew'] ?? ''),
             'fuel_block' => (string)($r['fuel_block'] ?? ''),
             'fuel_trip' => (string)($r['fuel_trip'] ?? ''),
@@ -1414,10 +1445,24 @@ if ($route === '/shift/smart_merge') {
                 $item['galley'] = !empty($inc['galley']) ? $inc['galley'] : ($old['galley'] ?? 'D');
             }
 
-            foreach (['dow', 'doi', 'mtow', 'baggage', 'pax_m', 'pax_f', 'pax_ch', 'pax_inf'] as $field) {
+            foreach (['dow', 'doi', 'mtow', 'baggage'] as $field) {
                 if (isset($old[$field]) && $old[$field] !== '') {
                     $item[$field] = $old[$field];
                 }
+            }
+
+            // Категории пассажиров (Взрослые, РБ дети, РМ младенцы):
+            // Если в AviaBit есть детальные данные, обновляем их из AviaBit
+            if (!empty($inc['pax_ch']) || !empty($inc['pax_inf']) || !empty($inc['pax_m']) || !empty($inc['pax_f'])) {
+                $item['pax_m'] = (string)($inc['pax_m'] ?? '');
+                $item['pax_f'] = (string)($inc['pax_f'] ?? '');
+                $item['pax_ch'] = (string)($inc['pax_ch'] ?? '');
+                $item['pax_inf'] = (string)($inc['pax_inf'] ?? '');
+            } elseif (!empty($old['pax_ch']) || !empty($old['pax_inf'])) {
+                $item['pax_m'] = (string)($old['pax_m'] ?? '');
+                $item['pax_f'] = (string)($old['pax_f'] ?? '');
+                $item['pax_ch'] = (string)($old['pax_ch'] ?? '');
+                $item['pax_inf'] = (string)($old['pax_inf'] ?? '');
             }
 
             // 1.1. Сохраняем ручной экипаж

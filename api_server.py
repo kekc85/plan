@@ -9,6 +9,8 @@ REST API Backend для электронного журнала смены Ди�
 import os
 import sys
 import io
+import re
+import math
 import json
 import urllib.parse
 import time
@@ -1272,6 +1274,32 @@ def get_current_shift():
             except Exception:
                 unread_obj = None
 
+        r_pax = str(r.get("pax") or "")
+        r_m = str(r.get("pax_m") or "")
+        r_f = str(r.get("pax_f") or "")
+        r_ch = str(r.get("pax_ch") or "")
+        r_inf = str(r.get("pax_inf") or "")
+
+        # Авто-извлечение детей если в БД колонки пустые
+        if not r_ch and not r_inf:
+            if "/" in r_pax:
+                pp = r_pax.split("/")
+                adt = int(pp[0]) if pp[0].isdigit() else 0
+                c_val = int(pp[1]) if len(pp) > 1 and pp[1].isdigit() else 0
+                i_val = int(pp[2]) if len(pp) > 2 and pp[2].isdigit() else 0
+                if c_val > 0: r_ch = str(c_val)
+                if i_val > 0: r_inf = str(i_val)
+                if not r_m and not r_f and adt > 0:
+                    m_val = math.ceil(adt / 2)
+                    r_m = str(m_val)
+                    r_f = str(adt - m_val)
+            elif r.get("notes"):
+                notes_str = str(r.get("notes"))
+                m_ch = re.search(r'(\d+)\s*(?:РБ|Рб|рб|CHD|chd)', notes_str, re.IGNORECASE)
+                m_inf = re.search(r'(\d+)\s*(?:РМ|Рм|рм|INF|inf)', notes_str, re.IGNORECASE)
+                if m_ch: r_ch = str(int(m_ch.group(1)))
+                if m_inf: r_inf = str(int(m_inf.group(1)))
+
         fl_item = {
             "id": str(r.get("id", "")),
             "flight": str(r.get("flight_number") or ""),
@@ -1283,11 +1311,11 @@ def get_current_shift():
             "ac_num": str(r.get("ac_num") or ""),
             "ac_type": str(r.get("ac_type") or ""),
             "ac_config": str(r.get("ac_config") or ""),
-            "pax": str(r.get("pax") or ""),
-            "pax_m": str(r.get("pax_m") or ""),
-            "pax_f": str(r.get("pax_f") or ""),
-            "pax_ch": str(r.get("pax_ch") or ""),
-            "pax_inf": str(r.get("pax_inf") or ""),
+            "pax": r_pax,
+            "pax_m": r_m,
+            "pax_f": r_f,
+            "pax_ch": r_ch,
+            "pax_inf": r_inf,
             "crew": str(r.get("crew") or ""),
             "fuel_block": str(r.get("fuel_block") or ""),
             "fuel_trip": str(r.get("fuel_trip") or ""),
@@ -1632,6 +1660,8 @@ def smart_merge_schedules(req: SmartMergeRequest, current_user: Optional[dict] =
                 ("ac_type", "ac_type"),
                 ("ac_config", "ac_config"),
                 ("pax", "pax"),
+                ("pax_ch", "pax_ch"),
+                ("pax_inf", "pax_inf"),
                 ("crew", "crew"),
                 ("cargo", "cargo"),
                 ("mail", "mail"),

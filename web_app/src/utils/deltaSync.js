@@ -17,6 +17,8 @@ export const TRACKED_AVIABIT_FIELDS = [
   'ac_type',
   'ac_config',
   'pax',
+  'pax_ch',
+  'pax_inf',
   'crew',
   'cargo',
   'mail',
@@ -33,6 +35,8 @@ export const FIELD_LABELS = {
   ac_type: 'Тип ВС',
   ac_config: 'Компоновка',
   pax: 'Пассажиры (PAX)',
+  pax_ch: 'Дети (РБ)',
+  pax_inf: 'Младенцы (РМ)',
   crew: 'Экипаж',
   cargo: 'Груз (FBL/UWS)',
   mail: 'Почта',
@@ -461,6 +465,20 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     }
 
     // 2.1 Строго сохраняем остальные ручные поля диспетчера центровки
+    // Всегда обновляем категории пассажиров из входящего расписания AviaBit
+    if (inc.pax_ch !== undefined && inc.pax_ch !== '') {
+      merged.pax_ch = String(inc.pax_ch);
+    }
+    if (inc.pax_inf !== undefined && inc.pax_inf !== '') {
+      merged.pax_inf = String(inc.pax_inf);
+    }
+    if (inc.pax_m !== undefined && inc.pax_m !== '') {
+      merged.pax_m = String(inc.pax_m);
+    }
+    if (inc.pax_f !== undefined && inc.pax_f !== '') {
+      merged.pax_f = String(inc.pax_f);
+    }
+
     const manualFields = [
       'dow',
       'doi',

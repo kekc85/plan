@@ -382,29 +382,24 @@ function FlightRow({
     if (acConfig) params.set('ac_config', acConfig);
     if (depTime) params.set('dep_time', depTime);
     if (flight.crew) params.set('crew', flight.crew);
-    let abCh = flight.pax_ch;
-    let abInf = flight.pax_inf;
+    let abCh = flight.pax_ch || (flight.pax?.includes('/') ? flight.pax.split('/')[1] : null);
+    let abInf = flight.pax_inf || (flight.pax?.includes('/') && flight.pax.split('/').length > 2 ? flight.pax.split('/')[2] : null);
     let abM = flight.pax_m;
     let abF = flight.pax_f;
     if (!abCh && !abInf) {
-      const pStr = String(flight.pax || '').trim();
-      if (pStr.includes('/')) {
-        const pParts = pStr.split('/');
-        const adt = parseInt(pParts[0], 10) || 0;
-        const cVal = parseInt(pParts[1], 10) || 0;
-        const iVal = pParts.length > 2 ? (parseInt(pParts[2], 10) || 0) : 0;
-        if (cVal > 0) abCh = String(cVal);
-        if (iVal > 0) abInf = String(iVal);
-        if (!abM && !abF && adt > 0) {
-          abM = String(Math.ceil(adt / 2));
-          abF = String(adt - Math.ceil(adt / 2));
-        }
-      } else {
-        const notesStr = String(flight.notes || '');
-        const rbM = notesStr.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd|дет)/i);
-        const rmM = notesStr.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf|младен|инф)/i);
-        if (rbM) abCh = rbM[1];
-        if (rmM) abInf = rmM[1];
+      const notesStr = String(flight.notes || '');
+      const rbM = notesStr.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd|дет)/i);
+      const rmM = notesStr.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf|младен|инф)/i);
+      if (rbM) abCh = rbM[1];
+      if (rmM) abInf = rmM[1];
+    }
+    if (!abM && !abF && flight.pax) {
+      const pStr = String(flight.pax).trim();
+      const adt = pStr.includes('/') ? (parseInt(pStr.split('/')[0], 10) || 0) : (parseInt(pStr, 10) || 0);
+      const realAdt = abCh ? Math.max(0, adt - (parseInt(abCh, 10) || 0)) : adt;
+      if (realAdt > 0) {
+        abM = String(Math.ceil(realAdt / 2));
+        abF = String(realAdt - Math.ceil(realAdt / 2));
       }
     }
 
@@ -502,29 +497,24 @@ function FlightRow({
     if (crewVal) params.set('crew', crewVal);
     if (depTime) params.set('time', depTime);
 
-    let lsCh = flight.pax_ch;
-    let lsInf = flight.pax_inf;
+    let lsCh = flight.pax_ch || (flight.pax?.includes('/') ? flight.pax.split('/')[1] : null);
+    let lsInf = flight.pax_inf || (flight.pax?.includes('/') && flight.pax.split('/').length > 2 ? flight.pax.split('/')[2] : null);
     let lsM = flight.pax_m;
     let lsF = flight.pax_f;
     if (!lsCh && !lsInf) {
-      const pStr = String(flight.pax || '').trim();
-      if (pStr.includes('/')) {
-        const pParts = pStr.split('/');
-        const adt = parseInt(pParts[0], 10) || 0;
-        const cVal = parseInt(pParts[1], 10) || 0;
-        const iVal = pParts.length > 2 ? (parseInt(pParts[2], 10) || 0) : 0;
-        if (cVal > 0) lsCh = String(cVal);
-        if (iVal > 0) lsInf = String(iVal);
-        if (!lsM && !lsF && adt > 0) {
-          lsM = String(Math.ceil(adt / 2));
-          lsF = String(adt - Math.ceil(adt / 2));
-        }
-      } else {
-        const notesStr = String(flight.notes || '');
-        const rbM = notesStr.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd|дет)/i);
-        const rmM = notesStr.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf|младен|инф)/i);
-        if (rbM) lsCh = rbM[1];
-        if (rmM) lsInf = rmM[1];
+      const notesStr = String(flight.notes || '');
+      const rbM = notesStr.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd|дет)/i);
+      const rmM = notesStr.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf|младен|инф)/i);
+      if (rbM) lsCh = rbM[1];
+      if (rmM) lsInf = rmM[1];
+    }
+    if (!lsM && !lsF && flight.pax) {
+      const pStr = String(flight.pax).trim();
+      const adt = pStr.includes('/') ? (parseInt(pStr.split('/')[0], 10) || 0) : (parseInt(pStr, 10) || 0);
+      const realAdt = lsCh ? Math.max(0, adt - (parseInt(lsCh, 10) || 0)) : adt;
+      if (realAdt > 0) {
+        lsM = String(Math.ceil(realAdt / 2));
+        lsF = String(realAdt - Math.ceil(realAdt / 2));
       }
     }
 
@@ -1015,7 +1005,23 @@ function FlightRow({
             value={flight.pax || ''}
             onChange={(e) => {
               const val = e.target.value.replace(/[^0-9/]/g, '').slice(0, 10);
-              handleCellChange('pax', val);
+              if (val.includes('/')) {
+                const parts = val.split('/');
+                const adt = parseInt(parts[0], 10) || 0;
+                const ch = parseInt(parts[1], 10) || 0;
+                const inf = parts.length > 2 ? (parseInt(parts[2], 10) || 0) : 0;
+                const m = Math.ceil(adt / 2);
+                const f = adt - m;
+                onUpdateFlight?.(flight.id, {
+                  pax: val,
+                  pax_m: String(m),
+                  pax_f: String(f),
+                  pax_ch: String(ch),
+                  pax_inf: String(inf)
+                });
+              } else {
+                handleCellChange('pax', val);
+              }
             }}
             onFocus={(e) => e.target.select()}
             onPointerDown={(e) => e.stopPropagation()}
@@ -1024,17 +1030,24 @@ function FlightRow({
             placeholder="0"
             maxLength={10}
             title={(() => {
-              const ch = flight.pax_ch || (flight.notes?.match(/(\d+)\s*(?:РБ|Рб|рб)/i)?.[1]) || '0';
-              const inf = flight.pax_inf || (flight.notes?.match(/(\d+)\s*(?:РМ|Рм|рм)/i)?.[1]) || '0';
+              const ch = flight.pax_ch || (flight.pax?.includes('/') ? flight.pax.split('/')[1] : null) || (flight.notes?.match(/(\d+)\s*(?:РБ|Рб|рб)/i)?.[1]) || '0';
+              const inf = flight.pax_inf || (flight.pax?.includes('/') && flight.pax.split('/').length > 2 ? flight.pax.split('/')[2] : null) || (flight.notes?.match(/(\d+)\s*(?:РМ|Рм|рм)/i)?.[1]) || '0';
               return `Пассажиры (PAX): ${flight.pax || 0} (РБ: ${ch}, РМ: ${inf})`;
             })()}
             className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-11 text-center font-mono font-black text-sm text-slate-950 dark:text-white outline-none cursor-text ${getChangedStyle('pax')}`}
           />
-          {((flight.pax_ch && Number(flight.pax_ch) > 0) || (flight.pax_inf && Number(flight.pax_inf) > 0)) && (
-            <span className="text-[8px] font-bold text-sky-600 dark:text-sky-400 tracking-tight leading-none mt-0.5" title={`Дети: ${flight.pax_ch || 0} РБ, Младенцы: ${flight.pax_inf || 0} РМ`}>
-              {flight.pax_ch ? `${flight.pax_ch}рб` : ''}{flight.pax_ch && flight.pax_inf ? ' ' : ''}{flight.pax_inf ? `${flight.pax_inf}рм` : ''}
-            </span>
-          )}
+          {(() => {
+            const ch = flight.pax_ch || (flight.pax?.includes('/') ? flight.pax.split('/')[1] : null) || (flight.notes?.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd)/i)?.[1]) || '';
+            const inf = flight.pax_inf || (flight.pax?.includes('/') && flight.pax.split('/').length > 2 ? flight.pax.split('/')[2] : null) || (flight.notes?.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf)/i)?.[1]) || '';
+            const numCh = parseInt(ch, 10) || 0;
+            const numInf = parseInt(inf, 10) || 0;
+            if (numCh <= 0 && numInf <= 0) return null;
+            return (
+              <span className="text-[8px] font-bold text-sky-600 dark:text-sky-400 tracking-tight leading-none mt-0.5" title={`Дети: ${numCh} РБ, Младенцы: ${numInf} РМ`}>
+                {numCh > 0 ? `${numCh}рб` : ''}{numCh > 0 && numInf > 0 ? ' ' : ''}{numInf > 0 ? `${numInf}рм` : ''}
+              </span>
+            );
+          })()}
           <ChangeBadge change={unread.pax} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'pax')} />
         </div>
       </td>
