@@ -200,3 +200,22 @@ export function lookupFleetWb(flight = {}, options = {}) {
     file: config.file
   };
 }
+
+
+/**
+ * Автоматическое определение максимального взлетного веса (MTOW) по номеру борта ВС.
+ * @param {string} tail - Номер борта (напр. '73326' или 'RA-73326')
+ * @param {string} [operator] - Опционально код авиакомпании ('N4' или 'EO')
+ * @returns {string} MTOW числом в виде строки (напр. '89000') или пустая строка
+ */
+export function getAircraftMtow(tail, operator = '') {
+  if (!tail) return '';
+  const normTail = normalizeTailNumber(tail);
+  if (!normTail) return '';
+  const configKey = resolveFleetConfigKey(normTail, operator);
+  if (configKey && fleetWbData[configKey] && fleetWbData[configKey].max_weights) {
+    const mtowVal = fleetWbData[configKey].max_weights.mtow;
+    if (mtowVal) return String(mtowVal);
+  }
+  return '';
+}

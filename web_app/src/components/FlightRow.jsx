@@ -18,7 +18,7 @@ import {
   detectPlaneType
 } from '../utils/validators';
 import { getSafeUnreadChanges, TRACKED_AVIABIT_FIELDS } from '../utils/deltaSync';
-import { lookupFleetWb } from '../utils/fleetWbLookup';
+import { lookupFleetWb, getAircraftMtow } from '../utils/fleetWbLookup';
 import { 
   getDisplayFlightTimes, 
   convertUtcToMsk, 
@@ -214,6 +214,12 @@ function FlightRow({
       if (wb && wb.success) {
         updates.dow = String(wb.dow);
         updates.doi = String(wb.doi);
+      }
+    }
+    if (!flight.mtow_manual) {
+      const autoMtow = getAircraftMtow(formatted);
+      if (autoMtow) {
+        updates.mtow = autoMtow;
       }
     }
     onUpdateFlight(flight.id, updates);
@@ -1245,16 +1251,26 @@ function FlightRow({
       <td className={`py-1 px-0.5 text-center w-14 min-w-[54px] max-w-[58px] ${overdueBorderTopBottom}`}>
         <input
           type="text"
-          value={flight.mtow || ''}
-          onChange={(e) => handleCellChange('mtow', formatValidMtow(e.target.value))}
+          value={flight.mtow || (!flight.mtow_manual && flight.ac_num ? getAircraftMtow(flight.ac_num) : '')}
+          onChange={(e) => {
+            const val = formatValidMtow(e.target.value);
+            onUpdateFlight(flight.id, {
+              mtow: val,
+              mtow_manual: val !== ''
+            });
+          }}
           onFocus={(e) => e.target.select()}
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           placeholder="MTOW"
           maxLength={6}
-          className="w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border border-slate-300 dark:border-slate-700 focus:border-sky-500 rounded px-0.5 py-0.5 text-center font-mono text-[11px] font-extrabold tracking-tight text-slate-900 dark:text-slate-200 placeholder:text-[9px] placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none cursor-text"
-          title="MTOW (Максимальная взлетная масса)"
+          className={`w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 focus:bg-white dark:focus:bg-slate-900 border ${
+            flight.mtow_manual 
+              ? 'border-amber-500/80 dark:border-amber-500/80 font-black text-amber-900 dark:text-amber-200' 
+              : 'border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-200'
+          } focus:border-sky-500 rounded px-0.5 py-0.5 text-center font-mono text-[11px] font-extrabold tracking-tight placeholder:text-[9px] placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none cursor-text`}
+          title={flight.mtow_manual ? 'MTOW (установлен вручную диспетчером)' : 'MTOW (автоматически из базы флота)'}
         />
       </td>
       {/* 11. LIR */}

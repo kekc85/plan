@@ -6,7 +6,7 @@
  * для визуальной подсветки до явного подтверждения диспетчером.
  */
 
-import { lookupFleetWb } from './fleetWbLookup';
+import { lookupFleetWb, getAircraftMtow } from './fleetWbLookup';
 
 // Поля, которые контролируются и обновляются из AviaBit
 export const TRACKED_AVIABIT_FIELDS = [
@@ -423,6 +423,10 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
           newFlightObj.doi = String(wb.doi);
         }
       }
+      if (!newFlightObj.mtow && newFlightObj.ac_num) {
+        const autoMtow = getAircraftMtow(newFlightObj.ac_num);
+        if (autoMtow) newFlightObj.mtow = autoMtow;
+      }
       mergedFlights.push(newFlightObj);
       continue;
     }
@@ -482,7 +486,6 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     const manualFields = [
       'dow',
       'doi',
-      'mtow',
       'baggage',
       'notes'
     ];
@@ -492,6 +495,21 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
         merged[field] = old[field];
       }
     });
+
+    // MTOW: если диспетчер изменил руками (mtow_manual), сохраняем ручное значение.
+    // Иначе подтягиваем автоматический MTOW из реестра флота по борту ВС.
+    if (old.mtow_manual) {
+      merged.mtow = old.mtow;
+      merged.mtow_manual = true;
+    } else {
+      const targetTail = merged.ac_num || old.ac_num;
+      const autoMtow = getAircraftMtow(targetTail);
+      if (autoMtow) {
+        merged.mtow = autoMtow;
+      } else if (old.mtow) {
+        merged.mtow = old.mtow;
+      }
+    }
 
     // Авто-определение DOW и DOI из официальных W&B матриц флота
     if (!old.dow_manual && (!merged.dow || !merged.doi || changes.ac_num || changes.crew)) {

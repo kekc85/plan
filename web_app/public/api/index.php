@@ -90,6 +90,38 @@ function getAerobagDb() {
     return $abPdo;
 }
 
+
+function getFleetMtow($tail, $operator = '') {
+    static $fleetData = null;
+    if ($fleetData === null) {
+        $paths = [
+            __DIR__ . '/../../data/fleet_wb.json',
+            dirname(__DIR__) . '/data/fleet_wb.json',
+            __DIR__ . '/../data/fleet_wb.json',
+            __DIR__ . '/fleet_wb.json',
+            dirname(__DIR__, 2) . '/loadsheet/fleet_wb.json'
+        ];
+        foreach ($paths as $p) {
+            if (file_exists($p)) {
+                $fleetData = json_decode(file_get_contents($p), true);
+                break;
+            }
+        }
+    }
+    if (!$fleetData || !$tail) return '';
+    $cleanTail = preg_replace('/^(RA|РА)[-\s]?/iu', '', trim($tail));
+    $cleanTail = preg_replace('/\D/', '', $cleanTail);
+    if (!$cleanTail) return '';
+    foreach ($fleetData as $k => $c) {
+        if (!empty($c['tail']) && $c['tail'] === $cleanTail) {
+            if (!empty($c['max_weights']['mtow'])) {
+                return (string)$c['max_weights']['mtow'];
+            }
+        }
+    }
+    return '';
+}
+
 function getDb() {
     static $pdo = null;
     if ($pdo === null) {
@@ -114,6 +146,7 @@ function getDb() {
                 "ALTER TABLE plan_flights ADD COLUMN plane_status VARCHAR(32) NULL",
                 "ALTER TABLE plan_flights ADD COLUMN crew_manual TINYINT(1) DEFAULT 0",
                 "ALTER TABLE plan_flights ADD COLUMN fuel_confirmed TINYINT(1) DEFAULT 0",
+                "ALTER TABLE plan_flights ADD COLUMN mtow_manual TINYINT(1) DEFAULT 0",
                 "ALTER TABLE plan_flights ADD COLUMN pax_m VARCHAR(16) NULL",
                 "ALTER TABLE plan_flights ADD COLUMN pax_f VARCHAR(16) NULL",
                 "ALTER TABLE plan_flights ADD COLUMN pax_ch VARCHAR(16) NULL",
@@ -1285,6 +1318,7 @@ if ($route === '/shift/current') {
             'doi' => (string)($r['doi'] ?? ''),
             'galley' => (string)($r['galley'] ?? 'D'),
             'mtow' => (string)($r['mtow'] ?? ''),
+            'mtow_manual' => !empty($r['mtow_manual']),
             'crew_manual' => !empty($r['crew_manual']),
             'lir_sent' => (bool)$r['lir_sent'],
             'cargo' => (string)($r['cargo'] ?? ''),
@@ -1462,7 +1496,7 @@ if ($route === '/shift/save') {
             INSERT INTO plan_flights (
                 id, shift_id, flight_number, flight_date, route_city, route_airports,
                 departure_time, release_time, ac_num, ac_type, ac_config, pax, pax_m, pax_f, pax_ch, pax_inf, crew,
-                fuel_block, fuel_trip, fuel_taxi, fuel_confirmed, dow, doi, galley, mtow, crew_manual,
+                fuel_block, fuel_trip, fuel_taxi, fuel_confirmed, dow, doi, galley, mtow, mtow_manual, crew_manual,
                 lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
                 status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
                 inbound_landing_calc, inbound_landing_time, outbound_takeoff_time,
@@ -1470,7 +1504,7 @@ if ($route === '/shift/save') {
             ) VALUES (
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
                 ?, ?, ?,
@@ -1507,6 +1541,7 @@ if ($route === '/shift/save') {
                 (string)($f['doi'] ?? ''),
                 (string)($f['galley'] ?? 'D'),
                 (string)($f['mtow'] ?? ''),
+                !empty($f['mtow_manual']) ? 1 : 0,
                 !empty($f['crew_manual']) ? 1 : 0,
                 !empty($f['lir_sent']) ? 1 : 0,
                 (string)($f['cargo'] ?? ''),
@@ -1619,10 +1654,19 @@ if ($route === '/shift/smart_merge') {
                 $item['galley'] = !empty($inc['galley']) ? $inc['galley'] : ($old['galley'] ?? 'D');
             }
 
-            foreach (['dow', 'doi', 'mtow', 'baggage'] as $field) {
+            foreach (['dow', 'doi', 'baggage'] as $field) {
                 if (isset($old[$field]) && $old[$field] !== '') {
                     $item[$field] = $old[$field];
                 }
+            }
+
+            if (!empty($old['mtow_manual'])) {
+                $item['mtow'] = $old['mtow'] ?? '';
+                $item['mtow_manual'] = true;
+            } else {
+                $autoMtow = getFleetMtow($inc['ac_num'] ?? ($old['ac_num'] ?? ''));
+                $item['mtow'] = $autoMtow ?: ($old['mtow'] ?? ($inc['mtow'] ?? ''));
+                $item['mtow_manual'] = false;
             }
 
             // Категории пассажиров (Взрослые, РБ дети, РМ младенцы):
@@ -2667,7 +2711,8 @@ if ($route === '/fetch_schedule') {
             'dow' => '',
             'doi' => '',
             'galley' => $galleyVal ?: 'D',
-            'mtow' => '',
+            'mtow' => getFleetMtow($tail),
+            'mtow_manual' => false,
             'lir_sent' => false,
             'cargo' => $cargoVal,
             'mail' => $mailVal,
