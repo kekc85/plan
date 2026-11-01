@@ -469,18 +469,30 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
     }
 
     // 2.1 Строго сохраняем остальные ручные поля диспетчера центровки
-    // Всегда обновляем категории пассажиров из входящего расписания AviaBit
-    if (inc.pax_ch !== undefined && inc.pax_ch !== '') {
+    // Категории пассажиров: если в новом расписании есть детальные данные, берем их;
+    // иначе бережно сохраняем имеющиеся из old, чтобы не затирать РБ/РМ при фоновых обновлениях
+    if (inc.pax_ch !== undefined && inc.pax_ch !== null && inc.pax_ch !== '') {
       merged.pax_ch = String(inc.pax_ch);
+    } else if (old.pax_ch !== undefined && old.pax_ch !== null && old.pax_ch !== '') {
+      merged.pax_ch = String(old.pax_ch);
     }
-    if (inc.pax_inf !== undefined && inc.pax_inf !== '') {
+
+    if (inc.pax_inf !== undefined && inc.pax_inf !== null && inc.pax_inf !== '') {
       merged.pax_inf = String(inc.pax_inf);
+    } else if (old.pax_inf !== undefined && old.pax_inf !== null && old.pax_inf !== '') {
+      merged.pax_inf = String(old.pax_inf);
     }
-    if (inc.pax_m !== undefined && inc.pax_m !== '') {
+
+    if (inc.pax_m !== undefined && inc.pax_m !== null && inc.pax_m !== '') {
       merged.pax_m = String(inc.pax_m);
+    } else if (old.pax_m !== undefined && old.pax_m !== null && old.pax_m !== '') {
+      merged.pax_m = String(old.pax_m);
     }
-    if (inc.pax_f !== undefined && inc.pax_f !== '') {
+
+    if (inc.pax_f !== undefined && inc.pax_f !== null && inc.pax_f !== '') {
       merged.pax_f = String(inc.pax_f);
+    } else if (old.pax_f !== undefined && old.pax_f !== null && old.pax_f !== '') {
+      merged.pax_f = String(old.pax_f);
     }
 
     const manualFields = [
