@@ -1616,6 +1616,70 @@ function getAviaBitCookie($name, $defaultCookie) {
 function saveAviaBitCookie($name, $cookieVal) {
     $sessionFile = __DIR__ . "/.session_{$name}.json";
     @file_put_contents($sessionFile, json_encode(['connect.sid' => $cookieVal], JSON_PRETTY_PRINT));
+    setSystemSetting("aviabit_cookie_{$name}", $cookieVal);
+}
+
+function testAviaBitAuth($baseUrl, $username, $password) {
+    $origin = rtrim($baseUrl, '/');
+    $authPayload = json_encode([
+        'rememberMe' => true,
+        'version' => [
+            'date' => '2026-08-06T08:00:00.000Z',
+            'company' => 'ООО "АвиаБит"',
+            'number' => '9.8.1'
+        ],
+        'eng' => false,
+        'username' => $username,
+        'password' => $password
+    ]);
+
+    $ch = curl_init("$origin/api/auth");
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $authPayload);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HEADER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Origin: $origin",
+        "Referer: $origin/plan-flight",
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Content-Type: application/json',
+        'Accept: application/json, text/plain, */*'
+    ]);
+    $res = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErr) {
+        return ['ok' => false, 'code' => $httpCode, 'message' => "Ошибка сети/cURL: $curlErr"];
+    }
+
+    if ($httpCode === 200) {
+        if (preg_match('/connect\.sid=([^;]+)/', $res, $m)) {
+            $cookieName = (strpos($origin, 'ikar') !== false) ? 'ikar' : 'nordwind';
+            saveAviaBitCookie($cookieName, $m[1]);
+        }
+        return ['ok' => true, 'code' => $httpCode, 'message' => 'Авторизация успешна (сессия получена)'];
+    } elseif ($httpCode === 401 || $httpCode === 403) {
+        return ['ok' => false, 'code' => $httpCode, 'message' => 'Неверный логин или пароль'];
+    } else {
+        return ['ok' => false, 'code' => $httpCode, 'message' => "HTTP код $httpCode"];
+    }
+}
+
+function resetAviaBitSessions() {
+    try {
+        $db = getDb();
+        $db->exec("DELETE FROM plan_settings WHERE setting_key LIKE 'aviabit_cookie_%'");
+    } catch (Exception $e) {}
+    foreach (['nordwind', 'ikar'] as $name) {
+        $sf = __DIR__ . "/.session_{$name}.json";
+        if (file_exists($sf)) {
+            @unlink($sf);
+        }
+    }
 }
 
 function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTsMs, $name = 'nordwind', &$diag = []) {
@@ -1805,20 +1869,22 @@ if ($route === '/fetch_schedule') {
         }
     } catch (Exception $e) {}
 
-    $avbUser = 'a.zubkov';
-    $avbPass = 'SoLnCeVo1985';
+    $avbUser = getSystemSetting('aviabit_username', 'a.zubkov');
+    $avbPass = getSystemSetting('aviabit_password', 'SoLnCeVo1985');
+    $urlNordwind = getSystemSetting('aviabit_url_nordwind', 'https://aviabit.nordwindairlines.ru');
+    $urlIkar = getSystemSetting('aviabit_url_ikar', 'https://aviabit.ikar.aero');
 
     $rawFlights = [];
     $diag = [];
     if ($airline === 'both' || $airline === 'nordwind') {
-        $nw = fetchAviaBitSchedule('https://aviabit.nordwindairlines.ru', $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'nordwind', $diag);
+        $nw = fetchAviaBitSchedule($urlNordwind, $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'nordwind', $diag);
         if (!empty($nw)) {
             foreach ($nw as &$f) { $f['_airline'] = 'nordwind'; }
             $rawFlights = array_merge($rawFlights, $nw);
         }
     }
     if ($airline === 'both' || $airline === 'ikar') {
-        $ik = fetchAviaBitSchedule('https://aviabit.ikar.aero', $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'ikar', $diag);
+        $ik = fetchAviaBitSchedule($urlIkar, $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'ikar', $diag);
         if (!empty($ik)) {
             foreach ($ik as &$f) { $f['_airline'] = 'ikar'; }
             $rawFlights = array_merge($rawFlights, $ik);
@@ -2839,6 +2905,161 @@ if (strpos($route, '/admin/telegram') === 0) {
             echo json_encode(['detail' => 'Не удалось связаться с сервером Telegram API']);
             exit;
         }
+    }
+}
+
+
+// ----------------------------------------------------
+// ЭНДПОИНТЫ: /admin/aviabit/* (Управление учетной записью парсера AviaBit)
+// ----------------------------------------------------
+if (strpos($route, '/admin/aviabit') === 0) {
+    $authUser = getAuthUser();
+    if ($authUser['role'] !== 'admin' && $authUser['role'] !== 'moderator') {
+        http_response_code(403);
+        echo json_encode(['detail' => 'Доступ разрешен только Администратору или Модератору']);
+        exit;
+    }
+
+    $method = $_SERVER['REQUEST_METHOD'];
+
+    if ($route === '/admin/aviabit/settings' || $route === '/admin/aviabit_settings') {
+        if ($method === 'GET') {
+            $user = getSystemSetting('aviabit_username', 'a.zubkov');
+            $pass = getSystemSetting('aviabit_password', 'SoLnCeVo1985');
+            $urlNw = getSystemSetting('aviabit_url_nordwind', 'https://aviabit.nordwindairlines.ru');
+            $urlIk = getSystemSetting('aviabit_url_ikar', 'https://aviabit.ikar.aero');
+            $hasNwCookie = file_exists(__DIR__ . '/.session_nordwind.json') || !empty(getSystemSetting('aviabit_cookie_nordwind', ''));
+            $hasIkCookie = file_exists(__DIR__ . '/.session_ikar.json') || !empty(getSystemSetting('aviabit_cookie_ikar', ''));
+
+            echo json_encode([
+                'username' => $user,
+                'password' => $pass,
+                'url_nordwind' => $urlNw,
+                'url_ikar' => $urlIk,
+                'has_nordwind_session' => $hasNwCookie,
+                'has_ikar_session' => $hasIkCookie
+            ]);
+            exit;
+        }
+
+        if ($method === 'POST') {
+            if ($authUser['role'] !== 'admin') {
+                http_response_code(403);
+                echo json_encode(['detail' => 'Изменение учетных данных AviaBit разрешено только Администратору']);
+                exit;
+            }
+            $input = getJsonInput();
+            if (isset($input['username'])) setSystemSetting('aviabit_username', trim($input['username']));
+            if (isset($input['password'])) setSystemSetting('aviabit_password', (string)$input['password']);
+            if (isset($input['url_nordwind'])) setSystemSetting('aviabit_url_nordwind', trim($input['url_nordwind']));
+            if (isset($input['url_ikar'])) setSystemSetting('aviabit_url_ikar', trim($input['url_ikar']));
+
+            // Если пароль или логин изменились - очищаем старые сессии
+            resetAviaBitSessions();
+
+            logSystemEvent('INFO', 'system', "Администратор '{$authUser['username']}' обновил учетную запись AviaBit ({$input['username']})", null, $authUser['id'], $authUser['username'], getClientIp());
+
+            echo json_encode(['success' => true, 'message' => 'Учетные данные AviaBit успешно сохранены. Кэш сессий обновлен.']);
+            exit;
+        }
+    }
+
+    if (($route === '/admin/aviabit/test' || $route === '/admin/aviabit_test') && $method === 'POST') {
+        $input = getJsonInput();
+        $testUser = trim($input['username'] ?? getSystemSetting('aviabit_username', 'a.zubkov'));
+        $testPass = (string)($input['password'] ?? getSystemSetting('aviabit_password', 'SoLnCeVo1985'));
+        $testUrlNw = trim($input['url_nordwind'] ?? getSystemSetting('aviabit_url_nordwind', 'https://aviabit.nordwindairlines.ru'));
+        $testUrlIk = trim($input['url_ikar'] ?? getSystemSetting('aviabit_url_ikar', 'https://aviabit.ikar.aero'));
+
+        $nwResult = testAviaBitAuth($testUrlNw, $testUser, $testPass);
+        $ikResult = testAviaBitAuth($testUrlIk, $testUser, $testPass);
+
+        logSystemEvent('INFO', 'system', "Тестирование подключения AviaBit: Nordwind=" . ($nwResult['ok'] ? 'OK' : 'ERR') . ", Ikar=" . ($ikResult['ok'] ? 'OK' : 'ERR'), null, $authUser['id'], $authUser['username'], getClientIp());
+
+        echo json_encode([
+            'success' => $nwResult['ok'] || $ikResult['ok'],
+            'nordwind' => $nwResult,
+            'ikar' => $ikResult
+        ]);
+        exit;
+    }
+
+    if (($route === '/admin/aviabit/reset_session' || $route === '/admin/aviabit_reset_session') && $method === 'POST') {
+        resetAviaBitSessions();
+        logSystemEvent('INFO', 'system', "Сброшен кэш активных сессий AviaBit администратором '{$authUser['username']}'", null, $authUser['id'], $authUser['username'], getClientIp());
+        echo json_encode(['success' => true, 'message' => 'Кэш сессий AviaBit успешно очищен']);
+        exit;
+    }
+}
+
+// ----------------------------------------------------
+// ЭНДПОИНТЫ: /admin/fleet_wb/* (Реестр флота W&B и DOW/DOI)
+// ----------------------------------------------------
+if (strpos($route, '/admin/fleet_wb') === 0) {
+    $authUser = getAuthUser();
+    $method = $_SERVER['REQUEST_METHOD'];
+
+    $fleetFilePaths = [
+        __DIR__ . '/../../data/fleet_wb.json',
+        dirname(__DIR__) . '/data/fleet_wb.json',
+        __DIR__ . '/../data/fleet_wb.json',
+        __DIR__ . '/fleet_wb.json'
+    ];
+    $activeFleetFile = null;
+    foreach ($fleetFilePaths as $fp) {
+        if (file_exists($fp)) {
+            $activeFleetFile = $fp;
+            break;
+        }
+    }
+
+    if ($route === '/admin/fleet_wb' && $method === 'GET') {
+        if ($activeFleetFile) {
+            $content = file_get_contents($activeFleetFile);
+            $fleet = json_decode($content, true);
+            echo json_encode(['success' => true, 'fleet' => $fleet]);
+            exit;
+        }
+        echo json_encode(['success' => false, 'fleet' => []]);
+        exit;
+    }
+
+    if ($route === '/admin/fleet_wb/update' && $method === 'POST') {
+        if ($authUser['role'] !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['detail' => 'Редактирование параметров флота W&B разрешено только Администратору']);
+            exit;
+        }
+        $input = getJsonInput();
+        $targetKey = $input['key'] ?? '';
+        $aircraftData = $input['aircraft'] ?? null;
+
+        if (!$targetKey || !$aircraftData) {
+            http_response_code(400);
+            echo json_encode(['detail' => 'Не указан ключ ВС или данные ВС']);
+            exit;
+        }
+
+        if ($activeFleetFile) {
+            $content = file_get_contents($activeFleetFile);
+            $fleet = json_decode($content, true);
+            $fleet[$targetKey] = $aircraftData;
+            file_put_contents($activeFleetFile, json_encode($fleet, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            
+            // Также синхронизируем с остальными найденными путями fleet_wb.json
+            foreach ($fleetFilePaths as $otherFp) {
+                if ($otherFp !== $activeFleetFile && file_exists(dirname($otherFp))) {
+                    @file_put_contents($otherFp, json_encode($fleet, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                }
+            }
+
+            logSystemEvent('INFO', 'system', "Администратор '{$authUser['username']}' обновил веса/параметры ВС $targetKey в реестре W&B", null, $authUser['id'], $authUser['username'], getClientIp());
+            echo json_encode(['success' => true, 'message' => "Данные ВС $targetKey успешно сохранены в реестре W&B"]);
+            exit;
+        }
+        http_response_code(500);
+        echo json_encode(['detail' => 'Файл базы данных флота fleet_wb.json не найден']);
+        exit;
     }
 }
 

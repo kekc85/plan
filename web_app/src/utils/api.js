@@ -379,3 +379,29 @@ export async function adminUploadFleetWbr(file) {
     body: formData
   });
 }
+
+// --- УПРАВЛЕНИЕ УЧЕТНОЙ ЗАПИСЬЮ И ШЛЮЗОМ AVIABIT ---
+
+export async function adminGetAviabitSettings() {
+  return request('/admin/aviabit/settings');
+}
+
+export async function adminUpdateAviabitSettings(payload) {
+  return request('/admin/aviabit/settings', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function adminTestAviabit(payload) {
+  return request('/admin/aviabit/test', {
+    method: 'POST',
+    body: JSON.stringify(payload || {})
+  });
+}
+
+export async function adminResetAviabitSession() {
+  return request('/admin/aviabit/reset_session', {
+    method: 'POST'
+  });
+}

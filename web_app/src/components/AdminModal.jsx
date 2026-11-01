@@ -5,7 +5,7 @@ import {
   Search, Download, Clock, Filter, ChevronRight, Copy, Check,
   AlertTriangle, Info, Server, Laptop, Database, Lock, Send,
   Bell, Archive, FileSpreadsheet, Calendar, CheckSquare, MessageSquare,
-  ExternalLink, Plane, Layers, HelpCircle
+  ExternalLink, Plane, Layers, HelpCircle, Key, KeyRound
 } from 'lucide-react';
 import FleetWbManager from './FleetWbManager';
 import { 
@@ -23,7 +23,11 @@ import {
   adminGetArchives,
   adminGetArchiveDetail,
   adminCreateArchive,
-  adminDeleteArchive
+  adminDeleteArchive,
+  adminGetAviabitSettings,
+  adminUpdateAviabitSettings,
+  adminTestAviabit,
+  adminResetAviabitSession
 } from '../utils/api';
 
 export default function AdminModal({ isOpen, onClose, currentUser }) {
@@ -79,6 +83,20 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
   const [tgTesting, setTgTesting] = useState(false);
   const [tgTestResult, setTgTestResult] = useState(null);
 
+  // Состояние: Шлюз AviaBit
+  const [avbUsername, setAvbUsername] = useState('a.zubkov');
+  const [avbPassword, setAvbPassword] = useState('');
+  const [showAvbPassword, setShowAvbPassword] = useState(false);
+  const [avbUrlNordwind, setAvbUrlNordwind] = useState('https://aviabit.nordwindairlines.ru');
+  const [avbUrlIkar, setAvbUrlIkar] = useState('https://aviabit.ikar.aero');
+  const [avbLoading, setAvbLoading] = useState(false);
+  const [avbSaving, setAvbSaving] = useState(false);
+  const [avbTesting, setAvbTesting] = useState(false);
+  const [avbTestResult, setAvbTestResult] = useState(null);
+  const [avbHasNwSession, setAvbHasNwSession] = useState(false);
+  const [avbHasIkSession, setAvbHasIkSession] = useState(false);
+  const [avbResetting, setAvbResetting] = useState(false);
+
   // Состояние: Посменные архивы
   const [archives, setArchives] = useState([]);
   const [archivesLoading, setArchivesLoading] = useState(false);
@@ -98,6 +116,8 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
         loadArchives();
       } else if (activeTab === 'telegram') {
         loadTelegramSettings();
+      } else if (activeTab === 'aviabit') {
+        loadAviabitSettings();
       }
     }
   }, [isOpen, activeTab]);
@@ -201,6 +221,100 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
     navigator.clipboard.writeText(text);
     setCopiedSuccess(true);
     setTimeout(() => setCopiedSuccess(false), 2000);
+  };
+
+
+  // --- МЕТОДЫ УПРАВЛЕНИЯ УЧЕТНОЙ ЗАПИСЬЮ AVIABIT ---
+
+  const loadAviabitSettings = async () => {
+    setAvbLoading(true);
+    setAvbTestResult(null);
+    try {
+      const res = await adminGetAviabitSettings();
+      if (res) {
+        setAvbUsername(res.username || '');
+        setAvbPassword(res.password || '');
+        setAvbUrlNordwind(res.url_nordwind || 'https://aviabit.nordwindairlines.ru');
+        setAvbUrlIkar(res.url_ikar || 'https://aviabit.ikar.aero');
+        setAvbHasNwSession(Boolean(res.has_nordwind_session));
+        setAvbHasIkSession(Boolean(res.has_ikar_session));
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Не удалось загрузить настройки AviaBit');
+    } finally {
+      setAvbLoading(false);
+    }
+  };
+
+  const handleSaveAviabit = async (e) => {
+    if (e) e.preventDefault();
+    if (!avbUsername.trim()) {
+      setErrorMsg('Укажите имя пользователя AviaBit');
+      return;
+    }
+    setAvbSaving(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      await adminUpdateAviabitSettings({
+        username: avbUsername.trim(),
+        password: avbPassword,
+        url_nordwind: avbUrlNordwind.trim(),
+        url_ikar: avbUrlIkar.trim()
+      });
+      setSuccessMsg('Учётная запись AviaBit успешно сохранена. Кэш сессий сброшен.');
+      await loadAviabitSettings();
+    } catch (err) {
+      setErrorMsg(err.message || 'Ошибка сохранения настроек AviaBit');
+    } finally {
+      setAvbSaving(false);
+    }
+  };
+
+  const handleTestAviabit = async () => {
+    if (!avbUsername.trim() || !avbPassword) {
+      setErrorMsg('Укажите имя пользователя и пароль AviaBit для проверки');
+      return;
+    }
+    setAvbTesting(true);
+    setAvbTestResult(null);
+    setErrorMsg('');
+    try {
+      const res = await adminTestAviabit({
+        username: avbUsername.trim(),
+        password: avbPassword,
+        url_nordwind: avbUrlNordwind.trim(),
+        url_ikar: avbUrlIkar.trim()
+      });
+      setAvbTestResult(res);
+      if (res.success) {
+        setSuccessMsg('Проверка подключения завершена: авторизация успешна!');
+      } else {
+        setErrorMsg('Не удалось авторизоваться в одной или обеих системах AviaBit');
+      }
+      await loadAviabitSettings();
+    } catch (err) {
+      setErrorMsg(err.message || 'Ошибка тестирования подключения AviaBit');
+    } finally {
+      setAvbTesting(false);
+    }
+  };
+
+  const handleResetAviabitSession = async () => {
+    if (window.confirm('Сбросить активные сессии AviaBit? При следующем запросе парсер выполнит повторный вход.')) {
+      setAvbResetting(true);
+      setErrorMsg('');
+      setSuccessMsg('');
+      try {
+        await adminResetAviabitSession();
+        setSuccessMsg('Сессии AviaBit успешно сброшены');
+        await loadAviabitSettings();
+      } catch (err) {
+        setErrorMsg(err.message || 'Ошибка сброса сессий');
+      } finally {
+        setAvbResetting(false);
+      }
+    }
   };
 
   // --- МЕТОДЫ TELEGRAM-ОПОВЕЩЕНИЙ ---
@@ -613,6 +727,22 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
             {tgChatId && (
               <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" title="Настроен" />
             )}
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('aviabit');
+              setErrorMsg('');
+              setSuccessMsg('');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              activeTab === 'aviabit'
+                ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+            <span>Шлюз AviaBit</span>
           </button>
 
           <button
@@ -1662,6 +1792,222 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
       {/* ========================================================== */}
       {/* ВКЛАДКА 5: ФЛОТ W&B (DOW / DOI) */}
       {/* ========================================================== */}
+      
+      {/* ========================================================== */}
+      {/* ВКЛАДКА 6: ШЛЮЗ И УЧЕТНАЯ ЗАПИСЬ AVIABIT                   */}
+      {/* ========================================================== */}
+      {activeTab === 'aviabit' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            
+            {/* Левая колонка: Форма учетных данных AviaBit */}
+            <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                    <KeyRound className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">Учётная запись парсера AviaBit</h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Автоматический сбор суточного плана, экипажей и заправки рейсов</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    avbHasNwSession || avbHasIkSession
+                      ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${avbHasNwSession || avbHasIkSession ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                    {avbHasNwSession || avbHasIkSession ? 'Сессия активна' : 'Требует входа'}
+                  </span>
+                </div>
+              </div>
+
+              {avbLoading ? (
+                <div className="py-12 text-center text-slate-400 flex items-center justify-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-sky-500" />
+                  <span>Загрузка настроек AviaBit...</span>
+                </div>
+              ) : (
+                <form onSubmit={handleSaveAviabit} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Логин */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Имя пользователя / Логин AviaBit
+                      </label>
+                      <input
+                        type="text"
+                        value={avbUsername}
+                        onChange={(e) => setAvbUsername(e.target.value)}
+                        placeholder="Например, a.zubkov"
+                        className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 font-bold"
+                      />
+                    </div>
+
+                    {/* Пароль */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Пароль учётной записи
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showAvbPassword ? 'text' : 'password'}
+                          value={avbPassword}
+                          onChange={(e) => setAvbPassword(e.target.value)}
+                          placeholder="Введите пароль"
+                          className="w-full px-3 py-2 pr-9 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 font-bold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAvbPassword(!showAvbPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        >
+                          {showAvbPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {/* URL Nordwind */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                        URL системы Nordwind Airlines
+                      </label>
+                      <input
+                        type="text"
+                        value={avbUrlNordwind}
+                        onChange={(e) => setAvbUrlNordwind(e.target.value)}
+                        placeholder="https://aviabit.nordwindairlines.ru"
+                        className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      />
+                    </div>
+
+                    {/* URL Ikar */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                        URL системы Ikar Airlines
+                      </label>
+                      <input
+                        type="text"
+                        value={avbUrlIkar}
+                        onChange={(e) => setAvbUrlIkar(e.target.value)}
+                        placeholder="https://aviabit.ikar.aero"
+                        className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Кнопки действий */}
+                  <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="submit"
+                        disabled={avbSaving}
+                        className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white rounded-xl shadow-sm transition-all disabled:opacity-50"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>{avbSaving ? 'Сохранение...' : 'Сохранить учётную запись'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleTestAviabit}
+                        disabled={avbTesting}
+                        className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-white rounded-xl shadow-sm transition-all disabled:opacity-50"
+                      >
+                        <Activity className={`w-3.5 h-3.5 ${avbTesting ? 'animate-spin' : ''}`} />
+                        <span>{avbTesting ? 'Проверка связи...' : 'Проверить подключение'}</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleResetAviabitSession}
+                      disabled={avbResetting}
+                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-all"
+                      title="Сбросить сессионные куки и заставить парсер авторизоваться заново"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${avbResetting ? 'animate-spin' : ''}`} />
+                      <span>Сбросить кэш сессий</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Правая колонка: Статус подключения и диагностика */}
+            <div className="bg-slate-50 dark:bg-slate-850 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+              <h5 className="font-extrabold text-xs text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                Состояние шлюзов
+              </h5>
+
+              <div className="space-y-2.5">
+                {/* Статус Nordwind */}
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Nordwind Airlines</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      avbHasNwSession
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'
+                    }`}>
+                      {avbHasNwSession ? 'Кука активна' : 'Нет сессии'}
+                    </span>
+                  </div>
+                  {avbTestResult?.nordwind && (
+                    <div className={`text-[11px] p-2 rounded-lg font-mono ${
+                      avbTestResult.nordwind.ok
+                        ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200'
+                        : 'bg-rose-50 text-rose-800 dark:bg-rose-950/50 dark:text-rose-200'
+                    }`}>
+                      {avbTestResult.nordwind.message} (HTTP {avbTestResult.nordwind.code})
+                    </div>
+                  )}
+                </div>
+
+                {/* Статус Ikar */}
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Ikar Airlines</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      avbHasIkSession
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'
+                    }`}>
+                      {avbHasIkSession ? 'Кука активна' : 'Нет сессии'}
+                    </span>
+                  </div>
+                  {avbTestResult?.ikar && (
+                    <div className={`text-[11px] p-2 rounded-lg font-mono ${
+                      avbTestResult.ikar.ok
+                        ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200'
+                        : 'bg-rose-50 text-rose-800 dark:bg-rose-950/50 dark:text-rose-200'
+                    }`}>
+                      {avbTestResult.ikar.message} (HTTP {avbTestResult.ikar.code})
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl border border-sky-100 dark:border-sky-900 text-[11px] text-sky-800 dark:text-sky-300 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                  <span>Безопасность и хранение</span>
+                </div>
+                <p className="leading-relaxed text-[10px] text-slate-600 dark:text-slate-400">
+                  Учётные данные сохраняются в БД. Парсер производит авторизацию только по протоколу HTTPS и сохраняет сессионные маркеры.
+                </p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {activeTab === 'fleet_wb' && (
         <FleetWbManager />
       )}

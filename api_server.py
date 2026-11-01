@@ -263,6 +263,12 @@ class TelegramSettingsRequest(BaseModel):
     notify_aviabit: Optional[bool] = True
 
 
+class AviabitSettingsRequest(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+    url_nordwind: Optional[str] = None
+    url_ikar: Optional[str] = None
+
 class TelegramTestRequest(BaseModel):
     bot_token: Optional[str] = None
     chat_id: Optional[str] = None
@@ -897,6 +903,135 @@ def test_telegram_connection(req: TelegramTestRequest, user: dict = Depends(requ
 
 
 # --- 2.3. ПОСМЕННЫЕ АРХИВЫ И АВТО-СНАПШОТЫ ---
+
+
+# --- AVIABIT SETTINGS & FLEET W&B ---
+
+@app.get("/api/admin/aviabit/settings")
+def get_aviabit_settings(user: dict = Depends(require_moderator_or_admin)):
+    """Получение настроек подключения к шлюзу AviaBit"""
+    import os
+    has_nw = os.path.exists(".session.json")
+    has_ik = os.path.exists(".session_ikar.json")
+    return {
+        "username": get_setting("aviabit_username", "a.zubkov"),
+        "password": get_setting("aviabit_password", "SoLnCeVo1985"),
+        "url_nordwind": get_setting("aviabit_url_nordwind", "https://aviabit.nordwindairlines.ru"),
+        "url_ikar": get_setting("aviabit_url_ikar", "https://aviabit.ikar.aero"),
+        "has_nordwind_session": has_nw,
+        "has_ikar_session": has_ik
+    }
+
+@app.post("/api/admin/aviabit/settings")
+def update_aviabit_settings(req: AviabitSettingsRequest, admin: dict = Depends(require_admin)):
+    """Обновление учетных данных AviaBit"""
+    import os
+    if req.username is not None:
+        set_setting("aviabit_username", req.username.strip())
+    if req.password is not None:
+        set_setting("aviabit_password", req.password)
+    if req.url_nordwind is not None:
+        set_setting("aviabit_url_nordwind", req.url_nordwind.strip())
+    if req.url_ikar is not None:
+        set_setting("aviabit_url_ikar", req.url_ikar.strip())
+    
+    # Сброс старых сессий
+    for sf in [".session.json", ".session_ikar.json"]:
+        if os.path.exists(sf):
+            try:
+                os.remove(sf)
+            except Exception:
+                pass
+    
+    log_system_event(
+        "INFO", "system",
+        f"Администратор '{admin['username']}' обновил учетную запись AviaBit ({req.username or ''})",
+        user_id=admin["id"], username=admin["username"]
+    )
+    return {"success": True, "message": "Учетные данные AviaBit успешно сохранены"}
+
+@app.post("/api/admin/aviabit/test")
+def test_aviabit_connection(req: AviabitSettingsRequest, user: dict = Depends(require_moderator_or_admin)):
+    """Проверка аутентификации в AviaBit"""
+    test_user = req.username or get_setting("aviabit_username", "a.zubkov")
+    test_pass = req.password or get_setting("aviabit_password", "SoLnCeVo1985")
+    url_nw = req.url_nordwind or get_setting("aviabit_url_nordwind", "https://aviabit.nordwindairlines.ru")
+    url_ik = req.url_ikar or get_setting("aviabit_url_ikar", "https://aviabit.ikar.aero")
+
+    nw_res = {"ok": False, "message": ""}
+    ik_res = {"ok": False, "message": ""}
+
+    try:
+        c_nw = AviaBitClient(username=test_user, password=test_pass, base_url=url_nw, session_filename=".session_test_nw.json", name="Nordwind")
+        ok_nw = c_nw.login()
+        nw_res = {"ok": ok_nw, "code": 200 if ok_nw else 401, "message": "Авторизация успешна" if ok_nw else "Неверный логин/пароль"}
+    except Exception as e:
+        nw_res = {"ok": False, "code": 500, "message": str(e)}
+
+    try:
+        c_ik = AviaBitClient(username=test_user, password=test_pass, base_url=url_ik, session_filename=".session_test_ik.json", name="Ikar")
+        ok_ik = c_ik.login()
+        ik_res = {"ok": ok_ik, "code": 200 if ok_ik else 401, "message": "Авторизация успешна" if ok_ik else "Неверный логин/пароль"}
+    except Exception as e:
+        ik_res = {"ok": False, "code": 500, "message": str(e)}
+
+    # Удаляем тестовые сессии
+    import os
+    for tf in [".session_test_nw.json", ".session_test_ik.json"]:
+        if os.path.exists(tf):
+            try: os.remove(tf)
+            except Exception: pass
+
+    return {
+        "success": nw_res["ok"] or ik_res["ok"],
+        "nordwind": nw_res,
+        "ikar": ik_res
+    }
+
+@app.post("/api/admin/aviabit/reset_session")
+def reset_aviabit_session(user: dict = Depends(require_moderator_or_admin)):
+    """Сброс кэшированных файлов сессий"""
+    import os
+    for sf in [".session.json", ".session_ikar.json", ".session_test_nw.json", ".session_test_ik.json"]:
+        if os.path.exists(sf):
+            try: os.remove(sf)
+            except Exception: pass
+    log_system_event("INFO", "system", f"Пользователь '{user['username']}' сбросил активные сессии AviaBit", user_id=user["id"], username=user["username"])
+    return {"success": True, "message": "Сессии AviaBit сброшены"}
+
+@app.get("/api/admin/fleet_wb")
+def get_fleet_wb_api(user: dict = Depends(require_moderator_or_admin)):
+    """Получение базы флота W&B"""
+    import json, os
+    fp = os.path.join(os.path.dirname(__file__), "web_app", "src", "data", "fleet_wb.json")
+    if os.path.exists(fp):
+        with open(fp, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {"success": True, "fleet": data}
+    return {"success": False, "fleet": {}}
+
+@app.post("/api/admin/fleet_wb/update")
+def update_fleet_wb_api(req: dict = Body(...), admin: dict = Depends(require_admin)):
+    """Обновление параметров ВС в fleet_wb.json"""
+    import json, os
+    k = req.get("key")
+    ac = req.get("aircraft")
+    if not k or not ac:
+        raise HTTPException(status_code=400, detail="Отсутствует ключ или данные ВС")
+    
+    target_files = [
+        os.path.join(os.path.dirname(__file__), "web_app", "src", "data", "fleet_wb.json"),
+        os.path.join(os.path.dirname(__file__), "web_app", "public", "data", "fleet_wb.json"),
+        os.path.join(os.path.dirname(__file__), "loadsheet", "fleet_wb.json")
+    ]
+    for fp in target_files:
+        if os.path.exists(fp):
+            with open(fp, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            data[k] = ac
+            with open(fp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+    return {"success": True, "message": f"ВС {k} обновлен"}
 
 @app.get("/api/admin/archives")
 def list_shift_archives(
@@ -1689,7 +1824,10 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
     # Nordwind
     if req.airline in ("both", "nordwind"):
         try:
-            client_nw = AviaBitClient(base_url=BASE_URL_NORDWIND, session_filename=".session.json", name="Nordwind")
+            user_avb = get_setting("aviabit_username", DEFAULT_USERNAME or "a.zubkov")
+            pass_avb = get_setting("aviabit_password", DEFAULT_PASSWORD or "SoLnCeVo1985")
+            url_nw = get_setting("aviabit_url_nordwind", BASE_URL_NORDWIND)
+            client_nw = AviaBitClient(username=user_avb, password=pass_avb, base_url=url_nw, session_filename=".session.json", name="Nordwind")
             client_nw.login()
             t_id = client_nw.get_template_id(req.filter_name)
             flights_nw = client_nw.fetch_schedule(start_dt, end_dt, template_id=t_id)
@@ -1702,7 +1840,8 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
     # Икар
     if req.airline in ("both", "ikar"):
         try:
-            client_ik = AviaBitClient(base_url=BASE_URL_IKAR, session_filename=".session_ikar.json", name="Икар")
+            url_ik = get_setting("aviabit_url_ikar", BASE_URL_IKAR)
+            client_ik = AviaBitClient(username=user_avb, password=pass_avb, base_url=url_ik, session_filename=".session_ikar.json", name="Икар")
             client_ik.login()
             t_id = client_ik.get_template_id(req.filter_name)
             flights_ik = client_ik.fetch_schedule(start_dt, end_dt, template_id=t_id)

@@ -3,6 +3,7 @@ import {
   Plane, Search, Filter, UploadCloud, Download, CheckCircle2, 
   AlertCircle, RefreshCw, FileText, Layers, Scale, Sliders, 
   ChevronRight, Info, X, Edit3, Save, FileSpreadsheet, Sparkles,
+  Maximize2, Printer,
   ArrowRightLeft, Check, AlertTriangle
 } from 'lucide-react';
 import { adminGetFleetWb, adminUpdateFleetWb, adminUploadFleetWbr } from '../utils/api';
@@ -38,6 +39,7 @@ export default function FleetWbManager() {
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadPreview, setUploadPreview] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showFullMatrixModal, setShowFullMatrixModal] = useState(false);
   const fileInputRef = useRef(null);
 
   // Загрузка актуального реестра с сервера
@@ -692,9 +694,20 @@ export default function FleetWbManager() {
 
               {/* ПОЛНАЯ ТАБЛИЦА МАТРИЦЫ W&B */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
-                  <span>Полная центровочная матрица графиков WBR</span>
-                  <span className="text-[10px] text-slate-400">Кликните по ячейке для моментального выбора</span>
+                <div className="flex items-center justify-between gap-2 flex-wrap text-[11px] font-bold text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-700 dark:text-slate-200">Полная центровочная матрица графиков WBR</span>
+                    <span className="text-[10px] text-slate-400 hidden sm:inline">• Клик по ячейке для моментального выбора</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFullMatrixModal(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold bg-sky-50 dark:bg-sky-950/50 hover:bg-sky-100 dark:hover:bg-sky-900 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 rounded-lg shadow-xs transition-all"
+                    title="Открыть всю таблицу весов и индексов целиком как в оригинале"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                    <span>Вся таблица целиком (Оригинал WBR)</span>
+                  </button>
                 </div>
 
                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[380px] overflow-y-auto overflow-x-auto">
@@ -766,7 +779,174 @@ export default function FleetWbManager() {
 
       </div>
 
-      {/* 4. МОДАЛЬНОЕ ОКНО ПРЕДПРОСМОТРА И ПОДТВЕРЖДЕНИЯ ЗАГРУЖЕННОГО WBR PDF */}
+
+      {/* 5. ПОЛНОЭКРАННОЕ МОДАЛЬНОЕ ОКНО ПРОСМОТРА ВСЕЙ ТАБЛИЦЫ WBR ЦЕЛИКОМ */}
+      {showFullMatrixModal && currentAircraft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            {/* Шапка модалки */}
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/90 dark:bg-slate-850/90">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-sky-600/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-mono font-black text-lg text-slate-900 dark:text-slate-100">
+                      RA-{currentAircraft.tail}
+                    </h3>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                      currentAircraft.operator === 'N4'
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300'
+                        : 'bg-sky-100 text-sky-700 dark:bg-sky-950/80 dark:text-sky-300'
+                    }`}>
+                      {currentAircraft.operator === 'N4' ? 'Nordwind Airlines' : 'Ikar Airlines'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      {currentAircraft.model}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {currentAircraft.file || 'WBR'} • Ревизия: <strong>{currentAircraft.revision || '1.0'}</strong> • Дата: <strong>{currentAircraft.date || '—'}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition-colors"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Печать</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowFullMatrixModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Базовые веса и пределы ВС */}
+            <div className="px-5 py-2.5 bg-slate-100/70 dark:bg-slate-850/50 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
+              <div className="flex items-center gap-5 flex-wrap">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Basic Weight / Index:</span>
+                  <span className="font-extrabold text-sm text-sky-600 dark:text-sky-400">
+                    {currentAircraft.basic_weight ? `${currentAircraft.basic_weight.toLocaleString()} кг` : 'В строках матрицы W&B'}
+                    {currentAircraft.basic_index !== undefined && currentAircraft.basic_index !== null && ` / ${currentAircraft.basic_index}`}
+                  </span>
+                </div>
+                {currentAircraft.max_weights && (
+                  <>
+                    <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">MZFW (Zero Fuel):</span>
+                      <strong className="text-slate-800 dark:text-slate-200">{currentAircraft.max_weights.mzfw ? `${currentAircraft.max_weights.mzfw.toLocaleString()} кг` : '—'}</strong>
+                    </div>
+                    <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">MTOW (Take-Off):</span>
+                      <strong className="text-slate-800 dark:text-slate-200">{currentAircraft.max_weights.mtow ? `${currentAircraft.max_weights.mtow.toLocaleString()} кг` : '—'}</strong>
+                    </div>
+                    <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">MLAW (Landing):</span>
+                      <strong className="text-slate-800 dark:text-slate-200">{currentAircraft.max_weights.mlaw ? `${currentAircraft.max_weights.mlaw.toLocaleString()} кг` : '—'}</strong>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="text-[11px] text-slate-500 font-sans">
+                Выбрано в симуляторе: <strong className="text-amber-600 dark:text-amber-400 font-mono font-bold">Экипаж {simCrew} / Pantry {simPantry}</strong> 
+                {simResult && <span className="ml-1 text-slate-700 dark:text-slate-300 font-mono font-bold">({simResult.dow ? simResult.dow.toLocaleString() : '—'} кг, DOI {simResult.doi})</span>}
+              </div>
+            </div>
+
+            {/* Просторная полная таблица всей матрицы W&B без сплющивания */}
+            <div className="p-4 sm:p-5 overflow-auto flex-1">
+              <table className="w-full text-left border-collapse font-mono text-xs border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-xs">
+                <thead className="bg-slate-200/90 dark:bg-slate-800 sticky top-0 z-20 text-slate-800 dark:text-slate-200 uppercase font-extrabold text-[11px]">
+                  <tr>
+                    <th className="px-4 py-3 bg-slate-200 dark:bg-slate-800 sticky left-0 z-30 border-r border-b border-slate-300 dark:border-slate-700">
+                      Экипаж (Crew)
+                    </th>
+                    {(currentAircraft.pantry_codes || ['A', 'B', 'D', 'E', 'F']).map(pCode => (
+                      <th key={pCode} className="px-4 py-3 text-center border-r border-b border-slate-300 dark:border-slate-700 last:border-r-0">
+                        <div className="text-xs font-black">Pantry {pCode}</div>
+                        <div className="text-[9px] text-slate-500 font-normal normal-case">DOW (кг) / DOI</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                  {currentAircraft.matrix && Object.entries(currentAircraft.matrix).map(([crewCode, pantries]) => (
+                    <tr key={crewCode} className="hover:bg-sky-50/50 dark:hover:bg-sky-950/20 transition-colors">
+                      <td className="px-4 py-2 font-black text-slate-900 dark:text-slate-100 bg-slate-100/90 dark:bg-slate-850 sticky left-0 z-10 border-r border-slate-200 dark:border-slate-800 whitespace-nowrap">
+                        {crewCode}
+                      </td>
+                      {(currentAircraft.pantry_codes || ['A', 'B', 'D', 'E', 'F']).map(pCode => {
+                        const cell = pantries[pCode];
+                        const isHighlighted = simCrew === crewCode && simPantry === pCode;
+
+                        return (
+                          <td
+                            key={pCode}
+                            onClick={() => {
+                              if (cell) {
+                                setSimCrew(crewCode);
+                                setSimPantry(pCode);
+                              }
+                            }}
+                            className={`px-3 py-2 text-center border-r border-slate-100 dark:border-slate-800 last:border-r-0 cursor-pointer transition-all ${
+                              isHighlighted
+                                ? 'bg-amber-100 dark:bg-amber-900/60 font-black ring-2 ring-amber-500 ring-inset shadow-xs'
+                                : cell
+                                ? 'hover:bg-sky-100/50 dark:hover:bg-slate-800'
+                                : 'text-slate-300 dark:text-slate-700'
+                            }`}
+                          >
+                            {cell ? (
+                              <div>
+                                <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                                  {cell.dow ? cell.dow.toLocaleString() : '—'}
+                                </div>
+                                <div className="text-[11px] font-bold text-sky-600 dark:text-sky-400">
+                                  {cell.doi !== undefined ? cell.doi : '—'}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-slate-300 dark:text-slate-700">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Подвал модалки */}
+            <div className="px-5 py-3 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span>Кликните по любой ячейке для выбора этой связки экипажа и кухни в расчет W&B</span>
+              <button
+                type="button"
+                onClick={() => setShowFullMatrixModal(false)}
+                className="px-4 py-1.5 font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg transition-colors"
+              >
+                Закрыть
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+            {/* 4. МОДАЛЬНОЕ ОКНО ПРЕДПРОСМОТРА И ПОДТВЕРЖДЕНИЯ ЗАГРУЖЕННОГО WBR PDF */}
       {showUploadModal && uploadPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 animate-in fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-xl w-full p-5 space-y-4">
