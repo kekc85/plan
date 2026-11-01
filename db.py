@@ -133,6 +133,10 @@ def init_db():
             ac_type VARCHAR(16) NULL,
             ac_config VARCHAR(32) NULL,
             pax VARCHAR(32) NULL,
+            pax_m VARCHAR(16) NULL,
+            pax_f VARCHAR(16) NULL,
+            pax_ch VARCHAR(16) NULL,
+            pax_inf VARCHAR(16) NULL,
             crew VARCHAR(32) NULL,
             fuel_block VARCHAR(32) NULL,
             fuel_trip VARCHAR(32) NULL,
@@ -337,6 +341,14 @@ def init_db():
         except Exception:
             pass
 
+        # Автомиграция: добавление колонок категорий пассажиров pax_m, pax_f, pax_ch, pax_inf
+        for col in ["pax_m", "pax_f", "pax_ch", "pax_inf"]:
+            try:
+                cursor.execute(f"ALTER TABLE plan_flights ADD COLUMN {col} VARCHAR(16) NULL;")
+                conn.commit()
+            except Exception:
+                pass
+
         # Автомиграция: добавление колонок статуса прочтения в plan_handover_logs
         for col, col_def in [
             ("is_read", "TINYINT(1) DEFAULT 0"),
@@ -391,6 +403,10 @@ def init_db():
             ac_type TEXT,
             ac_config TEXT,
             pax TEXT,
+            pax_m TEXT,
+            pax_f TEXT,
+            pax_ch TEXT,
+            pax_inf TEXT,
             crew TEXT,
             fuel_block TEXT,
             fuel_trip TEXT,
@@ -562,7 +578,7 @@ def init_db():
         conn.commit()
 
         # Автомиграция: добавление колонок если их еще нет
-        for col in ["ac_type", "unread_changes", "crew_manual", "fuel_confirmed", "inbound_flight", "inbound_dep", "inbound_takeoff_time", "inbound_landing_calc", "inbound_landing_time", "outbound_takeoff_time", "plane_status"]:
+        for col in ["ac_type", "unread_changes", "crew_manual", "fuel_confirmed", "pax_m", "pax_f", "pax_ch", "pax_inf", "inbound_flight", "inbound_dep", "inbound_takeoff_time", "inbound_landing_calc", "inbound_landing_time", "outbound_takeoff_time", "plane_status"]:
             try:
                 cursor.execute(f"ALTER TABLE plan_flights ADD COLUMN {col} TEXT;")
                 conn.commit()

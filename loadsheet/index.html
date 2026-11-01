@@ -2908,32 +2908,57 @@
       const toDest = data.to || data.f_to || data.arr || data.dest_1;
       setInp('dest_code_1', toDest);
 
-      // Пассажиры
-      const rawPaxM = data.pax_m !== undefined ? data.pax_m : data.pax_m_1;
-      const rawPaxF = data.pax_f !== undefined ? data.pax_f : data.pax_f_1;
-      const rawPaxCh = data.pax_ch !== undefined ? data.pax_ch : data.pax_ch_1;
-      const rawPaxInf = data.pax_inf !== undefined ? data.pax_inf : data.pax_inf_1;
+      // Пассажиры (Взрослые М/Ж, Дети РБ, Младенцы РМ)
+      let rawPaxM = data.pax_m !== undefined ? data.pax_m : data.pax_m_1;
+      let rawPaxF = data.pax_f !== undefined ? data.pax_f : data.pax_f_1;
+      let rawPaxCh = data.pax_ch !== undefined ? data.pax_ch : data.pax_ch_1;
+      let rawPaxInf = data.pax_inf !== undefined ? data.pax_inf : data.pax_inf_1;
 
-      const numM = parseInt(rawPaxM, 10) || 0;
-      const numF = parseInt(rawPaxF, 10) || 0;
-      const numCh = parseInt(rawPaxCh, 10) || 0;
-      const numInf = parseInt(rawPaxInf, 10) || 0;
+      const rawPaxStr = String(data.pax || data.pax_total || '').trim();
 
-      if (numM > 0 || numF > 0 || numCh > 0 || numInf > 0) {
-        if (numM > 0) setInp('pax_m_1', numM);
-        if (numF > 0) setInp('pax_f_1', numF);
-        if (numCh > 0) setInp('pax_ch_1', numCh);
-        if (numInf > 0) setInp('pax_inf_1', numInf);
-      } else {
-        // Если детальной разбивки нет, берем общее число пассажиров pax / pax_total
-        const totalPax = parseInt(data.pax || data.pax_total || 0, 10);
-        if (totalPax > 0) {
-          const halfM = Math.ceil(totalPax / 2);
-          const halfF = totalPax - halfM;
-          setInp('pax_m_1', halfM);
-          setInp('pax_f_1', halfF);
+      // Интеллектуальный поиск РБ / РМ если они явно не переданы
+      if ((rawPaxCh === undefined || rawPaxCh === '' || rawPaxCh === null) &&
+          (rawPaxInf === undefined || rawPaxInf === '' || rawPaxInf === null)) {
+        if (rawPaxStr.includes('/')) {
+          // Формат ВЗР/РБ/РМ (например "170/5/2")
+          const pParts = rawPaxStr.split('/');
+          const adt = parseInt(pParts[0], 10) || 0;
+          const chVal = parseInt(pParts[1], 10) || 0;
+          const infVal = pParts.length > 2 ? (parseInt(pParts[2], 10) || 0) : 0;
+          if (chVal > 0) rawPaxCh = chVal;
+          if (infVal > 0) rawPaxInf = infVal;
+          if (!rawPaxM && !rawPaxF && adt > 0) {
+            rawPaxM = Math.ceil(adt / 2);
+            rawPaxF = adt - rawPaxM;
+          }
+        } else if (data.notes) {
+          // Поиск в ремарках (например "5 РБ 2 РМ")
+          const nStr = String(data.notes);
+          const rbMatch = nStr.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd|дет)/i);
+          const rmMatch = nStr.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf|младен|инф)/i);
+          if (rbMatch) rawPaxCh = rbMatch[1];
+          if (rmMatch) rawPaxInf = rmMatch[1];
         }
       }
+
+      let numM = parseInt(rawPaxM, 10) || 0;
+      let numF = parseInt(rawPaxF, 10) || 0;
+      let numCh = parseInt(rawPaxCh, 10) || 0;
+      let numInf = parseInt(rawPaxInf, 10) || 0;
+
+      // Если есть общее количество пассажиров (например pax=175) и есть дети (numCh),
+      // а взрослые numM и numF явно не переданы — взрослые равны: totalPax - numCh
+      const totalPax = parseInt(rawPaxStr, 10) || 0;
+      if (numM === 0 && numF === 0 && totalPax > 0) {
+        const adults = Math.max(0, totalPax - numCh);
+        numM = Math.ceil(adults / 2);
+        numF = adults - numM;
+      }
+
+      if (numM > 0) setInp('pax_m_1', numM);
+      if (numF > 0) setInp('pax_f_1', numF);
+      if (numCh > 0) setInp('pax_ch_1', numCh);
+      if (numInf > 0) setInp('pax_inf_1', numInf);
 
       setInp('cabin_bag_1', data.cabin_bag || data.cabin_bag_1 || data.cargo_cabin_bag_1);
 

@@ -84,6 +84,10 @@ function getDb() {
                 "ALTER TABLE plan_flights ADD COLUMN plane_status VARCHAR(32) NULL",
                 "ALTER TABLE plan_flights ADD COLUMN crew_manual TINYINT(1) DEFAULT 0",
                 "ALTER TABLE plan_flights ADD COLUMN fuel_confirmed TINYINT(1) DEFAULT 0",
+                "ALTER TABLE plan_flights ADD COLUMN pax_m VARCHAR(16) NULL",
+                "ALTER TABLE plan_flights ADD COLUMN pax_f VARCHAR(16) NULL",
+                "ALTER TABLE plan_flights ADD COLUMN pax_ch VARCHAR(16) NULL",
+                "ALTER TABLE plan_flights ADD COLUMN pax_inf VARCHAR(16) NULL",
                 "ALTER TABLE plan_shifts ADD COLUMN deleted_flights TEXT NULL",
                 "ALTER TABLE plan_handover_logs ADD COLUMN is_read TINYINT(1) DEFAULT 0",
                 "ALTER TABLE plan_handover_logs ADD COLUMN read_at VARCHAR(64) NULL",
@@ -1063,6 +1067,10 @@ if ($route === '/shift/current') {
             'ac_type' => (string)($r['ac_type'] ?? ''),
             'ac_config' => (string)($r['ac_config'] ?? ''),
             'pax' => (string)($r['pax'] ?? ''),
+            'pax_m' => (string)($r['pax_m'] ?? ''),
+            'pax_f' => (string)($r['pax_f'] ?? ''),
+            'pax_ch' => (string)($r['pax_ch'] ?? ''),
+            'pax_inf' => (string)($r['pax_inf'] ?? ''),
             'crew' => (string)($r['crew'] ?? ''),
             'fuel_block' => (string)($r['fuel_block'] ?? ''),
             'fuel_trip' => (string)($r['fuel_trip'] ?? ''),
@@ -1248,7 +1256,7 @@ if ($route === '/shift/save') {
         $insertFlight = $db->prepare("
             INSERT INTO plan_flights (
                 id, shift_id, flight_number, flight_date, route_city, route_airports,
-                departure_time, release_time, ac_num, ac_type, ac_config, pax, crew,
+                departure_time, release_time, ac_num, ac_type, ac_config, pax, pax_m, pax_f, pax_ch, pax_inf, crew,
                 fuel_block, fuel_trip, fuel_taxi, fuel_confirmed, dow, doi, galley, mtow, crew_manual,
                 lir_sent, cargo, mail, baggage, szv_sent, ldm_sent, astra_times_sent,
                 status, notes, inbound_flight, inbound_dep, inbound_takeoff_time,
@@ -1256,7 +1264,7 @@ if ($route === '/shift/save') {
                 plane_status, unread_changes, sort_order, updated_at
             ) VALUES (
                 ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
@@ -1281,6 +1289,10 @@ if ($route === '/shift/save') {
                 normalizePlaneType($f['ac_type'] ?? ''),
                 (string)($f['ac_config'] ?? ''),
                 (string)($f['pax'] ?? ''),
+                (string)($f['pax_m'] ?? ''),
+                (string)($f['pax_f'] ?? ''),
+                (string)($f['pax_ch'] ?? ''),
+                (string)($f['pax_inf'] ?? ''),
                 (string)($f['crew'] ?? ''),
                 (string)($f['fuel_block'] ?? ''),
                 (string)($f['fuel_trip'] ?? ''),
@@ -1402,7 +1414,7 @@ if ($route === '/shift/smart_merge') {
                 $item['galley'] = !empty($inc['galley']) ? $inc['galley'] : ($old['galley'] ?? 'D');
             }
 
-            foreach (['dow', 'doi', 'mtow', 'baggage'] as $field) {
+            foreach (['dow', 'doi', 'mtow', 'baggage', 'pax_m', 'pax_f', 'pax_ch', 'pax_inf'] as $field) {
                 if (isset($old[$field]) && $old[$field] !== '') {
                     $item[$field] = $old[$field];
                 }

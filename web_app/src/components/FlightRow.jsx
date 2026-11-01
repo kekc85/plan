@@ -382,12 +382,38 @@ function FlightRow({
     if (acConfig) params.set('ac_config', acConfig);
     if (depTime) params.set('dep_time', depTime);
     if (flight.crew) params.set('crew', flight.crew);
+    let abCh = flight.pax_ch;
+    let abInf = flight.pax_inf;
+    let abM = flight.pax_m;
+    let abF = flight.pax_f;
+    if (!abCh && !abInf) {
+      const pStr = String(flight.pax || '').trim();
+      if (pStr.includes('/')) {
+        const pParts = pStr.split('/');
+        const adt = parseInt(pParts[0], 10) || 0;
+        const cVal = parseInt(pParts[1], 10) || 0;
+        const iVal = pParts.length > 2 ? (parseInt(pParts[2], 10) || 0) : 0;
+        if (cVal > 0) abCh = String(cVal);
+        if (iVal > 0) abInf = String(iVal);
+        if (!abM && !abF && adt > 0) {
+          abM = String(Math.ceil(adt / 2));
+          abF = String(adt - Math.ceil(adt / 2));
+        }
+      } else {
+        const notesStr = String(flight.notes || '');
+        const rbM = notesStr.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd|дет)/i);
+        const rmM = notesStr.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf|младен|инф)/i);
+        if (rbM) abCh = rbM[1];
+        if (rmM) abInf = rmM[1];
+      }
+    }
+
     if (flight.fuel_block) params.set('to_fuel', String(flight.fuel_block).replace(/\D/g, ''));
     if (flight.fuel_trip) params.set('trip_fuel', String(flight.fuel_trip).replace(/\D/g, ''));
-    if (flight.pax_m) params.set('pax_m', flight.pax_m);
-    if (flight.pax_f) params.set('pax_f', flight.pax_f);
-    if (flight.pax_ch) params.set('pax_ch', flight.pax_ch);
-    if (flight.pax_inf) params.set('pax_inf', flight.pax_inf);
+    if (abM) params.set('pax_m', abM);
+    if (abF) params.set('pax_f', abF);
+    if (abCh) params.set('pax_ch', abCh);
+    if (abInf) params.set('pax_inf', abInf);
     if (flight.cargo) params.set('cargo', flight.cargo);
     if (flight.mail) params.set('mail', flight.mail);
     if (flight.dow) params.set('dow', flight.dow);
@@ -476,13 +502,40 @@ function FlightRow({
     if (crewVal) params.set('crew', crewVal);
     if (depTime) params.set('time', depTime);
 
+    let lsCh = flight.pax_ch;
+    let lsInf = flight.pax_inf;
+    let lsM = flight.pax_m;
+    let lsF = flight.pax_f;
+    if (!lsCh && !lsInf) {
+      const pStr = String(flight.pax || '').trim();
+      if (pStr.includes('/')) {
+        const pParts = pStr.split('/');
+        const adt = parseInt(pParts[0], 10) || 0;
+        const cVal = parseInt(pParts[1], 10) || 0;
+        const iVal = pParts.length > 2 ? (parseInt(pParts[2], 10) || 0) : 0;
+        if (cVal > 0) lsCh = String(cVal);
+        if (iVal > 0) lsInf = String(iVal);
+        if (!lsM && !lsF && adt > 0) {
+          lsM = String(Math.ceil(adt / 2));
+          lsF = String(adt - Math.ceil(adt / 2));
+        }
+      } else {
+        const notesStr = String(flight.notes || '');
+        const rbM = notesStr.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd|дет)/i);
+        const rmM = notesStr.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf|младен|инф)/i);
+        if (rbM) lsCh = rbM[1];
+        if (rmM) lsInf = rmM[1];
+      }
+    }
+
     if (flight.fuel_block) params.set('to_fuel', String(flight.fuel_block).replace(/\D/g, ''));
     if (flight.fuel_trip) params.set('trip_fuel', String(flight.fuel_trip).replace(/\D/g, ''));
-    if (flight.pax_m) params.set('pax_m', flight.pax_m);
-    if (flight.pax_f) params.set('pax_f', flight.pax_f);
-    if (flight.pax_ch) params.set('pax_ch', flight.pax_ch);
-    if (flight.pax_inf) params.set('pax_inf', flight.pax_inf);
+    if (lsM) params.set('pax_m', lsM);
+    if (lsF) params.set('pax_f', lsF);
+    if (lsCh) params.set('pax_ch', lsCh);
+    if (lsInf) params.set('pax_inf', lsInf);
     if (pax) params.set('pax', pax);
+    if (flight.notes) params.set('notes', flight.notes);
     if (flight.cargo) params.set('cargo', flight.cargo);
     if (flight.mail) params.set('mail', flight.mail);
     if (flight.dow) params.set('dow', flight.dow);
@@ -960,15 +1013,28 @@ function FlightRow({
           <input
             type="text"
             value={flight.pax || ''}
-            onChange={(e) => handleCellChange('pax', e.target.value.replace(/\D/g, '').slice(0, 4))}
+            onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9/]/g, '').slice(0, 10);
+              handleCellChange('pax', val);
+            }}
             onFocus={(e) => e.target.select()}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             placeholder="0"
-            maxLength={4}
-            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-10 text-center font-mono font-black text-sm text-slate-950 dark:text-white outline-none cursor-text ${getChangedStyle('pax')}`}
+            maxLength={10}
+            title={(() => {
+              const ch = flight.pax_ch || (flight.notes?.match(/(\d+)\s*(?:РБ|Рб|рб)/i)?.[1]) || '0';
+              const inf = flight.pax_inf || (flight.notes?.match(/(\d+)\s*(?:РМ|Рм|рм)/i)?.[1]) || '0';
+              return `Пассажиры (PAX): ${flight.pax || 0} (РБ: ${ch}, РМ: ${inf})`;
+            })()}
+            className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-11 text-center font-mono font-black text-sm text-slate-950 dark:text-white outline-none cursor-text ${getChangedStyle('pax')}`}
           />
+          {((flight.pax_ch && Number(flight.pax_ch) > 0) || (flight.pax_inf && Number(flight.pax_inf) > 0)) && (
+            <span className="text-[8px] font-bold text-sky-600 dark:text-sky-400 tracking-tight leading-none mt-0.5" title={`Дети: ${flight.pax_ch || 0} РБ, Младенцы: ${flight.pax_inf || 0} РМ`}>
+              {flight.pax_ch ? `${flight.pax_ch}рб` : ''}{flight.pax_ch && flight.pax_inf ? ' ' : ''}{flight.pax_inf ? `${flight.pax_inf}рм` : ''}
+            </span>
+          )}
           <ChangeBadge change={unread.pax} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'pax')} />
         </div>
       </td>
