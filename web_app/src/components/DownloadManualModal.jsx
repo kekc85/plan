@@ -530,7 +530,7 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                   src={loadsheetScreenImg} 
                   alt="W&B Loadsheet Blank" 
                   onClick={() => setSelectedImage(loadsheetScreenImg)} 
-                  className="w-full object-cover max-h-[380px] cursor-pointer hover:opacity-95 transition-opacity"
+                  className="w-full object-contain max-h-[440px] bg-slate-50 dark:bg-slate-900 cursor-pointer hover:opacity-95 transition-opacity"
                 />
                 <div className="p-3 text-xs text-slate-500 dark:text-slate-400 italic text-center border-t border-slate-200 dark:border-slate-700">
                   Полный бланк центровки W&B Loadsheet: расчет весовых лимитов, пассажирские зоны, отсеки и центровочная трапеция.
@@ -549,7 +549,7 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                       src={loadsheetLimitsImg} 
                       alt="Loadsheet Take-off limits" 
                       onClick={() => setSelectedImage(loadsheetLimitsImg)} 
-                      className="w-full object-cover max-h-[140px] rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-95 transition-opacity"
+                      className="w-full object-contain bg-white dark:bg-slate-900 max-h-[140px] rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-95 transition-opacity"
                     />
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
@@ -560,13 +560,13 @@ export default function DownloadManualModal({ isOpen, onClose }) {
                 <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-850 p-3 flex flex-col justify-between">
                   <div>
                     <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 block mb-2 uppercase">
-                      Центровочный график (% MAC):
+                      Сводная ведомость центровки (Balance / Underload):
                     </span>
                     <img 
                       src={loadsheetEnvelopeImg} 
                       alt="Loadsheet Trim Envelope" 
                       onClick={() => setSelectedImage(loadsheetEnvelopeImg)} 
-                      className="w-full object-cover max-h-[140px] rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-95 transition-opacity"
+                      className="w-full object-contain bg-white dark:bg-slate-900 max-h-[140px] rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-95 transition-opacity"
                     />
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
