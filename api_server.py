@@ -21,7 +21,7 @@ from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, HTTPException, Depends, Body, Header, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, RedirectResponse
+from fastapi.responses import StreamingResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
@@ -2318,8 +2318,11 @@ def get_aerobag_shift_flights():
 @app.get("/aerobag/api.php")
 @app.post("/api.php")
 @app.post("/aerobag/api.php")
+@app.get("/aerobag/api.php")
+@app.post("/api.php")
+@app.get("/api.php")
 async def aerobag_api_php_compat(request: Request):
-    """Эмуляция API AeroBag для совместимости в локальном режиме"""
+    """Эмуляция API AeroBag для полноценной работы и персистентности в локальном режиме"""
     action = request.query_params.get("action", "")
     body = {}
     if request.method == "POST":
@@ -2331,12 +2334,12 @@ async def aerobag_api_php_compat(request: Request):
                 body = dict(form)
             except Exception:
                 body = {}
-    if not action:
+    if not action and isinstance(body, dict):
         action = body.get("action", "")
 
     if action == "login":
-        u = (body.get("username") or "").strip()
-        p = (body.get("password") or "").strip()
+        u = (body.get("username") or "").strip() if isinstance(body, dict) else ""
+        p = (body.get("password") or "").strip() if isinstance(body, dict) else ""
         u_up = u.upper()
         is_adm = (u_up in ("ADMIN", "АДМИНИСТРАТОР")) and (p in ("NW2026", "AeroBag#2026!Master", "admin", "admin123", ""))
         user_obj = {
@@ -2368,17 +2371,182 @@ async def aerobag_api_php_compat(request: Request):
             try:
                 with open(db_path, "r", encoding="utf-8") as f:
                     flts = json.load(f)
+                    if not isinstance(flts, list):
+                        flts = []
             except Exception:
-                pass
+                flts = []
         return {"success": True, "flights": flts}
 
-    elif action in ("update_theme", "save_settings", "save_flights"):
+    elif action == "save_flights":
+        flts = body if isinstance(body, list) else (body.get("flights") if isinstance(body, dict) else [])
+        if not isinstance(flts, list):
+            flts = []
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
+        try:
+            tmp_path = db_path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(flts, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, db_path)
+            return {"success": True, "count": len(flts), "message": f"Успешно сохранено {len(flts)} рейсов"}
+        except Exception as e:
+            return {"success": False, "error": f"Ошибка сохранения рейсов: {str(e)}"}
+
+    elif action == "delete_flight":
+        target_id = request.query_params.get("id") or (body.get("id") if isinstance(body, dict) else "")
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
+        if os.path.exists(db_path) and target_id:
+            try:
+                with open(db_path, "r", encoding="utf-8") as f:
+                    flts = json.load(f)
+                if isinstance(flts, list):
+                    flts = [fl for fl in flts if str(fl.get("id")) != str(target_id)]
+                    tmp_path = db_path + ".tmp"
+                    with open(tmp_path, "w", encoding="utf-8") as f:
+                        json.dump(flts, f, ensure_ascii=False, indent=2)
+                    os.replace(tmp_path, db_path)
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        return {"success": True, "message": "Рейс удален"}
+
+    elif action == "clear_db":
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
+        try:
+            tmp_path = db_path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump([], f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, db_path)
+            return {"success": True, "message": "База рейсов очищена"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif action == "update_theme":
         return {"success": True}
 
+    elif action == "save_settings":
+        k = ""
+        v = None
+        if isinstance(body, dict):
+            k = (body.get("setting_key") or body.get("key") or "").strip()
+            v = body.get("setting_value") if "setting_value" in body else body.get("value")
+        if k:
+            val_str = json.dumps(v, ensure_ascii=False) if v is not None else ""
+            set_setting(f"aerobag_{k}", val_str)
+            return {"success": True, "message": f"Настройка {k} сохранена"}
+        return {"success": False, "error": "Не указан ключ настройки"}
+
     elif action == "get_settings":
-        key = request.query_params.get("key", "")
-        val = get_setting(f"aerobag_{key}") or ""
-        return {"success": True, "value": val}
+        key = request.query_params.get("key", "").strip()
+        if key:
+            raw_v = get_setting(f"aerobag_{key}") or ""
+            val = None
+            if raw_v:
+                try:
+                    val = json.loads(raw_v)
+                except Exception:
+                    val = raw_v
+            return {"success": True, "key": key, "value": val}
+        return {"success": True, "settings": {}}
+
+    elif action == "list_backups":
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        backups = []
+        for fn in sorted(os.listdir(backup_dir), reverse=True):
+            if fn.endswith(".json"):
+                fp = os.path.join(backup_dir, fn)
+                st = os.stat(fp)
+                fl_cnt = 0
+                try:
+                    with open(fp, "r", encoding="utf-8") as f:
+                        b_data = json.load(f)
+                        fl_cnt = len(b_data.get("flights", [])) if isinstance(b_data, dict) else len(b_data)
+                except Exception:
+                    pass
+                backups.append({
+                    "filename": fn,
+                    "date": datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                    "size": f"{st.st_size / 1024:.1f} KB",
+                    "flights_count": fl_cnt
+                })
+        return {"success": True, "backups": backups}
+
+    elif action == "create_backup":
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
+        flts = []
+        if os.path.exists(db_path):
+            try:
+                with open(db_path, "r", encoding="utf-8") as f:
+                    flts = json.load(f)
+            except Exception:
+                flts = []
+        now_ts = datetime.now().strftime("%Y_%m_%d_%H%M%S")
+        backup_fn = f"aerobag_backup_{now_ts}.json"
+        backup_fp = os.path.join(backup_dir, backup_fn)
+        raw_filters = get_setting("aerobag_airport_filters")
+        filters = json.loads(raw_filters) if raw_filters else {}
+        raw_ports = get_setting("aerobag_custom_airports")
+        ports = json.loads(raw_ports) if raw_ports else []
+        
+        backup_data = {
+            "backup_version": "2.0",
+            "exported_at": datetime.now().isoformat(),
+            "flights_count": len(flts),
+            "flights": flts,
+            "custom_airports": ports,
+            "airport_filters": filters
+        }
+        with open(backup_fp, "w", encoding="utf-8") as f:
+            json.dump(backup_data, f, ensure_ascii=False, indent=2)
+        return {"success": True, "filename": backup_fn, "message": f"Бэкап создан: {backup_fn}"}
+
+    elif action == "restore_backup":
+        fn = (body.get("filename") or body.get("file") or "").strip() if isinstance(body, dict) else ""
+        if not fn:
+            return {"success": False, "error": "Не указано имя файла бэкапа"}
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "backups")
+        backup_fp = os.path.join(backup_dir, fn)
+        if not os.path.exists(backup_fp):
+            return {"success": False, "error": f"Файл бэкапа {fn} не найден"}
+        try:
+            with open(backup_fp, "r", encoding="utf-8") as f:
+                b_data = json.load(f)
+            restored_flights = b_data if isinstance(b_data, list) else b_data.get("flights", [])
+            db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
+            tmp_path = db_path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(restored_flights, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, db_path)
+            
+            if isinstance(b_data, dict):
+                if "airport_filters" in b_data:
+                    set_setting("aerobag_airport_filters", json.dumps(b_data["airport_filters"], ensure_ascii=False))
+                if "custom_airports" in b_data:
+                    set_setting("aerobag_custom_airports", json.dumps(b_data["custom_airports"], ensure_ascii=False))
+            return {"success": True, "flights_restored": len(restored_flights), "message": f"База успешно восстановлена: {len(restored_flights)} рейсов"}
+        except Exception as e:
+            return {"success": False, "error": f"Ошибка восстановления бэкапа: {str(e)}"}
+
+    elif action == "download_backup":
+        fn = request.query_params.get("file", "").strip()
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "backups")
+        backup_fp = os.path.join(backup_dir, fn)
+        if os.path.exists(backup_fp):
+            return FileResponse(backup_fp, filename=fn, media_type="application/json")
+        return {"success": False, "error": "Файл не найден"}
+
+    elif action == "delete_backup":
+        fn = (body.get("filename") or body.get("file") or "").strip() if isinstance(body, dict) else ""
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "backups")
+        backup_fp = os.path.join(backup_dir, fn)
+        if os.path.exists(backup_fp):
+            os.remove(backup_fp)
+            return {"success": True, "message": "Бэкап удален"}
+        return {"success": False, "error": "Файл не найден"}
+
+    elif action == "health":
+        return {"success": True, "status": "ok", "mode": "local_standalone"}
 
     elif action == "get_users":
         return {

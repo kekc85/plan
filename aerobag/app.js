@@ -7674,9 +7674,19 @@ function handleExportDatabase() {
     }
 }
 
-// Импорт базы данных из JSON файла резервной копии
+// Импорт базы данных из JSON файла резервной копии или Excel-отчета
 function handleImportDatabase(file) {
     if (!file) return;
+
+    // Если пользователь выбрал Excel-файл (.xls/.xlsx) через кнопку импорта базы,
+    // автоматически направляем его в обработчик таблиц регистрации
+    const lowerName = (file.name || '').toLowerCase();
+    if (lowerName.endsWith('.xls') || lowerName.endsWith('.xlsx')) {
+        handleUploadedFiles([file]);
+        const backupInput = document.getElementById('backup-file-input');
+        if (backupInput) backupInput.value = '';
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = async function(e) {

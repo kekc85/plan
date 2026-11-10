@@ -513,4 +513,7 @@
   * В api_server.py интегрированы шлюзы Lydia DCS (/api/dcs_sync) и рейс-менеджер /aerobag/flights для полной независимости от PHP и Beget;
   * В FlightRow.jsx и Header.jsx динамически маршрутизируются кнопки AeroBag и Loadsheet на локальный хост 127.0.0.1;
   * В AeroBag добавлена кнопка возврата [↩ В AeroPlan] и прием входящих URL-параметров рейса;
-  * Созданы скрипты Запуск_AeroPlan_2.0.bat, AeroPlan_Launch.vbs, Остановить_AeroPlan_2.0.bat и Создать_Ярлык_на_Рабочем_Столе.bat (zero-admin). База SQLite plan.db в режиме WAL.
+  * Созданы скрипты Запуск_AeroPlan_2.0.bat, AeroPlan_Launch.vbs, Остановить_AeroPlan_2.0.bat и Создать_Ярлык_на_Рабочем_Столе.bat (zero-admin). База SQLite plan.db в режиме WAL;
+  * Исправлена ошибка очистки базы при импорте в AeroBag: в api_server.py (/aerobag/api.php) реализовано сохранение (save_flights), удаление (delete_flight), очистка (clear_db), управление бэкапами (list/create/restore/download/delete_backup) и персистентные настройки аэропортов/фильтров;
+  * База dcs_saved_flights.json предзаполнена актуальным бэкапом (8719 рейсов), кнопка «Импорт базы» в AeroBag адаптирована под файлы .json, .xls и .xlsx;
+  * Устранена ошибка загрузки расписания AviaBit (области видимости DEFAULT_USERNAME и user_avb).
