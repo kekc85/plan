@@ -1,0 +1,21 @@
+Options -Indexes
+DirectoryIndex index.html index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # 1. Если запрашивается существующий файл или папка (CSS, JS, картинки) - отдавать напрямую
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # 2. Перенаправление всех запросов к API в обработчик PHP
+    RewriteRule ^api(?:/.*)?$ api/index.php [QSA,L]
+
+    # 3. Для всех остальных маршрутов SPA - отдавать index.html
+    RewriteRule ^ index.html [L]
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>

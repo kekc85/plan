@@ -1,0 +1,55 @@
+[
+  {
+    "code": "DYU",
+    "name": "Душанбе (DYU)",
+    "checked": true
+  },
+  {
+    "code": "NMA",
+    "name": "Наманган (NMA)",
+    "checked": true
+  },
+  {
+    "code": "TJU",
+    "name": "Куляб (TJU)",
+    "checked": true
+  },
+  {
+    "code": "SKD",
+    "name": "Самарканд (SKD)",
+    "checked": true
+  },
+  {
+    "code": "TAS",
+    "name": "Ташкент (TAS)",
+    "checked": true
+  },
+  {
+    "code": "CXR",
+    "name": "Камрань (CXR)",
+    "checked": true
+  },
+  {
+    "code": "IST",
+    "name": "Стамбул (IST)",
+    "checked": true
+  },
+  {
+    "code": "NQZ",
+    "name": "Астана (NQZ)",
+    "checked": true,
+    "isCustom": true
+  },
+  {
+    "code": "PQC",
+    "name": "Фукуок (PQC)",
+    "checked": true,
+    "isCustom": true
+  },
+  {
+    "code": "HKT",
+    "name": "Пхукет (HKT)",
+    "checked": true,
+    "isCustom": true
+  }
+]

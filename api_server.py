@@ -910,7 +910,7 @@ def test_telegram_connection(req: TelegramTestRequest, user: dict = Depends(requ
 # --- AVIABIT SETTINGS & FLEET W&B ---
 
 @app.get("/api/admin/aviabit/settings")
-def get_aviabit_settings(user: dict = Depends(require_moderator_or_admin)):
+def get_aviabit_settings(user: dict = Depends(require_admin_or_moderator)):
     """Получение настроек подключения к шлюзу AviaBit"""
     import os
     has_nw = os.path.exists(".session.json")
@@ -953,7 +953,7 @@ def update_aviabit_settings(req: AviabitSettingsRequest, admin: dict = Depends(r
     return {"success": True, "message": "Учетные данные AviaBit успешно сохранены"}
 
 @app.post("/api/admin/aviabit/test")
-def test_aviabit_connection(req: AviabitSettingsRequest, user: dict = Depends(require_moderator_or_admin)):
+def test_aviabit_connection(req: AviabitSettingsRequest, user: dict = Depends(require_admin_or_moderator)):
     """Проверка аутентификации в AviaBit"""
     test_user = req.username or get_setting("aviabit_username", "a.zubkov")
     test_pass = req.password or get_setting("aviabit_password", "SoLnCeVo1985")
@@ -991,7 +991,7 @@ def test_aviabit_connection(req: AviabitSettingsRequest, user: dict = Depends(re
     }
 
 @app.post("/api/admin/aviabit/reset_session")
-def reset_aviabit_session(user: dict = Depends(require_moderator_or_admin)):
+def reset_aviabit_session(user: dict = Depends(require_admin_or_moderator)):
     """Сброс кэшированных файлов сессий"""
     import os
     for sf in [".session.json", ".session_ikar.json", ".session_test_nw.json", ".session_test_ik.json"]:
@@ -1002,7 +1002,7 @@ def reset_aviabit_session(user: dict = Depends(require_moderator_or_admin)):
     return {"success": True, "message": "Сессии AviaBit сброшены"}
 
 @app.get("/api/admin/fleet_wb")
-def get_fleet_wb_api(user: dict = Depends(require_moderator_or_admin)):
+def get_fleet_wb_api(user: dict = Depends(require_admin_or_moderator)):
     """Получение базы флота W&B"""
     import json, os
     fp = os.path.join(os.path.dirname(__file__), "web_app", "src", "data", "fleet_wb.json")
@@ -2154,15 +2154,216 @@ def save_shift_legacy(data: dict = Body(...), current_user: dict = Depends(get_c
     return save_shift_state(req, current_user)
 
 
+# --- 8.1. СИНХРОНИЗАЦИЯ LYDIA DCS (AEROBAG PREDICTOR) ---
+from dcs_sync_server import (
+    load_dcs_config,
+    save_dcs_credentials,
+    load_dcs_stations,
+    save_dcs_stations,
+    DcsScraper,
+)
+
+@app.get("/api/dcs_sync")
+@app.get("/lydia_dcs_sync.php")
+@app.get("/aerobag/lydia_dcs_sync.php")
+def dcs_sync_get(action: str = ""):
+    if action == "get_dcs_stations":
+        stations = load_dcs_stations()
+        return {"success": True, "stations": stations}
+    elif action == "get_dcs_credentials":
+        cfg = load_dcs_config()
+        return {
+            "success": True,
+            "username": cfg.get("username", ""),
+            "password": cfg.get("password", ""),
+            "airline": cfg.get("airline", "N4"),
+        }
+    return {"success": False, "error": f"Неизвестное действие: {action}"}
+
+
+@app.post("/api/dcs_sync")
+@app.post("/lydia_dcs_sync.php")
+@app.post("/aerobag/lydia_dcs_sync.php")
+async def dcs_sync_post(request: Request):
+    action = request.query_params.get("action", "")
+    try:
+        body = await request.json()
+    except Exception:
+        form = await request.form()
+        body = dict(form)
+    if not action:
+        action = body.get("action", "")
+
+    config = load_dcs_config()
+    scraper = DcsScraper(config)
+
+    if action == "test_connection":
+        u = body.get("username") or config.get("username")
+        p = body.get("password") or config.get("password")
+        air = body.get("airline") or config.get("airline", "N4")
+        scraper.config["airline"] = air
+        return scraper.login(u, p)
+
+    elif action == "save_dcs_credentials":
+        u = body.get("username", "")
+        p = body.get("password", "")
+        air = body.get("airline", "N4")
+        ok = save_dcs_credentials(u, p, air)
+        return {"success": ok}
+
+    elif action == "save_dcs_stations":
+        stations = body.get("stations", [])
+        ok = save_dcs_stations(stations)
+        return {"success": ok}
+
+    elif action == "scan_flights":
+        if body.get("username"): config["username"] = body["username"]
+        if body.get("password"): config["password"] = body["password"]
+        if body.get("airline"): config["airline"] = body["airline"]
+        s_date = body.get("start_date", "")
+        e_date = body.get("end_date", "")
+        locs = body.get("locations") or config.get("default_locations")
+        if isinstance(locs, str):
+            locs = [l.strip() for l in locs.split(",") if l.strip()]
+        only_fin = body.get("only_finalized", True)
+        if isinstance(only_fin, str):
+            only_fin = (only_fin.lower() in ["true", "1", "yes"])
+        client_keys = body.get("client_flight_keys", [])
+        return scraper.scan_flights(s_date, e_date, locs, only_fin, client_keys)
+
+    elif action == "save_to_database":
+        flights = body.get("flights", [])
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
+        cur_db = []
+        if os.path.exists(db_path):
+            try:
+                with open(db_path, "r", encoding="utf-8") as f:
+                    cur_db = json.load(f)
+                    if not isinstance(cur_db, list): cur_db = []
+            except Exception:
+                cur_db = []
+        db_map = {f"{it.get('flight_no','')}_{it.get('date','')}_{it.get('from','')}_{it.get('to','')}": i for i, it in enumerate(cur_db)}
+        for f in flights:
+            clean_item = {
+                "id": f.get("id", f"dcs_{os.urandom(4).hex()}"),
+                "airline": f.get("airline", "N4"),
+                "flight_no": f.get("flight_no", ""),
+                "date": f.get("flight_date", ""),
+                "from": f.get("departure_code", "DYU"),
+                "to": f.get("dest_code", "UFA"),
+                "men": int(f.get("men", 0)),
+                "women": int(f.get("women", 0)),
+                "rb": int(f.get("rb", 0)),
+                "rm": int(f.get("rm", 0)),
+                "pax": int(f.get("pax", 0)),
+                "bag_pcs": int(f.get("bag_pcs", 0)),
+                "bag_weight": float(f.get("bag_weight", 0)),
+                "hb_weight": float(f.get("hb_weight", 0)),
+                "source": "Lydia DCS",
+                "active": True
+            }
+            k = f"{clean_item['flight_no']}_{clean_item['date']}_{clean_item['from']}_{clean_item['to']}"
+            if k in db_map:
+                cur_db[db_map[k]].update(clean_item)
+            else:
+                cur_db.append(clean_item)
+                db_map[k] = len(cur_db) - 1
+        with open(db_path, "w", encoding="utf-8") as f:
+            json.dump(cur_db, f, ensure_ascii=False, indent=2)
+        return {"success": True, "saved_count": len(flights)}
+
+    return {"success": False, "error": f"Неизвестное действие: {action}"}
+
+
+# --- 8.2. ШЛЮЗ ДЛЯ ОБЩЕЙ БАЗЫ РЕЙСОВ И НАСТРОЕК AEROBAG ---
+
+@app.get("/aerobag/flights")
+@app.get("/api/aerobag/flights")
+def get_aerobag_shift_flights():
+    """Возвращает текущие рейсы смены для бокового списка AeroBag"""
+    shift_res = get_current_shift()
+    flights = shift_res.get("flights", [])
+    converted = []
+    for f in flights:
+        converted.append({
+            "id": f.get("id"),
+            "flight_no": f.get("flight") or f.get("flight_no") or f.get("flight_number"),
+            "date": f.get("flight_date") or f.get("date"),
+            "from": f.get("airport_from") or f.get("from"),
+            "to": f.get("airport_to") or f.get("to"),
+            "pax": f.get("pax", 0),
+            "dep_time": f.get("time_dep") or f.get("dep_time"),
+            "ac_num": f.get("ac_num") or f.get("aircraft_reg"),
+            "ac_type": f.get("ac_type") or f.get("aircraft_type"),
+            "ac_config": f.get("ac_config") or f.get("layout"),
+            "pax_m": f.get("pax_m"),
+            "pax_f": f.get("pax_f"),
+            "pax_ch": f.get("pax_ch"),
+            "pax_inf": f.get("pax_inf"),
+            "bag_pcs": f.get("bag_pcs"),
+            "bag_wt": f.get("bag_wt"),
+            "cargo_wt": f.get("cargo_wt"),
+            "mail_wt": f.get("mail_wt"),
+            "dow": f.get("dow"),
+            "doi": f.get("doi"),
+            "galley": f.get("galley"),
+        })
+    return {"success": True, "flights": converted}
+
+
+@app.get("/api.php")
+@app.get("/aerobag/api.php")
+@app.post("/api.php")
+@app.post("/aerobag/api.php")
+async def aerobag_api_php_compat(request: Request):
+    """Эмуляция API AeroBag для совместимости в локальном режиме"""
+    action = request.query_params.get("action", "")
+    if not action and request.method == "POST":
+        try:
+            b = await request.json()
+            action = b.get("action", "")
+        except Exception:
+            pass
+
+    if action == "get_flights":
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
+        flts = []
+        if os.path.exists(db_path):
+            try:
+                with open(db_path, "r", encoding="utf-8") as f:
+                    flts = json.load(f)
+            except Exception:
+                pass
+        return {"success": True, "flights": flts}
+
+    elif action == "update_theme" or action == "save_settings":
+        return {"success": True}
+
+    elif action == "get_settings":
+        key = request.query_params.get("key", "")
+        val = get_setting(f"aerobag_{key}") or ""
+        return {"success": True, "value": val}
+
+    return {"success": True}
+
+
 # --- 9. РАЗДАЧА СТАТИКИ ВЕБ-ПРИЛОЖЕНИЯ (PRODUCTION UI) ---
 
 dist_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_app", "dist")
 if os.path.exists(dist_dir):
     app.mount("/plan", StaticFiles(directory=dist_dir, html=True), name="plan")
 
-    @app.get("/")
-    def redirect_to_plan():
-        return RedirectResponse(url="/plan/")
+loadsheet_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "loadsheet")
+if os.path.exists(loadsheet_dir):
+    app.mount("/loadsheet", StaticFiles(directory=loadsheet_dir, html=True), name="loadsheet")
+
+aerobag_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag")
+if os.path.exists(aerobag_dir):
+    app.mount("/aerobag", StaticFiles(directory=aerobag_dir, html=True), name="aerobag")
+
+@app.get("/")
+def redirect_to_plan():
+    return RedirectResponse(url="/plan/")
 
 
 if __name__ == "__main__":

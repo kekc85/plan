@@ -370,15 +370,19 @@ function FlightRow({
       }
     }
 
+    const isLocal = typeof window !== 'undefined' && 
+                   (window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1');
     const isPlan2 = window.location.href.includes('plan_2');
-    const isTest = !isPlan2 && (window.location.href.includes('plan_test') || 
-                   window.location.hostname === 'localhost' || 
-                   window.location.hostname === '127.0.0.1');
+    const isTest = !isPlan2 && (window.location.href.includes('plan_test') || isLocal);
     
-    // Для plan_2 и тестовых сборок открываем версию со списком рейсов слева (aerobag-test)
-    const targetAeroBagUrl = (isPlan2 || isTest)
+    // В локальном режиме направляем на локальный /aerobag/, иначе на хостинг
+    let targetAeroBagUrl = (isPlan2 || isTest)
       ? 'https://boostandgo.ru/aerobag-test/' 
       : 'https://boostandgo.ru/aerobag/';
+    if (isLocal) {
+      targetAeroBagUrl = `${window.location.origin}/aerobag/`;
+    }
 
     const params = new URLSearchParams();
     params.set('flight', flightNum);
@@ -487,14 +491,18 @@ function FlightRow({
       }
     }
 
+    const isLocal = typeof window !== 'undefined' && 
+                   (window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1');
     const isPlan2 = window.location.href.includes('plan_2');
-    const isTest = !isPlan2 && (window.location.href.includes('plan_test') || 
-                   window.location.hostname === 'localhost' || 
-                   window.location.hostname === '127.0.0.1');
+    const isTest = !isPlan2 && (window.location.href.includes('plan_test') || isLocal);
     
-    const targetLoadsheetUrl = isTest 
+    let targetLoadsheetUrl = isTest 
       ? 'https://boostandgo.ru/loadsheet_test/' 
       : 'https://boostandgo.ru/loadsheet/';
+    if (isLocal) {
+      targetLoadsheetUrl = `${window.location.origin}/loadsheet/`;
+    }
 
     const params = new URLSearchParams();
     params.set('flight', flightNum);
