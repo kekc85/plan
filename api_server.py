@@ -60,6 +60,8 @@ from parser import (
     AviaBitClient,
     BASE_URL_NORDWIND,
     BASE_URL_IKAR,
+    DEFAULT_USERNAME,
+    DEFAULT_PASSWORD,
     ALLOWED_DEPARTURES,
     IATA_CITIES,
     parse_date_arg,
@@ -1851,11 +1853,12 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
     all_raw_flights = []
     errors = []
 
+    user_avb = get_setting("aviabit_username", DEFAULT_USERNAME or "a.zubkov")
+    pass_avb = get_setting("aviabit_password", DEFAULT_PASSWORD or "SoLnCeVo1985")
+
     # Nordwind
     if req.airline in ("both", "nordwind"):
         try:
-            user_avb = get_setting("aviabit_username", DEFAULT_USERNAME or "a.zubkov")
-            pass_avb = get_setting("aviabit_password", DEFAULT_PASSWORD or "SoLnCeVo1985")
             url_nw = get_setting("aviabit_url_nordwind", BASE_URL_NORDWIND)
             client_nw = AviaBitClient(username=user_avb, password=pass_avb, base_url=url_nw, session_filename=".session.json", name="Nordwind")
             client_nw.login()
@@ -2318,14 +2321,47 @@ def get_aerobag_shift_flights():
 async def aerobag_api_php_compat(request: Request):
     """Эмуляция API AeroBag для совместимости в локальном режиме"""
     action = request.query_params.get("action", "")
-    if not action and request.method == "POST":
+    body = {}
+    if request.method == "POST":
         try:
-            b = await request.json()
-            action = b.get("action", "")
+            body = await request.json()
         except Exception:
-            pass
+            try:
+                form = await request.form()
+                body = dict(form)
+            except Exception:
+                body = {}
+    if not action:
+        action = body.get("action", "")
 
-    if action == "get_flights":
+    if action == "login":
+        u = (body.get("username") or "").strip()
+        p = (body.get("password") or "").strip()
+        u_up = u.upper()
+        is_adm = (u_up in ("ADMIN", "АДМИНИСТРАТОР")) and (p in ("NW2026", "AeroBag#2026!Master", "admin", "admin123", ""))
+        user_obj = {
+            "id": "usr_local_admin" if is_adm else f"usr_local_{u.lower() or 'disp'}",
+            "username": "ADMIN" if is_adm else (u or "DISPATCHER"),
+            "full_name": "Главный Администратор (Local)" if is_adm else f"Диспетчер ({u or 'Смена'})",
+            "role": "admin" if is_adm else "dispatcher",
+            "theme": "dark"
+        }
+        return {"success": True, "user": user_obj, "token": "local_aerobag_token"}
+
+    elif action == "check_auth":
+        user_obj = {
+            "id": "usr_local_admin",
+            "username": "ADMIN",
+            "full_name": "Главный Администратор (Local)",
+            "role": "admin",
+            "theme": "dark"
+        }
+        return {"success": True, "authenticated": True, "user": user_obj}
+
+    elif action == "logout":
+        return {"success": True}
+
+    elif action == "get_flights":
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
         flts = []
         if os.path.exists(db_path):
@@ -2336,13 +2372,21 @@ async def aerobag_api_php_compat(request: Request):
                 pass
         return {"success": True, "flights": flts}
 
-    elif action == "update_theme" or action == "save_settings":
+    elif action in ("update_theme", "save_settings", "save_flights"):
         return {"success": True}
 
     elif action == "get_settings":
         key = request.query_params.get("key", "")
         val = get_setting(f"aerobag_{key}") or ""
         return {"success": True, "value": val}
+
+    elif action == "get_users":
+        return {
+            "success": True,
+            "users": [
+                {"id": "usr_local_admin", "username": "ADMIN", "full_name": "Главный Администратор", "role": "admin"}
+            ]
+        }
 
     return {"success": True}
 
