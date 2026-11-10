@@ -1862,8 +1862,9 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
             url_nw = get_setting("aviabit_url_nordwind", BASE_URL_NORDWIND)
             client_nw = AviaBitClient(username=user_avb, password=pass_avb, base_url=url_nw, session_filename=".session.json", name="Nordwind")
             client_nw.login()
-            t_id = client_nw.get_template_id(req.filter_name)
-            flights_nw = client_nw.fetch_schedule(start_dt, end_dt, template_id=t_id)
+            # Запрашиваем полный флот без шаблона на стороне AviaBit,
+            # чтобы движок отслеживания воздушных судов видел входящие плечи борта из любых городов
+            flights_nw = client_nw.fetch_schedule(start_dt, end_dt)
             for fl in flights_nw:
                 fl["_client"] = client_nw
                 all_raw_flights.append(fl)
@@ -1876,8 +1877,7 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
             url_ik = get_setting("aviabit_url_ikar", BASE_URL_IKAR)
             client_ik = AviaBitClient(username=user_avb, password=pass_avb, base_url=url_ik, session_filename=".session_ikar.json", name="Икар")
             client_ik.login()
-            t_id = client_ik.get_template_id(req.filter_name)
-            flights_ik = client_ik.fetch_schedule(start_dt, end_dt, template_id=t_id)
+            flights_ik = client_ik.fetch_schedule(start_dt, end_dt)
             for fl in flights_ik:
                 fl["_client"] = client_ik
                 all_raw_flights.append(fl)
