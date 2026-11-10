@@ -4,7 +4,7 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 Set desktops = CreateObject("Scripting.Dictionary")
 
 currentDir = fso.GetParentFolderName(WScript.ScriptFullName)
-targetBat = currentDir & "\Запуск_AeroPlan_2.0.bat"
+targetBat = currentDir & "\Start_AeroPlan.bat"
 iconFile = currentDir & "\app_icon.ico"
 
 ' 1. Standard Desktop via WScript SpecialFolders
@@ -24,7 +24,6 @@ userProf = WshShell.ExpandEnvironmentStrings("%USERPROFILE%")
 If fso.FolderExists(userProf & "\OneDrive\Desktop") Then desktops.Item(userProf & "\OneDrive\Desktop") = True
 If fso.FolderExists(userProf & "\OneDrive\Рабочий стол") Then desktops.Item(userProf & "\OneDrive\Рабочий стол") = True
 If fso.FolderExists(userProf & "\Desktop") Then desktops.Item(userProf & "\Desktop") = True
-If fso.FolderExists(userProf & "\Рабочий стол") Then desktops.Item(userProf & "\Рабочий стол") = True
 
 ' 4. Local application directory
 desktops.Item(currentDir) = True
@@ -38,7 +37,7 @@ For Each d In desktops.Keys
     If fso.FileExists(iconFile) Then
         lnk.IconLocation = iconFile & ",0"
     End If
-    lnk.Description = "AeroPlan 2.0 - W&B, AeroBag and Loadsheet"
+    lnk.Description = "AeroPlan 2.0"
     lnk.Save
     WScript.Echo "[+] Shortcut created: " & lnkPath
     createdCount = createdCount + 1

@@ -2960,15 +2960,19 @@ function handleBulkInput(compIdx, rowIdx, field, rawValue) {
     if (field === 'pcs') {
         const pcsVal = parseInt(rawValue, 10);
         row.pcs = isNaN(pcsVal) || pcsVal < 0 ? 0 : pcsVal;
-        if (row.pcs === 0) {
-            row.locked = false;
-            row.weight = 0;
-            const weightInput = document.getElementById(`bulk-weight-${compIdx}-${rowIdx}`);
-            if (weightInput) {
+        // При изменении количества мест на позиции ВСЕГДА сбрасываем ручную фиксацию веса,
+        // чтобы вес пересчитывался динамически по среднему весу места
+        row.locked = false;
+        const weightInput = document.getElementById(`bulk-weight-${compIdx}-${rowIdx}`);
+        if (weightInput) {
+            weightInput.removeAttribute('data-locked');
+            weightInput.classList.remove('weight-locked');
+            if (row.pcs === 0) {
                 weightInput.value = '0';
-                weightInput.removeAttribute('data-locked');
-                weightInput.classList.remove('weight-locked');
             }
+        }
+        if (row.pcs === 0) {
+            row.weight = 0;
         }
     } else if (field === 'weight') {
         const weightVal = parseFloat(rawValue);
@@ -2996,12 +3000,18 @@ function handleReturnToAeroPlan(e) {
     } else if (window.history.length > 1) {
         window.history.back();
     } else {
-        const isPlan2 = document.referrer.includes('plan_2') || window.location.href.includes('plan_2');
-        if (isPlan2) {
-            window.location.href = 'https://boostandgo.ru/plan_2/';
+        const isLocal = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1';
+        if (isLocal) {
+            window.location.href = '/plan/';
         } else {
-            const isTest = window.location.href.includes('aerobag-test');
-            window.location.href = isTest ? 'https://boostandgo.ru/plan_test/' : 'https://boostandgo.ru/plan/';
+            const isPlan2 = document.referrer.includes('plan_2') || window.location.href.includes('plan_2');
+            if (isPlan2) {
+                window.location.href = 'https://boostandgo.ru/plan_2/';
+            } else {
+                const isTest = window.location.href.includes('aerobag-test');
+                window.location.href = isTest ? 'https://boostandgo.ru/plan_test/' : 'https://boostandgo.ru/plan/';
+            }
         }
     }
 }
@@ -3271,12 +3281,15 @@ function openWbLoadsheet() {
     }
 
     // 5. Определение стенда Loadsheet
-    const isTest = window.location.href.includes('aerobag-test') || 
-                   window.location.hostname === 'localhost' || 
-                   window.location.hostname === '127.0.0.1';
-    const targetUrl = isTest 
-        ? 'https://boostandgo.ru/loadsheet_test/' 
-        : 'https://boostandgo.ru/loadsheet/';
+    const isLocal = window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1';
+    const isTest = window.location.href.includes('aerobag-test');
+    let targetUrl = '/loadsheet/';
+    if (!isLocal) {
+        targetUrl = isTest 
+            ? 'https://boostandgo.ru/loadsheet_test/' 
+            : 'https://boostandgo.ru/loadsheet/';
+    }
 
     const params = new URLSearchParams();
     if (flightNumber) params.set('flight', flightNumber);
@@ -9129,8 +9142,12 @@ async function syncFlightTimesWithAeroPlan(explicitFlights = null) {
     if (!flights || !Array.isArray(flights) || flights.length === 0) {
         // 2. Если в LocalStorage рейсов нет, запрашиваем активную смену с сервера AeroPlan
         try {
-            const isTest = window.location.pathname.includes('_test') || window.location.pathname.includes('-test') || window.location.href.includes('8080');
-            const apiEndpoint = isTest ? 'https://boostandgo.ru/plan_test/api/shift/current' : 'https://boostandgo.ru/plan/api/shift/current';
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            let apiEndpoint = '/api/shift/current';
+            if (!isLocal) {
+                const isTest = window.location.pathname.includes('_test') || window.location.pathname.includes('-test') || window.location.href.includes('8080');
+                apiEndpoint = isTest ? 'https://boostandgo.ru/plan_test/api/shift/current' : 'https://boostandgo.ru/plan/api/shift/current';
+            }
             const res = await fetch(apiEndpoint, { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
