@@ -43,7 +43,11 @@ def main():
         subprocess.Popen(
             [runner, "api_server.py"],
             cwd=root_dir,
-            creationflags=flags
+            creationflags=flags,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True
         )
 
         # Ожидаем готовности сервера до 6 секунд
