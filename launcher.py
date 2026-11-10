@@ -35,9 +35,9 @@ def main():
         runner = pythonw_candidate if os.path.exists(pythonw_candidate) else python_exe
 
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        # BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
-        # Запускаем фоновый сервер с пониженным приоритетом, чтобы не отнимать CPU у офисных программ
+        # DETACHED_PROCESS = 0x00000008, BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
         if sys.platform == "win32":
+            flags |= 0x00000008
             flags |= 0x00004000
 
         subprocess.Popen(
