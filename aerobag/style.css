@@ -116,9 +116,10 @@ body.light-theme .aviation-grid-overlay {
 }
 
 .app-container {
-    max-width: 1440px;
+    max-width: 1780px;
+    width: 98%;
     margin: 0 auto;
-    padding: 20px;
+    padding: 16px 20px;
     position: relative;
     z-index: 1;
 }
@@ -156,43 +157,6 @@ body.light-theme .glass {
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
-}
-
-.btn-back-to-origin {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(14, 165, 233, 0.15);
-    border: 1px solid rgba(56, 189, 248, 0.6);
-    color: #38bdf8;
-    padding: 5px 12px;
-    border-radius: 8px;
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    font-weight: 800;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-right: 6px;
-}
-
-.btn-back-to-origin:hover {
-    background: rgba(14, 165, 233, 0.35);
-    border-color: #38bdf8;
-    box-shadow: 0 0 14px rgba(56, 189, 248, 0.5);
-    transform: translateY(-1px);
-}
-
-body.light-theme .btn-back-to-origin {
-    background: rgba(2, 132, 199, 0.1);
-    border-color: rgba(2, 132, 199, 0.5);
-    color: #0369a1;
-}
-
-body.light-theme .btn-back-to-origin:hover {
-    background: rgba(2, 132, 199, 0.2);
-    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
 }
 
 .header-logo {
@@ -446,11 +410,192 @@ body.light-theme .tab-btn.active {
 }
 
 #tab-content-predict .workspace-grid {
-    grid-template-columns: minmax(0, 580px) minmax(0, 1fr);
+    display: grid;
+    grid-template-columns: 440px minmax(380px, 430px) minmax(0, 1fr);
+    gap: 16px;
     align-items: stretch;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
+}
+
+.history-column {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.history-predictions-section {
+    padding: 10px 12px !important;
+    display: flex;
+    flex-direction: column;
+    margin-top: 0 !important;
+    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    box-sizing: border-box;
+}
+
+.history-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 8px;
+}
+
+.history-header-container .panel-title {
+    font-size: 0.88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+    letter-spacing: 0.5px;
+}
+
+.btn-clear-history-compact {
+    padding: 3px 8px !important;
+    font-size: 0.72rem !important;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.table-responsive.predictions-table-responsive-compact,
+.predictions-table-responsive-compact {
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.predictions-table-responsive-compact::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+.predictions-compact-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.predictions-compact-table th {
+    padding: 5px 4px !important;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+    position: sticky;
+    top: 0;
+    background: var(--card-bg);
+    z-index: 2;
+}
+
+.predictions-compact-table td {
+    padding: 4.5px 4px !important;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.predictions-compact-table .history-cell-route {
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+
+.predictions-compact-table .history-cell-time {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    text-align: center;
+}
+
+.predictions-compact-table .history-cell-tail {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #ffd700;
+    text-align: center;
+}
+
+body.light-theme .predictions-compact-table .history-cell-time {
+    color: #0284c7;
+}
+
+body.light-theme .predictions-compact-table .history-cell-tail {
+    color: #b45309;
+}
+
+.predictions-compact-table .history-cell-flight {
+    font-size: 0.82rem;
+}
+
+.predictions-compact-table .history-cell-action {
+    text-align: center;
+    padding: 4px 2px !important;
+}
+
+.predictions-compact-table .flight-day-tag {
+    font-size: 0.75rem;
+    color: #ffd700;
+    margin-left: 3px;
+    font-weight: 700;
+}
+
+.predictions-compact-table .btn-delete-row {
+    padding: 3px 4px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.predictions-compact-table .btn-delete-row:hover {
+    opacity: 1;
+}
+
+@media (max-width: 1440px) and (min-width: 1101px) {
+    #tab-content-predict .workspace-grid {
+        grid-template-columns: 380px minmax(340px, 400px) minmax(0, 1fr);
+        gap: 12px;
+    }
+    .predictions-compact-table {
+        font-size: 0.76rem;
+    }
+}
+
+@media (max-width: 1100px) and (min-width: 769px) {
+    #tab-content-predict .workspace-grid {
+        grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
+    }
+    .history-column {
+        grid-column: 1 / -1;
+    }
+    .predictions-table-responsive-compact {
+        max-height: 250px;
+    }
+}
+
+@media (max-width: 768px) {
+    #tab-content-predict .workspace-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+    .predictions-table-responsive-compact {
+        max-height: 250px;
+    }
 }
 
 @media (max-width: 1024px) {
@@ -1411,7 +1556,7 @@ body.light-theme .sampled-flights-table tfoot tr.sample-formulas-row td {
     white-space: nowrap;
 }
 
-.table-responsive {
+.table-responsive:not(.predictions-table-responsive-compact) {
     max-height: 350px;
     overflow-y: auto;
 }
@@ -1470,12 +1615,11 @@ body.light-theme .sampled-flights-table tfoot tr.sample-formulas-row td {
 
 #predictions-table th:first-child,
 #predictions-table td:first-child {
-    min-width: 115px;
     white-space: nowrap;
 }
 
-#predictions-table th:nth-child(8),
-#predictions-table td:nth-child(8) {
+#predictions-table th:last-child,
+#predictions-table td:last-child {
     text-align: center;
 }
 
@@ -4036,7 +4180,8 @@ body.light-theme .history-row-clickable.selected-history-row {
 }
 
 .load-rows-scroll-container .rows-table tbody tr {
-    height: calc(100% / 12) !important;
+    height: auto !important;
+    min-height: 38px !important;
 }
 
 /* Бесшовное объединение верхнего блока, отсеков и подвала в единую таблицу */
@@ -7246,201 +7391,6 @@ body.light-theme .system-logs-table tr:hover {
 }
 
 body.light-theme .btn-log-details {
-/* ==========================================================================
-   СИСТЕМА АУДИТА, ЛОГИРОВАНИЯ И МОНИТОРИНГА ОШИБОК (HUD LOGGING)
-   ========================================================================== */
-
-.system-logs-section {
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.system-logs-section.collapsed .system-logs-body {
-    display: none;
-}
-
-.system-logs-header {
-    cursor: pointer;
-    user-select: none;
-    transition: background 0.2s ease;
-}
-
-.system-logs-header:hover {
-    background: rgba(0, 240, 255, 0.03);
-}
-
-/* Бейджи уровней логов */
-.badge-log-level {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px 7px;
-    border-radius: 4px;
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
-}
-
-.badge-log-level.badge-level-error {
-    background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.5);
-    box-shadow: 0 0 6px rgba(239, 68, 68, 0.2);
-}
-
-.badge-log-level.badge-level-warning {
-    background: rgba(245, 158, 11, 0.18);
-    color: #f59e0b;
-    border: 1px solid rgba(245, 158, 11, 0.45);
-    box-shadow: 0 0 6px rgba(245, 158, 11, 0.15);
-}
-
-.badge-log-level.badge-level-info {
-    background: rgba(0, 240, 255, 0.12);
-    color: var(--accent-cyan);
-    border: 1px solid rgba(0, 240, 255, 0.35);
-}
-
-/* Бейджи категорий логов */
-.badge-log-cat {
-    display: inline-block;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    font-weight: 600;
-    background: rgba(148, 163, 184, 0.12);
-    color: #94a3b8;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-}
-
-.badge-log-cat.cat-auth {
-    background: rgba(168, 85, 247, 0.15);
-    color: #c084fc;
-    border-color: rgba(168, 85, 247, 0.35);
-}
-
-.badge-log-cat.cat-database {
-    background: rgba(14, 165, 233, 0.15);
-    color: #38bdf8;
-    border-color: rgba(14, 165, 233, 0.35);
-}
-
-.badge-log-cat.cat-backup {
-    background: rgba(34, 197, 94, 0.15);
-    color: #4ade80;
-    border-color: rgba(34, 197, 94, 0.35);
-}
-
-.badge-log-cat.cat-client_js {
-    background: rgba(236, 72, 153, 0.15);
-    color: #f472b6;
-    border-color: rgba(236, 72, 153, 0.35);
-}
-
-.badge-log-cat.cat-system {
-    background: rgba(234, 179, 8, 0.15);
-    color: #facc15;
-    border-color: rgba(234, 179, 8, 0.35);
-}
-
-.badge-log-cat.cat-import {
-    background: rgba(20, 184, 166, 0.15);
-    color: #2dd4bf;
-    border-color: rgba(20, 184, 166, 0.35);
-}
-
-/* Таблица системных логов */
-.system-logs-table {
-    width: 100%;
-    table-layout: fixed;
-}
-
-.system-logs-table th,
-.system-logs-table td {
-    padding: 8px 10px;
-    font-size: 0.8rem;
-    vertical-align: middle;
-}
-
-.system-logs-table td.log-msg-cell {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--font-mono);
-    font-size: 0.78rem;
-}
-
-.system-logs-table tr.log-row-error {
-    background: rgba(239, 68, 68, 0.05);
-}
-
-.system-logs-table tr.log-row-warning {
-    background: rgba(245, 158, 11, 0.04);
-}
-
-.system-logs-table tr:hover {
-    background: rgba(0, 240, 255, 0.06) !important;
-}
-
-/* Кнопка деталей лога */
-.btn-log-details {
-    padding: 3px 8px;
-    font-size: 0.72rem;
-    font-family: var(--font-mono);
-    border-radius: 4px;
-    background: rgba(0, 240, 255, 0.1);
-    color: var(--accent-cyan);
-    border: 1px solid rgba(0, 240, 255, 0.3);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-log-details:hover {
-    background: var(--accent-cyan);
-    color: #040814;
-    box-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
-}
-
-/* Светлая тема для логов */
-body.light-theme .badge-log-level.badge-level-error {
-    background: rgba(239, 68, 68, 0.12);
-    color: #dc2626;
-    border-color: rgba(239, 68, 68, 0.4);
-}
-
-body.light-theme .badge-log-level.badge-level-warning {
-    background: rgba(245, 158, 11, 0.12);
-    color: #d97706;
-    border-color: rgba(245, 158, 11, 0.4);
-}
-
-body.light-theme .badge-log-level.badge-level-info {
-    background: rgba(2, 132, 199, 0.12);
-    color: #0284c7;
-    border-color: rgba(2, 132, 199, 0.35);
-}
-
-body.light-theme .logs-filter-bar {
-    background: #f8fafc;
-    border-color: rgba(2, 132, 199, 0.2);
-}
-
-body.light-theme .system-logs-table tr.log-row-error {
-    background: rgba(254, 242, 242, 0.7);
-}
-
-body.light-theme .system-logs-table tr.log-row-warning {
-    background: rgba(254, 252, 232, 0.7);
-}
-
-body.light-theme .system-logs-table tr:hover {
-    background: rgba(2, 132, 199, 0.08) !important;
-}
-
-body.light-theme .btn-log-details {
     background: rgba(2, 132, 199, 0.1);
     color: #0284c7;
     border-color: rgba(2, 132, 199, 0.3);
@@ -8348,4 +8298,402 @@ body.light-theme #log-modal-details-pre {
     background: #f8fafc !important;
     border: 1px solid #cbd5e1 !important;
     color: #0369a1 !important;
+}
+
+/* Светлая тема для компактной истории расчетов */
+html.light-theme .predictions-compact-table th,
+body.light-theme .predictions-compact-table th {
+    background: #f8fafc;
+    border-bottom: 1px solid #cbd5e1;
+    color: #475569;
+}
+
+html.light-theme .predictions-compact-table td,
+body.light-theme .predictions-compact-table td {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+html.light-theme .predictions-compact-table .flight-day-tag,
+body.light-theme .predictions-compact-table .flight-day-tag {
+    color: #b45309;
+}
+
+/* --- Авиационная кнопка перехода в AeroPlan W&B --- */
+a.header-plan-pill,
+.header-plan-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px;
+    background: rgba(0, 240, 255, 0.08) !important;
+    border: 1px solid rgba(0, 240, 255, 0.45) !important;
+    padding: 3px 10px !important;
+    border-radius: 14px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    text-decoration: none !important;
+    font-family: var(--font-mono) !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    color: var(--accent-cyan) !important;
+    letter-spacing: 0.5px !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
+    box-shadow: 0 0 8px rgba(0, 240, 255, 0.15) !important;
+    line-height: 1 !important;
+    height: 24px;
+    box-sizing: border-box;
+}
+
+a.header-plan-pill *,
+.header-plan-pill * {
+    text-decoration: none !important;
+}
+
+a.header-plan-pill:hover,
+.header-plan-pill:hover {
+    background: rgba(0, 240, 255, 0.22) !important;
+    border-color: var(--accent-cyan) !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 14px rgba(0, 240, 255, 0.45) !important;
+    transform: translateY(-1px);
+    text-decoration: none !important;
+}
+
+.header-plan-pill .pill-icon {
+    font-size: 0.8rem;
+    line-height: 1;
+}
+
+.header-plan-pill .pill-text {
+    line-height: 1;
+}
+
+.header-plan-pill .pill-arrow {
+    font-size: 0.72rem;
+    opacity: 0.85;
+    line-height: 1;
+}
+
+/* Светлая тема */
+body.light-theme a.header-plan-pill,
+body.light-theme .header-plan-pill {
+    background: rgba(2, 132, 199, 0.08) !important;
+    border-color: rgba(2, 132, 199, 0.4) !important;
+    color: #0284c7 !important;
+    box-shadow: none !important;
+}
+
+body.light-theme a.header-plan-pill:hover,
+body.light-theme .header-plan-pill:hover {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    border-color: #0284c7 !important;
+}
+
+/* --- Мульти-загрузка отсеков BULK --- */
+.bulk-planning-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.bulk-type-select {
+    width: 100% !important;
+    height: 28px !important;
+    padding: 2px 22px 2px 6px !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    background-color: rgba(15, 23, 42, 0.85) !important;
+    border: 1px solid rgba(0, 240, 255, 0.25) !important;
+    color: #f1f5f9 !important;
+    border-radius: 4px !important;
+    cursor: pointer;
+    text-overflow: ellipsis;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2300f0ff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 6px center !important;
+    background-size: 14px !important;
+}
+
+body.light-theme .bulk-type-select {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 6px center !important;
+    background-size: 14px !important;
+}
+
+.btn-bulk-add {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #10b981;
+    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-bulk-add:hover {
+    background: #10b981;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+    transform: scale(1.05);
+}
+
+.btn-bulk-del {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #ef4444;
+    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-bulk-del:hover {
+    background: #ef4444;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+    transform: scale(1.05);
+}
+
+.sub-arrow {
+    color: var(--accent-cyan);
+    font-weight: 800;
+    font-size: 0.95rem;
+}
+
+.bulk-cpt-subrow {
+    background: rgba(0, 240, 255, 0.03);
+}
+
+.bulk-cpt-subtotal-row {
+    background: rgba(0, 0, 0, 0.35);
+    font-size: 0.78rem;
+    border-bottom: 2px solid rgba(0, 240, 255, 0.25) !important;
+}
+
+body.light-theme .bulk-cpt-subtotal-row {
+    background: #f8fafc;
+    border-bottom: 2px solid #cbd5e1 !important;
+}
+
+.cpt-subtotal-label {
+    text-align: right !important;
+    padding-right: 12px !important;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.78rem;
+}
+
+
+/* ==========================================================================
+   РУЧНОЙ ВВОД ВРЕМЕНИ ВЫЛЕТА (ИСТОРИЯ ПРОГНОЗОВ) И ДИНАМИЧЕСКИЙ BULK ЗАГОЛОВОК
+   ========================================================================== */
+
+.predictions-compact-table .dep-time-input {
+    width: 100%;
+    max-width: 58px;
+    background: rgba(0, 240, 255, 0.08);
+    border: 1px solid rgba(0, 240, 255, 0.28);
+    border-radius: 4px;
+    color: var(--accent-cyan);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-align: center;
+    padding: 1px 2px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.predictions-compact-table .dep-time-input:hover {
+    border-color: rgba(0, 240, 255, 0.6);
+    background: rgba(0, 240, 255, 0.16);
+}
+
+.predictions-compact-table .dep-time-input:focus {
+    border-color: #00f0ff;
+    background: rgba(0, 240, 255, 0.25);
+    box-shadow: 0 0 6px rgba(0, 240, 255, 0.4);
+    color: #ffffff;
+}
+
+body.light-theme .predictions-compact-table .dep-time-input {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+    color: #0284c7;
+}
+
+body.light-theme .predictions-compact-table .dep-time-input:focus {
+    border-color: #0284c7;
+    background: #ffffff;
+    box-shadow: 0 0 6px rgba(2, 132, 199, 0.3);
+}
+
+/* Шапка BULK с бейджем борта и кнопкой FWD */
+.bulk-header-flex {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    gap: 8px;
+    width: 100%;
+}
+
+.bulk-title-badge-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.aircraft-model-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    background: rgba(0, 240, 255, 0.15);
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    color: #00f0ff;
+}
+
+.select-aircraft-tail {
+    background: rgba(10, 25, 45, 0.9);
+    border: 1px solid rgba(0, 240, 255, 0.35);
+    border-radius: 4px;
+    color: #ffd700;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    outline: none;
+    cursor: pointer;
+}
+
+.select-aircraft-tail:focus {
+    border-color: #ffd700;
+    box-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+}
+
+body.light-theme .select-aircraft-tail {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #b45309;
+}
+
+.select-aircraft-tail optgroup,
+.select-aircraft-tail option {
+    background: #0a192d;
+    color: #f1f5f9;
+    font-family: var(--font-mono);
+}
+
+body.light-theme .select-aircraft-tail optgroup,
+body.light-theme .select-aircraft-tail option {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+.btn-toggle-fwd {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: rgba(255, 215, 0, 0.14);
+    border: 1px solid rgba(255, 215, 0, 0.5);
+    color: #ffd700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-toggle-fwd:hover {
+    background: rgba(255, 215, 0, 0.25);
+    border-color: #ffd700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.35);
+}
+
+.btn-toggle-fwd.active {
+    background: rgba(255, 77, 77, 0.18);
+    border-color: rgba(255, 77, 77, 0.6);
+    color: #ff6b6b;
+}
+
+.btn-toggle-fwd.active:hover {
+    background: rgba(255, 77, 77, 0.3);
+}
+
+body.light-theme .btn-toggle-fwd {
+    background: #fef3c7;
+    border-color: #f59e0b;
+    color: #b45309;
+}
+
+/* FWD и AFT багажники в темной теме */
+html body:not(.light-theme) table td.cpt-fwd,
+html body:not(.light-theme) table td.cpt-fwd strong,
+.cpt-fwd strong {
+    color: #ffd700 !important;
+    font-weight: 800 !important;
+}
+
+html body:not(.light-theme) table td.cpt-aft,
+html body:not(.light-theme) table td.cpt-aft strong,
+.cpt-aft strong {
+    color: #00f0ff !important;
+    font-weight: 800 !important;
+}
+
+/* Разделение переднего и заднего багажников в светлой теме */
+html.light-theme body table td.cpt-fwd,
+html.light-theme body table td.cpt-fwd strong,
+body.light-theme table td.cpt-fwd,
+body.light-theme table td.cpt-fwd strong,
+html.light-theme .cpt-fwd strong {
+    color: #d97706 !important; /* Насыщенный янтарный для FWD */
+    font-weight: 800 !important;
+}
+
+html.light-theme body table td.cpt-aft,
+html.light-theme body table td.cpt-aft strong,
+body.light-theme table td.cpt-aft,
+body.light-theme table td.cpt-aft strong,
+html.light-theme .cpt-aft strong {
+    color: #0284c7 !important; /* Яркий лазурный для AFT */
+    font-weight: 800 !important;
+}
+
+/* Четкая визуальная граница между FWD и AFT багажниками */
+.cpt-section-boundary td {
+    border-bottom: 2px solid rgba(0, 240, 255, 0.45) !important;
+}
+
+body.light-theme .cpt-section-boundary td,
+html.light-theme .cpt-section-boundary td {
+    border-bottom: 2.5px solid #0284c7 !important;
 }

@@ -1,6 +1,6 @@
 // Версия приложения AeroBag Predictor
-const APP_VERSION = 'v12.0.197';
-const APP_BUILD_DATE = '31.10.2026';
+const APP_VERSION = 'v12.2.30';
+const APP_BUILD_DATE = '01.11.2026';
 
 // Глобальное состояние
 // Встроенная справочная база аэропортов и правил для гарантированной оффлайн-работы
@@ -1590,11 +1590,16 @@ const translations = {
         'theme-dark': 'Темная тема',
         'unit-kg': 'кг',
         // Новые строки для истории прогнозов
-        'predictions-table-title': 'История расчетов прогнозов',
-        'btn-clear-predictions': 'Очистить историю',
+        'predictions-table-title': 'История расчетов',
+        'btn-clear-predictions': 'Очистить',
+        'th-flight-date': 'Рейс / Дата',
+        'th-dep-time': 'Вылет',
+        'th-tail': 'Борт',
+        'btn-return-plan': 'В план AeroPlan',
+        'th-load-type': 'ТИП ЗАГРУЗКИ',
         'th-pax-count': 'Пассажиры (PAX)',
         'th-calc-date': 'Дата расчета',
-        'empty-predictions-table': 'История прогнозов пуста. Сделайте расчет выше.',
+        'empty-predictions-table': 'История пуста.',
         'confirm-clear-predictions': 'Вы уверены, что хотите очистить всю историю прогнозов?',
         'modal-confirm-title': '[\u00A0ТРЕБУЕТСЯ\u00A0ДЕЙСТВИЕ:\u00A0ОЧИСТКА\u00A0СИСТЕМЫ\u00A0]',
         'modal-confirm-cancel': '[\u00A0ОТМЕНА\u00A0]',
@@ -1858,11 +1863,16 @@ const translations = {
         'theme-dark': 'Dark Theme',
         'unit-kg': 'kg',
         // New strings for predictions history
-        'predictions-table-title': 'Prediction Calculation History',
-        'btn-clear-predictions': 'Clear History',
+        'predictions-table-title': 'Forecast History',
+        'btn-clear-predictions': 'Clear',
+        'th-flight-date': 'Flight / Date',
+        'th-dep-time': 'Dep',
+        'th-tail': 'Tail',
+        'btn-return-plan': 'To AeroPlan',
+        'th-load-type': 'LOAD TYPE',
         'th-pax-count': 'Passengers (PAX)',
         'th-calc-date': 'Calculation Date',
-        'empty-predictions-table': 'Predictions history is empty. Calculate a forecast above.',
+        'empty-predictions-table': 'History is empty.',
         'confirm-clear-predictions': 'Are you sure you want to clear the entire predictions history?',
         'modal-confirm-title': '[\u00A0ACTION\u00A0REQUIRED:\u00A0SYSTEM\u00A0PURGE\u00A0]',
         'modal-confirm-cancel': '[\u00A0CANCEL\u00A0]',
@@ -2315,6 +2325,1153 @@ function clearLoadPlanningUI() {
     }
 }
 
+
+// ==========================================================================
+// МУЛЬТИ-КАТЕГОРИЙНАЯ ЗАГРУЗКА ОТСЕКОВ BULK & ИНТЕГРАЦИЯ С AEROPLAN
+// ==========================================================================
+
+const BULK_LOAD_CATEGORIES = [
+    { code: 'B', nameRu: 'B — Прямой', nameEn: 'B — Local', isDefault: true },
+    { code: 'BT', nameRu: 'BT — Трансфер', nameEn: 'BT — Transfer' },
+    { code: 'BC', nameRu: 'BC — Приоритет', nameEn: 'BC — Priority' },
+    { code: 'BZ', nameRu: 'BZ — Экипаж', nameEn: 'BZ — Crew' },
+    { code: 'BX', nameRu: 'BX — Досыл', nameEn: 'BX — Rush' },
+    { code: 'DAA', nameRu: 'DAA — Коляски', nameEn: 'DAA — Strollers' },
+    { code: 'C', nameRu: 'C — Cargo', nameEn: 'C — Cargo' },
+    { code: 'M', nameRu: 'M — Mail', nameEn: 'M — Mail' },
+    { code: 'E', nameRu: 'E — Снаряжение', nameEn: 'E — Equip' }
+];
+
+let currentCompartmentsState = [];
+
+
+// ==========================================================================
+// КОНФИГУРАЦИЯ БАГАЖНЫХ ОТСЕКОВ ПО БОРТОВЫМ НОМЕРАМ ФЛОТА (FLEET MAPPING)
+// ==========================================================================
+
+const FLEET_COMPARTMENT_CONFIGS = {
+    // --- AIRBUS A321 ---
+    '73271': {
+        model: 'A321',
+        isWidebody: false,
+        fwd: ['11', '12', '21', '22', '23'],
+        aft: ['31', '32', '33', '41', '42', '51', '52', '53']
+    },
+    '73273': {
+        model: 'A321',
+        isWidebody: false,
+        fwd: ['11', '12', '21', '22', '23'],
+        aft: ['32', '33', '41', '42', '51', '52', '53']
+    },
+    '73324': {
+        model: 'A321',
+        isWidebody: false,
+        fwd: ['11', '12', '21', '22', '23'],
+        aft: ['32', '33', '41', '42', '51', '52', '53']
+    },
+    '73325': {
+        model: 'A321',
+        isWidebody: false,
+        fwd: ['11', '12', '21', '22', '23'],
+        aft: ['32', '33', '41', '42', '51', '52', '53']
+    },
+    '73326': {
+        model: 'A321',
+        isWidebody: false,
+        fwd: ['11', '12', '21', '22', '23'],
+        aft: ['31', '32', '33', '41', '42', '51', '52', '53']
+    },
+
+    // --- AIRBUS A321-NEO ---
+    '73322': {
+        model: 'A321-NEO',
+        isWidebody: false,
+        fwd: ['11', '12', '21', '22', '23'],
+        aft: ['31', '32', '33', '41', '42', '51', '52', '53']
+    },
+    '73323': {
+        model: 'A321-NEO',
+        isWidebody: false,
+        fwd: ['11', '12', '21', '22', '23'],
+        aft: ['31', '32', '33', '41', '42', '51', '52', '53']
+    },
+
+    // --- BOEING 737-800 ---
+    '73269': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '73311': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '73312': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '73313': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '73314': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '73315': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '73316': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '73317': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '73318': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '73319': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '73321': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+
+    // --- BOEING 737-900 ---
+    '73343': { model: 'B737-900', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '73344': { model: 'B737-900', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+
+    // --- EMBRAER E190 ---
+    '02740': { model: 'E190', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '02741': { model: 'E190', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '02743': { model: 'E190', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+
+    // --- AIRBUS A330-200 (Широкофюзеляжный) ---
+    '73270': {
+        model: 'A330-200',
+        isWidebody: true,
+        defaultShowFwd: false,
+        fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R'],
+        aft: ['31L', '31R', '32L', '32R', '33L', '33R', '41L', '41R', '42L', '42R', '51', '52', '53']
+    },
+    '73328': {
+        model: 'A330-200',
+        isWidebody: true,
+        defaultShowFwd: false,
+        fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R'],
+        aft: ['31L', '31R', '32L', '32R', '33L', '33R', '41L', '41R', '42L', '42R', '51', '52', '53']
+    },
+
+    // --- AIRBUS A330-300 (Широкофюзеляжный) ---
+    '73848': {
+        model: 'A330-300',
+        isWidebody: true,
+        defaultShowFwd: false,
+        fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R', '26L', '26R'],
+        aft: ['31L', '31R', '32L', '32R', '33L', '33R', '34L', '34R', '41L', '41R', '42L', '42R', '43L', '43R', '5']
+    },
+    '73849': {
+        model: 'A330-300',
+        isWidebody: true,
+        defaultShowFwd: false,
+        fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R', '26L', '26R'],
+        aft: ['31L', '31R', '32L', '32R', '33L', '33R', '34L', '34R', '41L', '41R', '42L', '42R', '43L', '43R', '5']
+    },
+    '73850': {
+        model: 'A330-300',
+        isWidebody: true,
+        defaultShowFwd: false,
+        fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R', '26L', '26R'],
+        aft: ['31L', '31R', '32L', '32R', '33L', '33R', '34L', '34R', '41L', '41R', '42L', '42R', '43L', '43R', '5']
+    },
+
+    // --- BOEING 777-200ER (Широкофюзеляжный) ---
+    '73340': {
+        model: 'B777-200ER',
+        isWidebody: true,
+        defaultShowFwd: false,
+        fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R'],
+        aft: ['33L', '33R', '41L', '41R', '42L', '42R', '43L', '43R', '44L', '44R', '5']
+    },
+    '73341': {
+        model: 'B777-200ER',
+        isWidebody: true,
+        defaultShowFwd: false,
+        fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R'],
+        aft: ['33L', '33R', '41L', '41R', '42L', '42R', '43L', '43R', '44L', '44R', '5']
+    },
+    '73272': {
+        model: 'B777-200ER',
+        isWidebody: true,
+        defaultShowFwd: false,
+        fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R'],
+        aft: ['31L', '31R', '32L', '32R', '33L', '33R', '41L', '41R', '42L', '42R', '43L', '43R', '44L', '44R', '5']
+    },
+    '73347': {
+        model: 'B777-200ER',
+        isWidebody: true,
+        defaultShowFwd: false,
+        fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R'],
+        aft: ['31L', '31R', '32L', '32R', '33L', '33R', '41L', '41R', '42L', '42R', '43L', '43R', '44L', '44R', '5']
+    },
+
+    // --- BOEING 777-300ER (Широкофюзеляжный) ---
+    '73342': {
+        model: 'B777-300ER',
+        isWidebody: true,
+        defaultShowFwd: false,
+        fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R', '26L', '26R', '27L', '27R', '28L', '28R'],
+        aft: ['31L', '31R', '32L', '32R', '33L', '33R', '34L', '34R', '35L', '35R', '36L', '36R', '41L', '41R', '42L', '42R', '43L', '43R', '44L', '44R', '5']
+    },
+    '73847': {
+        model: 'B777-300ER',
+        isWidebody: true,
+        defaultShowFwd: false,
+        fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R', '26L', '26R', '27L', '27R', '28L', '28R'],
+        aft: ['31L', '31R', '32L', '32R', '33L', '33R', '34L', '34R', '35L', '35R', '36L', '36R', '41L', '41R', '42L', '42R', '43L', '43R', '44L', '44R', '5']
+    }
+};
+
+const DEFAULT_TYPE_CONFIGS = {
+    'A321': { model: 'A321', isWidebody: false, fwd: ['11', '12', '21', '22', '23'], aft: ['31', '32', '33', '41', '42', '51', '52', '53'] },
+    '321': { model: 'A321', isWidebody: false, fwd: ['11', '12', '21', '22', '23'], aft: ['31', '32', '33', '41', '42', '51', '52', '53'] },
+    'A321-NEO': { model: 'A321-NEO', isWidebody: false, fwd: ['11', '12', '21', '22', '23'], aft: ['31', '32', '33', '41', '42', '51', '52', '53'] },
+    'B737-800': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '738': { model: 'B737-800', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    'B737-900': { model: 'B737-900', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '739': { model: 'B737-900', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    'E190': { model: 'E190', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    '190': { model: 'E190', isWidebody: false, fwd: ['1', '2'], aft: ['3', '4'] },
+    'A330-200': { model: 'A330-200', isWidebody: true, defaultShowFwd: false, fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R'], aft: ['31L', '31R', '32L', '32R', '33L', '33R', '41L', '41R', '42L', '42R', '51', '52', '53'] },
+    '332': { model: 'A330-200', isWidebody: true, defaultShowFwd: false, fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R'], aft: ['31L', '31R', '32L', '32R', '33L', '33R', '41L', '41R', '42L', '42R', '51', '52', '53'] },
+    'A330-300': { model: 'A330-300', isWidebody: true, defaultShowFwd: false, fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R', '26L', '26R'], aft: ['31L', '31R', '32L', '32R', '33L', '33R', '34L', '34R', '41L', '41R', '42L', '42R', '43L', '43R', '5'] },
+    '333': { model: 'A330-300', isWidebody: true, defaultShowFwd: false, fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R', '26L', '26R'], aft: ['31L', '31R', '32L', '32R', '33L', '33R', '34L', '34R', '41L', '41R', '42L', '42R', '43L', '43R', '5'] },
+    'B777-200ER': { model: 'B777-200ER', isWidebody: true, defaultShowFwd: false, fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R'], aft: ['33L', '33R', '41L', '41R', '42L', '42R', '43L', '43R', '44L', '44R', '5'] },
+    '772': { model: 'B777-200ER', isWidebody: true, defaultShowFwd: false, fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R'], aft: ['33L', '33R', '41L', '41R', '42L', '42R', '43L', '43R', '44L', '44R', '5'] },
+    'B777-300ER': { model: 'B777-300ER', isWidebody: true, defaultShowFwd: false, fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R', '26L', '26R', '27L', '27R', '28L', '28R'], aft: ['31L', '31R', '32L', '32R', '33L', '33R', '34L', '34R', '35L', '35R', '36L', '36R', '41L', '41R', '42L', '42R', '43L', '43R', '44L', '44R', '5'] },
+    '773': { model: 'B777-300ER', isWidebody: true, defaultShowFwd: false, fwd: ['11L', '11R', '12L', '12R', '13L', '13R', '14L', '14R', '21L', '21R', '22L', '22R', '23L', '23R', '24L', '24R', '25L', '25R', '26L', '26R', '27L', '27R', '28L', '28R'], aft: ['31L', '31R', '32L', '32R', '33L', '33R', '34L', '34R', '35L', '35R', '36L', '36R', '41L', '41R', '42L', '42R', '43L', '43R', '44L', '44R', '5'] }
+};
+
+let currentActiveAircraftTail = '';
+let currentActiveAircraftModel = 'A321';
+let isFwdCompartmentsVisible = false;
+
+// Очистка и извлечение чистого номера борта (напр. "RA-73340" -> "73340")
+function normalizeTailNumber(rawTail) {
+    if (!rawTail) return '';
+    let s = String(rawTail).trim().toUpperCase();
+    s = s.replace(/^(RA-|RA_|RAs?)/i, '');
+    const m = s.match(/\d{4,5}/);
+    return m ? m[0] : s;
+}
+
+// Получение конфигурации отсеков по номеру борта или типу ВС
+function getAircraftCompartmentConfig(tailOrType) {
+    if (!tailOrType) return DEFAULT_TYPE_CONFIGS['A321'];
+    const cleanTail = normalizeTailNumber(tailOrType);
+    if (FLEET_COMPARTMENT_CONFIGS[cleanTail]) {
+        return FLEET_COMPARTMENT_CONFIGS[cleanTail];
+    }
+    const cleanType = String(tailOrType).trim().toUpperCase().replace(/\s+/g, '-');
+    if (DEFAULT_TYPE_CONFIGS[cleanType]) {
+        return DEFAULT_TYPE_CONFIGS[cleanType];
+    }
+    // Поиск по подстроке типа ВС
+    for (let key of Object.keys(DEFAULT_TYPE_CONFIGS)) {
+        if (cleanType.includes(key) || key.includes(cleanType)) {
+            return DEFAULT_TYPE_CONFIGS[key];
+        }
+    }
+    return DEFAULT_TYPE_CONFIGS['A321'];
+}
+
+// Применение конфигурации отсеков под конкретный борт
+function applyAircraftCompartmentConfig(tailOrType, forceShowFwd = null, savedCompartmentsSource = null) {
+    const config = getAircraftCompartmentConfig(tailOrType);
+    const cleanTail = normalizeTailNumber(tailOrType);
+
+    currentActiveAircraftTail = cleanTail || '';
+    currentActiveAircraftModel = config.model || 'A321';
+
+    if (forceShowFwd !== null) {
+        isFwdCompartmentsVisible = !!forceShowFwd;
+    } else if (config.isWidebody) {
+        isFwdCompartmentsVisible = false;
+    } else {
+        isFwdCompartmentsVisible = true;
+    }
+
+    // Обновляем бейдж модели ВС в шапке BULK
+    const modelBadge = document.getElementById('aircraft-model-badge');
+    if (modelBadge) {
+        if (cleanTail || tailOrType) {
+            modelBadge.textContent = currentActiveAircraftModel;
+            modelBadge.classList.remove('hidden');
+        } else {
+            modelBadge.classList.add('hidden');
+        }
+    }
+
+    // Обновляем селектор борта в шапке BULK
+    const tailSelect = document.getElementById('select-aircraft-tail');
+    if (tailSelect) {
+        if (cleanTail) {
+            let found = false;
+            for (let opt of tailSelect.options) {
+                if (normalizeTailNumber(opt.value) === cleanTail) {
+                    tailSelect.value = opt.value;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                const opt = document.createElement('option');
+                opt.value = cleanTail;
+                opt.textContent = `RA-${cleanTail} (${currentActiveAircraftModel})`;
+                tailSelect.appendChild(opt);
+                tailSelect.value = cleanTail;
+            }
+        } else {
+            tailSelect.value = '';
+        }
+    }
+
+    // Управление кнопкой переключения FWD для широкофюзеляжных
+    const btnFwd = document.getElementById('btn-toggle-fwd');
+    if (btnFwd) {
+        if (config.isWidebody) {
+            btnFwd.classList.remove('hidden');
+            if (isFwdCompartmentsVisible) {
+                btnFwd.classList.add('active');
+                btnFwd.innerHTML = '<span>➖ Скрыть FWD</span>';
+            } else {
+                btnFwd.classList.remove('active');
+                btnFwd.innerHTML = '<span>➕ FWD (Передний)</span>';
+            }
+        } else {
+            btnFwd.classList.add('hidden');
+        }
+    }
+
+    // Формируем карту строк:
+    // 1) savedCompartmentsSource === false -> чистый сброс отсеков (все строки нулевые)
+    // 2) Array.isArray(savedCompartmentsSource) -> восстанавливаем СТРОГО строки переданного рейса (без утечки данных других рейсов!)
+    // 3) savedCompartmentsSource === null -> диспетчер сменил борт/FWD для текущего активного рейса, сохраняем matching rows
+    let sourceMap = null;
+    if (savedCompartmentsSource === false) {
+        sourceMap = null;
+    } else if (Array.isArray(savedCompartmentsSource)) {
+        sourceMap = new Map();
+        savedCompartmentsSource.forEach(c => {
+            if (!c) return;
+            const name = String(c.name || c.cpt || '');
+            if (Array.isArray(c.rows) && c.rows.length > 0) {
+                sourceMap.set(name, JSON.parse(JSON.stringify(c.rows)));
+            } else if (c.pcs !== undefined || c.weight !== undefined) {
+                sourceMap.set(name, [{
+                    type: c.type || 'B',
+                    pcs: parseInt(c.pcs, 10) || 0,
+                    weight: parseFloat(c.weight) || 0,
+                    locked: !!c.locked
+                }]);
+            }
+        });
+    } else {
+        sourceMap = new Map();
+        if (currentCompartmentsState && Array.isArray(currentCompartmentsState)) {
+            currentCompartmentsState.forEach(c => {
+                if (c && c.name && Array.isArray(c.rows)) {
+                    sourceMap.set(c.name, JSON.parse(JSON.stringify(c.rows)));
+                }
+            });
+        }
+    }
+
+    // Формируем список отсеков согласно правилам
+    let targetPositions = [];
+    if (config.isWidebody) {
+        if (isFwdCompartmentsVisible) {
+            targetPositions = [...config.fwd.map(n => ({ name: n, sec: 'FWD' })), ...config.aft.map(n => ({ name: n, sec: 'AFT' }))];
+        } else {
+            targetPositions = config.aft.map(n => ({ name: n, sec: 'AFT' }));
+        }
+    } else {
+        targetPositions = [...config.fwd.map(n => ({ name: n, sec: 'FWD' })), ...config.aft.map(n => ({ name: n, sec: 'AFT' }))];
+    }
+
+    currentCompartmentsState = targetPositions.map((pos, idx) => {
+        const preservedRows = sourceMap ? sourceMap.get(pos.name) : null;
+        return {
+            cpt: idx + 1,
+            name: pos.name,
+            section: pos.sec,
+            rows: preservedRows && preservedRows.length > 0 ? preservedRows : [
+                { type: 'B', pcs: 0, weight: 0, locked: false }
+            ]
+        };
+    });
+
+    renderCompartmentsTable();
+    recalculateLoadPlanning();
+}
+
+// Переключение отображения переднего багажника (FWD) для широкофюзеляжных
+function toggleFwdCompartments() {
+    isFwdCompartmentsVisible = !isFwdCompartmentsVisible;
+    applyAircraftCompartmentConfig(currentActiveAircraftTail || currentActiveAircraftModel, isFwdCompartmentsVisible);
+}
+
+// Заполнение выпадающего списка выбора борта в шапке BULK
+function populateAircraftTailDropdown() {
+    const tailSelect = document.getElementById('select-aircraft-tail');
+    if (!tailSelect) return;
+
+    const currentVal = tailSelect.value || currentActiveAircraftTail || '';
+    tailSelect.innerHTML = '<option value="">-- Выбрать борт --</option>';
+
+    // Группировка бортов по моделям ВС
+    const groups = {
+        'Airbus A321': ['73271', '73273', '73324', '73325', '73326'],
+        'Airbus A321-NEO': ['73322', '73323'],
+        'Boeing 737-800': ['73269', '73311', '73312', '73313', '73314', '73315', '73316', '73317', '73318', '73319', '73321'],
+        'Boeing 737-900': ['73343', '73344'],
+        'Embraer E190': ['02740', '02741', '02743'],
+        'Airbus A330-200 (Widebody)': ['73270', '73328'],
+        'Airbus A330-300 (Widebody)': ['73848', '73849', '73850'],
+        'Boeing 777-200ER (Widebody)': ['73340', '73341', '73272', '73347'],
+        'Boeing 777-300ER (Widebody)': ['73342', '73847']
+    };
+
+    Object.entries(groups).forEach(([groupName, tails]) => {
+        const grp = document.createElement('optgroup');
+        grp.label = groupName;
+        tails.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = `RA-${t}`;
+            grp.appendChild(opt);
+        });
+        tailSelect.appendChild(grp);
+    });
+
+    if (currentVal) {
+        tailSelect.value = currentVal;
+    }
+
+    if (tailSelect.dataset.hasListener) return;
+    tailSelect.dataset.hasListener = 'true';
+
+    tailSelect.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val) {
+            applyAircraftCompartmentConfig(val);
+            if (currentActivePredictionId) {
+                const p = predictionsHistory.find(item => item.id === currentActivePredictionId);
+                if (p) {
+                    p.ac_num = normalizeTailNumber(val);
+                    updateActiveFlightBadge(p.from, p.to, p.flight_no, p.flight_date || p.calc_date, p.ac_num, p.dep_time);
+                    savePredictionsHistory();
+                    renderPredictionsTable();
+                }
+            } else {
+                currentIncomingFlightData.ac_num = val;
+                updateActiveFlightBadge(currentIncomingFlightData.from, currentIncomingFlightData.to, currentIncomingFlightData.flight, currentIncomingFlightData.date, val, currentIncomingFlightData.dep_time);
+            }
+        }
+    });
+}
+
+function initDefaultCompartmentsState() {
+    const defCfg = DEFAULT_TYPE_CONFIGS['A321'];
+    const positions = [...defCfg.fwd.map(n => ({ name: n, sec: 'FWD' })), ...defCfg.aft.map(n => ({ name: n, sec: 'AFT' }))];
+    currentCompartmentsState = positions.map((pos, idx) => ({
+        cpt: idx + 1,
+        name: pos.name,
+        section: pos.sec,
+        rows: [
+            { type: 'B', pcs: 0, weight: 0, locked: false }
+        ]
+    }));
+}
+
+function renderCompartmentsTable() {
+    const tbody = document.getElementById('unified-load-tbody');
+    if (!tbody) return;
+
+    if (!currentCompartmentsState || currentCompartmentsState.length === 0) {
+        initDefaultCompartmentsState();
+    }
+
+    tbody.innerHTML = '';
+    let globalRowIdx = 0;
+
+    currentCompartmentsState.forEach((comp, compIdx) => {
+        const rowsCount = comp.rows.length;
+
+        comp.rows.forEach((row, rowIdx) => {
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-comp', compIdx);
+            tr.setAttribute('data-row', rowIdx);
+
+            const isLastFwdRow = (comp.section === 'FWD' && rowIdx === rowsCount - 1 && currentCompartmentsState[compIdx + 1] && currentCompartmentsState[compIdx + 1].section === 'AFT');
+            if (rowIdx === 0) {
+                tr.className = 'bulk-cpt-row' + (isLastFwdRow ? ' cpt-section-boundary' : '');
+            } else {
+                tr.className = 'bulk-cpt-subrow' + (isLastFwdRow ? ' cpt-section-boundary' : '');
+            }
+
+            // 1. Номер отсека или стрелка
+            const tdCpt = document.createElement('td');
+            tdCpt.style.textAlign = 'center';
+            const secClass = comp.section === 'FWD' ? 'cpt-fwd' : (comp.section === 'AFT' ? 'cpt-aft' : '');
+            if (rowIdx === 0) {
+                tdCpt.className = `bulk-cpt-num ${secClass}`;
+                tdCpt.innerHTML = `<strong>${comp.name}</strong>`;
+            } else {
+                tdCpt.className = `bulk-cpt-num sub-cpt ${secClass}`;
+                tdCpt.innerHTML = `<span class="sub-arrow">↳</span>`;
+            }
+            tr.appendChild(tdCpt);
+
+            // 2. Селектор типа загрузки
+            const tdType = document.createElement('td');
+            tdType.className = 'bulk-type-cell';
+            const select = document.createElement('select');
+            select.className = 'form-control bulk-type-select';
+            select.tabIndex = 11 + (globalRowIdx * 3);
+            select.onchange = (e) => handleBulkTypeChange(compIdx, rowIdx, e.target.value);
+            BULK_LOAD_CATEGORIES.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.code;
+                opt.textContent = (currentLang === 'ru') ? cat.nameRu : cat.nameEn;
+                if (cat.code === row.type) opt.selected = true;
+                select.appendChild(opt);
+            });
+            tdType.appendChild(select);
+            tr.appendChild(tdType);
+
+            // 3. Поле ввода мест
+            const tdPcs = document.createElement('td');
+            tdPcs.style.textAlign = 'center';
+            const inputPcs = document.createElement('input');
+            inputPcs.type = 'number';
+            inputPcs.id = `bulk-pcs-${compIdx}-${rowIdx}`;
+            inputPcs.className = 'form-control table-input bulk-pcs-input monospace-val super-input-cyan';
+            inputPcs.min = '0';
+            inputPcs.max = '1000';
+            inputPcs.value = String(row.pcs || 0);
+            inputPcs.tabIndex = 11 + (globalRowIdx * 3) + 1;
+            inputPcs.oninput = (e) => handleBulkInput(compIdx, rowIdx, 'pcs', e.target.value);
+            inputPcs.onfocus = (e) => e.target.select();
+            tdPcs.appendChild(inputPcs);
+            tr.appendChild(tdPcs);
+
+            // 4. Поле ввода веса
+            const tdWeight = document.createElement('td');
+            tdWeight.style.textAlign = 'center';
+            const inputWeight = document.createElement('input');
+            inputWeight.type = 'number';
+            inputWeight.id = `bulk-weight-${compIdx}-${rowIdx}`;
+            inputWeight.className = 'form-control table-input bulk-weight-input monospace-val super-input-gold';
+            inputWeight.min = '0';
+            inputWeight.max = '50000';
+            inputWeight.value = String(row.weight || 0);
+            inputWeight.tabIndex = 11 + (globalRowIdx * 3) + 2;
+            if (row.locked) {
+                inputWeight.setAttribute('data-locked', 'true');
+                inputWeight.classList.add('weight-locked');
+            }
+            inputWeight.oninput = (e) => handleBulkInput(compIdx, rowIdx, 'weight', e.target.value);
+            inputWeight.onfocus = (e) => e.target.select();
+            tdWeight.appendChild(inputWeight);
+            tr.appendChild(tdWeight);
+
+            // 5. Кнопка действия (+ или ✕)
+            const tdAction = document.createElement('td');
+            tdAction.style.textAlign = 'center';
+            if (rowIdx === 0) {
+                const btnAdd = document.createElement('button');
+                btnAdd.type = 'button';
+                btnAdd.className = 'btn btn-bulk-add';
+                btnAdd.title = currentLang === 'ru' ? 'Добавить категорию в этот отсек' : 'Add category to this compartment';
+                btnAdd.tabIndex = -1;
+                btnAdd.textContent = '+';
+                btnAdd.onclick = () => handleAddCompartmentSubRow(compIdx);
+                tdAction.appendChild(btnAdd);
+            } else {
+                const btnDel = document.createElement('button');
+                btnDel.type = 'button';
+                btnDel.className = 'btn btn-bulk-del';
+                btnDel.tabIndex = -1;
+                btnDel.title = currentLang === 'ru' ? 'Удалить категорию' : 'Delete category';
+                btnDel.textContent = '✕';
+                btnDel.onclick = () => handleRemoveCompartmentSubRow(compIdx, rowIdx);
+                tdAction.appendChild(btnDel);
+            }
+            tr.appendChild(tdAction);
+
+            tbody.appendChild(tr);
+            globalRowIdx++;
+        });
+
+        // Промежуточный итог отсека при нескольких категориях
+        if (rowsCount > 1) {
+            const trSub = document.createElement('tr');
+            trSub.className = 'bulk-cpt-subtotal-row';
+            trSub.setAttribute('data-comp-subtotal', compIdx);
+
+            const tdLabel = document.createElement('td');
+            tdLabel.colSpan = 2;
+            tdLabel.className = 'cpt-subtotal-label';
+            tdLabel.textContent = `Всего CPT ${comp.name}:`;
+            trSub.appendChild(tdLabel);
+
+            const tdSubPcs = document.createElement('td');
+            tdSubPcs.id = `cpt-subtotal-pcs-${compIdx}`;
+            tdSubPcs.style.textAlign = 'center';
+            tdSubPcs.className = 'monospace-val text-center super-val-cyan';
+            tdSubPcs.style.fontWeight = '700';
+            tdSubPcs.style.fontSize = '0.9rem';
+            tdSubPcs.textContent = '0';
+            trSub.appendChild(tdSubPcs);
+
+            const tdSubWeight = document.createElement('td');
+            tdSubWeight.id = `cpt-subtotal-weight-${compIdx}`;
+            tdSubWeight.style.textAlign = 'center';
+            tdSubWeight.className = 'monospace-val text-center super-val-gold';
+            tdSubWeight.style.fontWeight = '700';
+            tdSubWeight.style.fontSize = '0.9rem';
+            tdSubWeight.textContent = '0 кг';
+            trSub.appendChild(tdSubWeight);
+
+            const tdEmpty = document.createElement('td');
+            trSub.appendChild(tdEmpty);
+
+            tbody.appendChild(trSub);
+        }
+    });
+}
+
+function handleBulkTypeChange(compIdx, rowIdx, newType) {
+    if (currentCompartmentsState[compIdx] && currentCompartmentsState[compIdx].rows[rowIdx]) {
+        currentCompartmentsState[compIdx].rows[rowIdx].type = newType;
+        recalculateLoadPlanning();
+        debouncedSaveCompartmentsToPrediction();
+    }
+}
+
+function handleAddCompartmentSubRow(compIdx) {
+    if (!currentCompartmentsState[compIdx]) return;
+    currentCompartmentsState[compIdx].rows.push({
+        type: 'BT',
+        pcs: 0,
+        weight: 0,
+        locked: false
+    });
+    renderCompartmentsTable();
+    recalculateLoadPlanning();
+    debouncedSaveCompartmentsToPrediction();
+}
+
+function handleRemoveCompartmentSubRow(compIdx, rowIdx) {
+    if (!currentCompartmentsState[compIdx] || rowIdx === 0) return;
+    currentCompartmentsState[compIdx].rows.splice(rowIdx, 1);
+    renderCompartmentsTable();
+    recalculateLoadPlanning();
+    debouncedSaveCompartmentsToPrediction();
+}
+
+function handleBulkInput(compIdx, rowIdx, field, rawValue) {
+    if (!currentCompartmentsState[compIdx] || !currentCompartmentsState[compIdx].rows[rowIdx]) return;
+    const row = currentCompartmentsState[compIdx].rows[rowIdx];
+
+    if (field === 'pcs') {
+        const pcsVal = parseInt(rawValue, 10);
+        row.pcs = isNaN(pcsVal) || pcsVal < 0 ? 0 : pcsVal;
+        if (row.pcs === 0) {
+            row.locked = false;
+            row.weight = 0;
+            const weightInput = document.getElementById(`bulk-weight-${compIdx}-${rowIdx}`);
+            if (weightInput) {
+                weightInput.value = '0';
+                weightInput.removeAttribute('data-locked');
+                weightInput.classList.remove('weight-locked');
+            }
+        }
+    } else if (field === 'weight') {
+        const weightVal = parseFloat(rawValue);
+        row.weight = isNaN(weightVal) || weightVal < 0 ? 0 : weightVal;
+        row.locked = true;
+        const weightInput = document.getElementById(`bulk-weight-${compIdx}-${rowIdx}`);
+        if (weightInput) {
+            weightInput.setAttribute('data-locked', 'true');
+            weightInput.classList.add('weight-locked');
+        }
+    }
+
+    recalculateLoadPlanning();
+    debouncedSaveCompartmentsToPrediction();
+}
+
+function handleReturnToAeroPlan(e) {
+    if (e) e.preventDefault();
+    const urlParams = new URLSearchParams(window.location.search);
+    const returnUrl = urlParams.get('return_url');
+    const targetUrl = returnUrl ? decodeURIComponent(returnUrl) : '';
+
+    if (targetUrl) {
+        window.location.href = targetUrl;
+    } else if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        const isPlan2 = document.referrer.includes('plan_2') || window.location.href.includes('plan_2');
+        if (isPlan2) {
+            window.location.href = 'https://boostandgo.ru/plan_2/';
+        } else {
+            const isTest = window.location.href.includes('aerobag-test');
+            window.location.href = isTest ? 'https://boostandgo.ru/plan_test/' : 'https://boostandgo.ru/plan/';
+        }
+    }
+}
+
+let currentIncomingFlightData = {
+    flight: '',
+    date: '',
+    ac_num: '',
+    dep_time: '',
+    crew: '',
+    galley: 'D',
+    dow: '',
+    doi: '',
+    pax: '',
+    pax_m: '',
+    pax_f: '',
+    pax_ch: '',
+    pax_inf: '',
+    to_fuel: '',
+    trip_fuel: '',
+    cargo: '',
+    mail: '',
+    from: '',
+    to: ''
+};
+
+// --- W&B FLEET REGISTRY (DOW / DOI) ---
+let fleetWbData = null;
+
+async function loadFleetWb() {
+    try {
+        const response = await fetch('fleet_wb.json');
+        if (response && response.ok) {
+            fleetWbData = await response.json();
+            console.log('[AeroBag W&B] Загружен реестр флота fleet_wb.json, бортов:', Object.keys(fleetWbData).length);
+        }
+    } catch (e) {
+        console.warn('[AeroBag W&B] Не удалось загрузить fleet_wb.json:', e);
+    }
+}
+
+function normalizeTailNumber(val) {
+    if (!val) return '';
+    return String(val).toUpperCase().replace(/^(RA|РА)[-\s]?/i, '').replace(/\D/g, '').trim();
+}
+
+function detectFlightOperator(flight) {
+    const flightStr = String(flight.flight || flight.flight_no || flight.flight_number || '').toUpperCase().trim();
+    if (/^(EO|KAR|ИК|ЕО)/i.test(flightStr)) return 'EO';
+    if (/^(N4|NWS|СВ|Н4)/i.test(flightStr)) return 'N4';
+    if (flight.operator) {
+        const op = String(flight.operator).toUpperCase().trim();
+        if (op === 'EO' || op === 'KAR') return 'EO';
+        if (op === 'N4' || op === 'NWS') return 'N4';
+    }
+    return '';
+}
+
+function normalizeCrewCode(val) {
+    if (!val) return '';
+    const parts = String(val).split(/[\/\-\s]+/).filter(Boolean);
+    if (parts.length >= 2) return `${parseInt(parts[0], 10)}/${parseInt(parts[1], 10)}`;
+    if (parts.length === 1 && !isNaN(parseInt(parts[0], 10))) return `${parseInt(parts[0], 10)}/0`;
+    return '';
+}
+
+function lookupFleetWb(flight = {}) {
+    if (!fleetWbData) return null;
+    const tail = normalizeTailNumber(flight.ac_num || flight.tail);
+    if (!tail) return null;
+
+    const operator = detectFlightOperator(flight);
+    let configKey = null;
+
+    if (operator && fleetWbData[`${tail}_${operator}`]) {
+        configKey = `${tail}_${operator}`;
+    } else if (operator && fleetWbData[`${tail}_${operator}_FAK_2AKE`]) {
+        configKey = `${tail}_${operator}_FAK_2AKE`;
+    } else {
+        const candidates = Object.keys(fleetWbData).filter(k => k.startsWith(`${tail}_`));
+        if (candidates.length === 1) {
+            configKey = candidates[0];
+        } else if (candidates.length > 1) {
+            if (operator) configKey = candidates.find(k => k.includes(`_${operator}`)) || candidates[0];
+            else configKey = candidates.find(k => k.includes('_N4')) || candidates[0];
+        }
+    }
+
+    if (!configKey || !fleetWbData[configKey]) return null;
+    const cfg = fleetWbData[configKey];
+
+    const crewCode = normalizeCrewCode(flight.crew);
+    if (!crewCode || !cfg.matrix || !cfg.matrix[crewCode]) return null;
+
+    let galley = String(flight.galley || 'D').toUpperCase().trim() || 'D';
+    let cell = cfg.matrix[crewCode][galley];
+    if (!cell && cfg.pantry_codes && cfg.pantry_codes.length > 0) {
+        const fallback = cfg.pantry_codes.includes('D') ? 'D' : cfg.pantry_codes[0];
+        cell = cfg.matrix[crewCode][fallback];
+        if (cell) galley = fallback;
+    }
+
+    if (!cell) return null;
+
+    return {
+        success: true,
+        dow: cell.dow,
+        doi: cell.doi,
+        model: cfg.model,
+        revision: cfg.revision,
+        crew: crewCode,
+        galley: galley,
+        tail: tail
+    };
+}
+
+function openWbLoadsheet() {
+    // 1. Текущий активный рейс и предсказание
+    let activePred = null;
+    if (typeof currentActivePredictionId !== 'undefined' && currentActivePredictionId) {
+        activePred = (predictionsHistory || []).find(p => p.id === currentActivePredictionId);
+    }
+    if (!activePred && typeof predictionsHistory !== 'undefined' && predictionsHistory.length > 0) {
+        activePred = predictionsHistory[0];
+    }
+
+    if (typeof saveCompartmentsToPrediction === 'function' && activePred) {
+        saveCompartmentsToPrediction(activePred);
+    }
+
+    // 2. Реквизиты рейса
+    const flightNumber = (document.getElementById('select-flight')?.value || activePred?.flight_no || currentIncomingFlightData.flight || '').trim();
+    const flightDate = (document.getElementById('input-date')?.value || activePred?.calc_date || currentIncomingFlightData.date || '').trim();
+    const fromAirport = (currentIncomingFlightData.from || activePred?.from || '').trim();
+    const toAirport = (currentIncomingFlightData.to || activePred?.to || '').trim();
+    const selectedTail = (document.getElementById('select-aircraft-tail')?.value || activePred?.aircraft_tail || currentIncomingFlightData.ac_num || '').trim();
+    const currentModel = (document.getElementById('aircraft-model-badge')?.textContent || activePred?.aircraft_model || 'B737-800').trim();
+
+    // Определение компоновки салона (Version в LoadSheet): например Y215, Y189, Y220
+    const MODEL_TO_LAYOUT_MAP = {
+        'B737-900': 'Y215',
+        'B739': 'Y215',
+        '739': 'Y215',
+        'B737-800': 'Y189',
+        'B738': 'Y189',
+        '738': 'Y189',
+        'A321': 'Y220',
+        'A321-NEO': 'Y218',
+        '321': 'Y220',
+        'E190': 'Y110',
+        '190': 'Y110',
+        'A330-200': 'Y365',
+        'A332': 'Y365',
+        '332': 'Y365',
+        'A330-300': 'Y379',
+        'A333': 'Y379',
+        '333': 'Y379',
+        'B777-200': 'Y440',
+        'B772': 'Y440',
+        '772': 'Y440',
+        'B777-300': 'Y486',
+        'B773': 'Y486',
+        '773': 'Y486'
+    };
+
+    let cabinVersion = currentIncomingFlightData.ac_config || activePred?.ac_config || '';
+    if (!cabinVersion || MODEL_TO_LAYOUT_MAP[cabinVersion.toUpperCase()]) {
+        cabinVersion = MODEL_TO_LAYOUT_MAP[cabinVersion.toUpperCase()] || MODEL_TO_LAYOUT_MAP[currentModel] || 'Y189';
+    }
+
+    // 3. Агрегация весов багажа по отсекам CPT 1..5
+    const cptWeights = {
+        b: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        c: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        m: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        tr: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        uld: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+    };
+
+    const compList = (currentCompartmentsState && currentCompartmentsState.length > 0)
+        ? currentCompartmentsState
+        : (activePred && Array.isArray(activePred.compartments) ? activePred.compartments : []);
+
+    let totalBaggageFound = 0;
+
+    if (compList && compList.length > 0) {
+        compList.forEach((comp, compIdx) => {
+            const secName = String(comp.name || comp.cpt || '').trim();
+            const cptIndex = parseInt(secName.charAt(0), 10);
+            if (cptIndex >= 1 && cptIndex <= 5 && Array.isArray(comp.rows)) {
+                comp.rows.forEach((row, rowIdx) => {
+                    const wtInput = document.getElementById(`bulk-weight-${compIdx}-${rowIdx}`);
+                    const wt = wtInput ? (parseFloat(wtInput.value) || 0) : (parseFloat(row.weight) || 0);
+                    if (wt > 0) {
+                        const rType = String(row.type || 'B').toUpperCase().trim();
+                        if (['B', 'BT', 'BC', 'BZ', 'BX', 'DAA'].includes(rType)) {
+                            cptWeights.b[cptIndex] += Math.round(wt);
+                            totalBaggageFound += Math.round(wt);
+                        } else if (rType === 'C') {
+                            cptWeights.c[cptIndex] += Math.round(wt);
+                        } else if (rType === 'M') {
+                            cptWeights.m[cptIndex] += Math.round(wt);
+                        } else if (rType === 'TR') {
+                            cptWeights.tr[cptIndex] += Math.round(wt);
+                        } else if (rType === 'ULD') {
+                            cptWeights.uld[cptIndex] += Math.round(wt);
+                        } else {
+                            cptWeights.b[cptIndex] += Math.round(wt);
+                            totalBaggageFound += Math.round(wt);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    // Если в отсеках вес еще не вводился, проверяем общий рассчитанный прогноз
+    if (totalBaggageFound === 0) {
+        const prelimWeight = parseFloat(document.getElementById('prelim-weight')?.textContent || 0) || 
+                             parseFloat(activePred?.weight || activePred?.baggageWeight || 0) || 0;
+        if (prelimWeight > 0) {
+            cptWeights.b[3] = Math.round(prelimWeight);
+        }
+    }
+
+    // 4. Пассажиры, экипаж и топливо
+    const lirPaxNum = parseInt(document.getElementById('lir-pax')?.value || 0, 10);
+    const inputPaxNum = parseInt(document.getElementById('input-pax')?.value || 0, 10);
+    const prelimPaxNum = parseInt(document.getElementById('prelim-pax')?.textContent || 0, 10);
+    const incomingPaxNum = parseInt(currentIncomingFlightData.pax || activePred?.pax || 0, 10);
+    const effPax = (lirPaxNum > 0) ? lirPaxNum : ((inputPaxNum > 0) ? inputPaxNum : ((prelimPaxNum > 0) ? prelimPaxNum : incomingPaxNum));
+    const paxTotal = effPax > 0 ? String(effPax) : '';
+
+    let paxM = currentIncomingFlightData.pax_m || activePred?.pax_m || document.getElementById('manual-men')?.value || '';
+    let paxF = currentIncomingFlightData.pax_f || activePred?.pax_f || document.getElementById('manual-women')?.value || '';
+    let paxCh = currentIncomingFlightData.pax_ch || activePred?.pax_ch || document.getElementById('manual-rb')?.value || '';
+    let paxInf = currentIncomingFlightData.pax_inf || activePred?.pax_inf || document.getElementById('manual-rm')?.value || '';
+
+    if (!paxM && !paxF && effPax > 0) {
+        const halfM = Math.ceil(effPax / 2);
+        paxM = String(halfM);
+        paxF = String(effPax - halfM);
+    }
+
+    const crewVal = currentIncomingFlightData.crew || activePred?.crew || '';
+    const toFuel = currentIncomingFlightData.to_fuel || currentIncomingFlightData.fuel_block || activePred?.fuel_block || '';
+    const tripFuel = currentIncomingFlightData.trip_fuel || activePred?.fuel_trip || '';
+    const cargoVal = currentIncomingFlightData.cargo || '';
+    const mailVal = currentIncomingFlightData.mail || '';
+    let dowVal = currentIncomingFlightData.dow || activePred?.dow || '';
+    let doiVal = currentIncomingFlightData.doi || activePred?.doi || '';
+    const galleyVal = currentIncomingFlightData.galley || activePred?.galley || 'D';
+
+    // Если DOW или DOI еще не были определены (напр. расчет начат прямо в AeroBag) - вычисляем на лету!
+    if (!dowVal || !doiVal) {
+        const flightForWb = {
+            flight: flightNumber,
+            ac_num: selectedTail,
+            crew: crewVal,
+            galley: galleyVal
+        };
+        const wbRes = typeof lookupFleetWb === 'function' ? lookupFleetWb(flightForWb) : null;
+        if (wbRes && wbRes.success) {
+            if (!dowVal) dowVal = String(wbRes.dow);
+            if (!doiVal) doiVal = String(wbRes.doi);
+        }
+    }
+
+    // 5. Определение стенда Loadsheet
+    const isTest = window.location.href.includes('aerobag-test') || 
+                   window.location.hostname === 'localhost' || 
+                   window.location.hostname === '127.0.0.1';
+    const targetUrl = isTest 
+        ? 'https://boostandgo.ru/loadsheet_test/' 
+        : 'https://boostandgo.ru/loadsheet/';
+
+    const params = new URLSearchParams();
+    if (flightNumber) params.set('flight', flightNumber);
+    if (fromAirport) params.set('from', fromAirport);
+    if (toAirport) params.set('to', toAirport);
+    if (flightDate) params.set('date', flightDate);
+    if (selectedTail) params.set('acreg', selectedTail);
+    if (cabinVersion) params.set('version', cabinVersion);
+    if (crewVal) params.set('crew', crewVal);
+    if (paxM) params.set('pax_m', paxM);
+    if (paxF) params.set('pax_f', paxF);
+    if (paxCh) params.set('pax_ch', paxCh);
+    if (paxInf) params.set('pax_inf', paxInf);
+    if (paxTotal) params.set('pax', paxTotal);
+    if (toFuel) params.set('to_fuel', toFuel);
+    if (tripFuel) params.set('trip_fuel', tripFuel);
+    if (dowVal) params.set('dow', dowVal);
+    if (doiVal) params.set('doi', doiVal);
+    if (galleyVal) params.set('galley', galleyVal);
+    if (cargoVal) params.set('cargo', cargoVal);
+    if (mailVal) params.set('mail', mailVal);
+
+    for (let c = 1; c <= 5; c++) {
+        if (cptWeights.b[c] > 0) params.set(`cpt_${c}_b`, cptWeights.b[c]);
+        if (cptWeights.c[c] > 0) params.set(`cpt_${c}_c`, cptWeights.c[c]);
+        if (cptWeights.m[c] > 0) params.set(`cpt_${c}_m`, cptWeights.m[c]);
+        if (cptWeights.tr[c] > 0) params.set(`cpt_${c}_tr`, cptWeights.tr[c]);
+        if (cptWeights.uld[c] > 0) params.set(`cpt_${c}_uld`, cptWeights.uld[c]);
+    }
+
+    params.set('return_url', window.location.href);
+
+    try {
+        const payload = {
+            flight: flightNumber,
+            from: fromAirport,
+            to: toAirport,
+            date: flightDate,
+            acreg: selectedTail,
+            version: cabinVersion,
+            crew: crewVal,
+            pax_m: paxM,
+            pax_f: paxF,
+            pax_ch: paxCh,
+            pax_inf: paxInf,
+            pax: paxTotal,
+            to_fuel: toFuel,
+            trip_fuel: tripFuel,
+            dow: dowVal,
+            doi: doiVal,
+            galley: galleyVal,
+            cargo: cargoVal,
+            mail: mailVal,
+            return_url: window.location.href
+        };
+        for (let c = 1; c <= 5; c++) {
+            if (cptWeights.b[c] > 0) payload[`cpt_${c}_b`] = cptWeights.b[c];
+            if (cptWeights.c[c] > 0) payload[`cpt_${c}_c`] = cptWeights.c[c];
+            if (cptWeights.m[c] > 0) payload[`cpt_${c}_m`] = cptWeights.m[c];
+            if (cptWeights.tr[c] > 0) payload[`cpt_${c}_tr`] = cptWeights.tr[c];
+            if (cptWeights.uld[c] > 0) payload[`cpt_${c}_uld`] = cptWeights.uld[c];
+        }
+        localStorage.setItem('wb_loadsheet_incoming', JSON.stringify(payload));
+    } catch (e) {
+        console.warn('LocalStorage error:', e);
+    }
+
+    window.location.href = `${targetUrl}?${params.toString()}`;
+}
+
+// Надежное извлечение числового номера рейса без буквенно-цифровых префиксов авиакомпаний (N4, EO, NWS, KAR, U6 и т.д.)
+function extractNumericFlightNumber(flightStr) {
+    if (!flightStr) return '';
+    let s = String(flightStr).trim().toUpperCase();
+    s = s.replace(/^(N4|EO|NWS|KAR|NW|WZ|S7|SU|DP|UT|A4|U6|FV|5N|7R|KL|КЛ|Н4|ЕО)[-\s]?/i, '');
+    s = s.replace(/^[A-ZА-Я][A-ZА-Я0-9]{0,2}[-\s]?/i, '');
+    const match = s.match(/\d+/);
+    return match ? match[0] : s.replace(/\D/g, '');
+}
+
+function checkIncomingFlightParameters() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const flightParam = urlParams.get('flight') || urlParams.get('flt') || urlParams.get('flight_no');
+    const fromParam = urlParams.get('from');
+    const toParam = urlParams.get('to');
+    const dateParam = urlParams.get('date');
+    const paxParam = urlParams.get('pax');
+    const acNumParam = urlParams.get('ac_num') || urlParams.get('tail');
+    const depTimeParam = urlParams.get('dep_time') || urlParams.get('time') || urlParams.get('dep');
+    const returnUrlParam = urlParams.get('return_url');
+    const crewParam = urlParams.get('crew');
+    const paxMParam = urlParams.get('pax_m');
+    const paxFParam = urlParams.get('pax_f');
+    const paxChParam = urlParams.get('pax_ch');
+    const paxInfParam = urlParams.get('pax_inf');
+    const toFuelParam = urlParams.get('to_fuel') || urlParams.get('fuel_block') || urlParams.get('fuel');
+    const tripFuelParam = urlParams.get('trip_fuel') || urlParams.get('fuel_trip');
+    const cargoParam = urlParams.get('cargo');
+    const mailParam = urlParams.get('mail');
+    const acConfigParam = urlParams.get('ac_config') || urlParams.get('version') || urlParams.get('layout');
+    const dowParam = urlParams.get('dow');
+    const doiParam = urlParams.get('doi');
+    const galleyParam = urlParams.get('galley');
+
+    if (dowParam) currentIncomingFlightData.dow = dowParam;
+    if (doiParam) currentIncomingFlightData.doi = doiParam;
+    if (galleyParam) currentIncomingFlightData.galley = galleyParam;
+
+    if (acConfigParam) currentIncomingFlightData.ac_config = acConfigParam;
+    if (crewParam) currentIncomingFlightData.crew = crewParam;
+    if (paxMParam) currentIncomingFlightData.pax_m = paxMParam;
+    if (paxFParam) currentIncomingFlightData.pax_f = paxFParam;
+    if (paxChParam) currentIncomingFlightData.pax_ch = paxChParam;
+    if (paxInfParam) currentIncomingFlightData.pax_inf = paxInfParam;
+    if (toFuelParam) currentIncomingFlightData.to_fuel = toFuelParam;
+    if (tripFuelParam) currentIncomingFlightData.trip_fuel = tripFuelParam;
+    if (cargoParam) currentIncomingFlightData.cargo = cargoParam;
+    if (mailParam) currentIncomingFlightData.mail = mailParam;
+
+    if (depTimeParam) currentIncomingFlightData.dep_time = depTimeParam;
+    if (acNumParam) currentIncomingFlightData.ac_num = acNumParam;
+    if (dateParam) currentIncomingFlightData.date = dateParam;
+    if (fromParam) currentIncomingFlightData.from = fromParam;
+    if (toParam) currentIncomingFlightData.to = toParam;
+
+    const cleanFlight = extractNumericFlightNumber(flightParam);
+    if (cleanFlight) {
+        currentIncomingFlightData.flight = cleanFlight;
+        const flightInput = document.getElementById('select-flight');
+        if (flightInput) {
+            flightInput.value = cleanFlight;
+        }
+    }
+
+    if (dateParam) {
+        const dateInput = document.getElementById('input-date');
+        if (dateInput) {
+            dateInput.value = dateParam;
+        }
+    }
+
+    if (paxParam) {
+        currentIncomingFlightData.pax = paxParam;
+        const paxInput = document.getElementById('input-pax');
+        if (paxInput) {
+            paxInput.value = paxParam;
+        }
+    }
+
+    // Автоподбор маршрута: если переданы и from, и to — применяем их напрямую;
+    // иначе, если известен номер рейса — подбираем маршрут из базы
+    if (fromParam && toParam) {
+        applyRouteSelection({ from: fromParam, to: toParam });
+    } else if (cleanFlight) {
+        const route = findRouteByFlightNo(cleanFlight);
+        if (route) {
+            applyRouteSelection(route);
+        }
+    }
+
+    // Защита от сброса пассажиров: если был передан PAX, гарантированно возвращаем его в инпут
+    if (paxParam) {
+        const paxInput = document.getElementById('input-pax');
+        if (paxInput) {
+            paxInput.value = paxParam;
+        }
+    }
+
+    // Закрываем выпадающие подсказки рейса
+    if (typeof hideCustomFlightSuggestions === 'function') {
+        hideCustomFlightSuggestions();
+    }
+
+    if (acNumParam) {
+        applyAircraftCompartmentConfig(acNumParam, false);
+        updateActiveFlightBadge(
+            currentIncomingFlightData.from,
+            currentIncomingFlightData.to,
+            currentIncomingFlightData.flight,
+            currentIncomingFlightData.date,
+            acNumParam,
+            currentIncomingFlightData.dep_time
+        );
+    }
+
+    if (returnUrlParam) {
+        const returnBtn = document.getElementById('btn-return-aeroplan');
+        if (returnBtn) {
+            returnBtn.setAttribute('data-return-url', returnUrlParam);
+            returnBtn.classList.add('pulse-highlight');
+        }
+    }
+}
+
+
 // Сохранение текущей раскладки BULK отсеков в объект prediction из Истории расчетов
 function saveCompartmentsToPrediction() {
     if (!currentActivePredictionId) return;
@@ -2329,48 +3486,26 @@ function saveCompartmentsToPrediction() {
     if (lirPcsInput && lirPcsInput.value !== '') p.lir_pcs = parseInt(lirPcsInput.value, 10) || 0;
     if (lirWeightInput && lirWeightInput.value !== '') p.lir_weight = parseFloat(lirWeightInput.value) || 0;
 
-    const compartments = [];
-    for (let i = 1; i <= 12; i++) {
-        const pcsInput = document.getElementById(`bulk-pcs-${i}`);
-        const weightInput = document.getElementById(`bulk-weight-${i}`);
-        const pcs = pcsInput ? parseInt(pcsInput.value, 10) || 0 : 0;
-        const weight = weightInput ? parseInt(weightInput.value, 10) || 0 : 0;
-        const locked = weightInput ? (weightInput.getAttribute('data-locked') === 'true') : false;
-        compartments.push({ pcs, weight, locked });
+    p.compartments = JSON.parse(JSON.stringify(currentCompartmentsState));
+    if (currentActiveAircraftTail) {
+        p.ac_num = currentActiveAircraftTail;
     }
-
-    p.compartments = compartments;
+    p.show_fwd = isFwdCompartmentsVisible;
     savePredictionsHistory();
 }
 
 // Восстановление раскладки BULK отсеков из объекта prediction
 function restoreCompartmentsFromPrediction(p) {
-    // Всегда сбрасываем ячейки 1..12 перед заполнением, чтобы не оставалось хвостов от других рейсов
-    resetCompartments();
+    if (!p) return;
+    const tail = p.ac_num || '';
+    const showFwd = p.show_fwd !== undefined ? p.show_fwd : null;
+    applyAircraftCompartmentConfig(tail, showFwd, p.compartments);
+}
 
-    if (!p || !p.compartments || !Array.isArray(p.compartments)) {
-        return;
-    }
-
-    for (let i = 1; i <= 12; i++) {
-        const comp = p.compartments[i - 1];
-        if (!comp) continue;
-
-        const pcsInput = document.getElementById(`bulk-pcs-${i}`);
-        const weightInput = document.getElementById(`bulk-weight-${i}`);
-
-        if (pcsInput) pcsInput.value = String(comp.pcs || 0);
-        if (weightInput) {
-            weightInput.value = String(comp.weight || 0);
-            if (comp.locked) {
-                weightInput.setAttribute('data-locked', 'true');
-                weightInput.classList.add('weight-locked');
-            } else {
-                weightInput.removeAttribute('data-locked');
-                weightInput.classList.remove('weight-locked');
-            }
-        }
-    }
+// Очистка значений отсеков (с сохранением текущей модели ВС и позиций борта)
+function resetCompartments() {
+    const tailOrType = currentActiveAircraftTail || currentActiveAircraftModel || 'A321';
+    applyAircraftCompartmentConfig(tailOrType, isFwdCompartmentsVisible, false);
 }
 
 
@@ -2409,29 +3544,57 @@ function transferToPreliminary() {
     if (lirPcs) lirPcs.value = pcsVal;
     if (lirWeight) lirWeight.value = weightVal;
 
-    // Связываем с самым свежим расчетом из истории
-    if (predictionsHistory && predictionsHistory.length > 0) {
-        currentActivePredictionId = predictionsHistory[0].id;
-        const activePred = predictionsHistory[0];
-        updateActiveFlightBadge(activePred.from, activePred.to, activePred.flight_no, activePred.flight_date || activePred.calc_date);
+    // Находим расчет: строго текущий активный расчет, либо самый свежий по времени расчета (calc_date)
+    let activePred = null;
+    if (currentActivePredictionId) {
+        activePred = predictionsHistory.find(item => item.id === currentActivePredictionId);
+    }
+    if (!activePred && predictionsHistory && predictionsHistory.length > 0) {
+        activePred = predictionsHistory.slice().sort((a, b) => new Date(b.calc_date || 0) - new Date(a.calc_date || 0))[0];
+    }
+
+    if (activePred) {
+        currentActivePredictionId = activePred.id;
+        activePred.lir_pax = paxVal;
+        activePred.lir_pcs = pcsVal;
+        activePred.lir_weight = weightVal;
+        activePred.pax = paxVal;
+        activePred.bag_pcs = pcsVal;
+        activePred.bag_weight = weightVal;
+
+        updateActiveFlightBadge(activePred.from, activePred.to, activePred.flight_no, activePred.flight_date || activePred.calc_date, activePred.ac_num, activePred.dep_time);
         highlightPredictionRow(currentActivePredictionId);
+
+        if (activePred.ac_num) {
+            applyAircraftCompartmentConfig(activePred.ac_num, activePred.show_fwd !== undefined ? activePred.show_fwd : null, activePred.compartments);
+        }
     }
 
     resetCompartments();
     recalculateLoadPlanning();
     saveCompartmentsToPrediction();
+
+    setTimeout(() => {
+        const firstSelect = document.querySelector('#unified-load-tbody .bulk-type-select');
+        if (firstSelect) {
+            firstSelect.focus();
+        }
+    }, 50);
 }
 
 function transferPredictionToPreliminary(predId) {
-    const p = predictionsHistory.find(item => item.id === predId);
-    if (!p) return;
+    if (!predId) return;
 
-    // Сохраняем раскладку BULK текущего активного рейса из Истории перед переключением (только если это другой рейс)
+    // 1. СТРОГО ПЕРВЫМ ДЕЛОМ: сохраняем раскладку отсеков и LIR предыдущего активного рейса,
+    // чтобы его данные не потерялись и не перетерлись новым рейсом!
     if (currentActivePredictionId && currentActivePredictionId !== predId) {
         saveCompartmentsToPrediction();
     }
 
-    // Устанавливаем новый активный рейс из Истории
+    const p = predictionsHistory.find(item => item.id === predId);
+    if (!p) return;
+
+    // 2. Устанавливаем новый активный рейс
     currentActivePredictionId = predId;
 
     const paxVal = parseInt(p.pax, 10) || 0;
@@ -2441,11 +3604,6 @@ function transferPredictionToPreliminary(predId) {
     const prelimPax = document.getElementById('prelim-pax');
     const prelimPcs = document.getElementById('prelim-pcs');
     const prelimWeight = document.getElementById('prelim-weight');
-
-    const lirPax = document.getElementById('lir-pax');
-    const lirPcs = document.getElementById('lir-pcs');
-    const lirWeight = document.getElementById('lir-weight');
-
     if (prelimPax) prelimPax.textContent = paxVal;
     if (prelimPcs) prelimPcs.textContent = pcsVal;
     if (prelimWeight) prelimWeight.textContent = weightVal;
@@ -2454,29 +3612,61 @@ function transferPredictionToPreliminary(predId) {
     const curLirPcs = (p.lir_pcs !== undefined && p.lir_pcs !== null) ? p.lir_pcs : pcsVal;
     const curLirWeight = (p.lir_weight !== undefined && p.lir_weight !== null) ? p.lir_weight : weightVal;
 
+    const lirPax = document.getElementById('lir-pax');
+    const lirPcs = document.getElementById('lir-pcs');
+    const lirWeight = document.getElementById('lir-weight');
     if (lirPax) lirPax.value = curLirPax;
     if (lirPcs) lirPcs.value = curLirPcs;
     if (lirWeight) lirWeight.value = curLirWeight;
 
+    // Карточки результатов (средняя колонка)
     const resPcs = document.getElementById('res-pcs');
     const resWeight = document.getElementById('res-weight');
     const resHb = document.getElementById('res-hb');
-
     if (resPcs) resPcs.textContent = p.bag_pcs || 0;
     if (resWeight) resWeight.textContent = p.bag_weight || 0;
     if (resHb) resHb.textContent = p.hb_weight || 0;
 
-    // Восстанавливаем раскладку BULK из сохранённых данных рейса (или обнуляем если пустые)
-    restoreCompartmentsFromPrediction(p);
-    recalculateLoadPlanning();
+    // 3. Восстанавливаем отсеки СТРОГО этого рейса через applyAircraftCompartmentConfig
+    // Передаем p.compartments в качестве источника — исключаем любую утечку данных из других рейсов!
+    const targetTail = p.ac_num || '';
+    const showFwd = p.show_fwd !== undefined ? p.show_fwd : null;
+    applyAircraftCompartmentConfig(targetTail, showFwd, p.compartments);
 
-    updateActiveFlightBadge(p.from, p.to, p.flight_no, p.flight_date || p.calc_date);
-    highlightPredictionRow(predId);
+    // 4. Обновляем инфо-плашку активного рейса в правой колонке
+    updateActiveFlightBadge(p.from, p.to, p.flight_no, p.flight_date || p.calc_date, p.ac_num, p.dep_time);
 
-    const targetEl = document.querySelector('.load-planning-panel') || document.getElementById('prelim-pax');
-    if (targetEl) {
-        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // 5. Синхронизируем форму прогноза с выбранным рейсом
+    if (p.from && p.to) {
+        applyRouteSelection({ from: p.from, to: p.to });
     }
+    const flightInput = document.getElementById('select-flight');
+    if (flightInput && p.flight_no) {
+        flightInput.value = p.flight_no;
+    }
+    const dateInput = document.getElementById('input-date');
+    if (dateInput && (p.flight_date || p.calc_date)) {
+        const dStr = (p.flight_date || p.calc_date).split('T')[0];
+        if (dStr) dateInput.value = dStr;
+    }
+    const historyPax = p.raw_pax || p.pax;
+    if (historyPax) {
+        currentIncomingFlightData.pax = historyPax;
+        const mainInputPax = document.getElementById('input-pax');
+        if (mainInputPax) mainInputPax.value = historyPax;
+    }
+    if (typeof hideCustomFlightSuggestions === 'function') {
+        hideCustomFlightSuggestions();
+    }
+
+    if (p.ac_num) currentIncomingFlightData.ac_num = p.ac_num;
+    if (p.dep_time) currentIncomingFlightData.dep_time = p.dep_time;
+    if (p.flight_no) currentIncomingFlightData.flight = p.flight_no;
+    if (p.from) currentIncomingFlightData.from = p.from;
+    if (p.to) currentIncomingFlightData.to = p.to;
+
+    // 6. Подсвечиваем строку рейса в левой таблице
+    highlightPredictionRow(predId);
 }
 
 function recalculateLoadPlanning() {
@@ -2501,8 +3691,8 @@ function recalculateLoadPlanning() {
     const prelimAvgWeight = document.getElementById('prelim-avg-weight');
     const prelimAvgPax = document.getElementById('prelim-avg-pax');
 
+    const avgW = targetPcs > 0 ? (targetWeight / targetPcs) : 0;
     if (prelimAvgWeight) {
-        const avgW = targetPcs > 0 ? (targetWeight / targetPcs) : 0;
         prelimAvgWeight.textContent = avgW.toFixed(2).replace('.', ',');
     }
     if (prelimAvgPax) {
@@ -2510,259 +3700,114 @@ function recalculateLoadPlanning() {
         prelimAvgPax.textContent = avgP.toFixed(2).replace('.', ',');
     }
 
-    // 1-й проход: Подсчет зафиксированных весов и мест, а также сбор незафиксированных отсеков
-    let lockedWeightSum = 0;
-    let lockedPcsSum = 0;
-    const unlockedComps = [];
+    let totalPcs = 0;
+    let totalWeight = 0;
 
-    for (let i = 1; i <= 12; i++) {
-        const pcsInput = document.getElementById(`bulk-pcs-${i}`);
-        const weightCell = document.getElementById(`bulk-weight-${i}`);
+    if (!currentCompartmentsState || currentCompartmentsState.length === 0) {
+        initDefaultCompartmentsState();
+    }
 
-        if (pcsInput && weightCell) {
-            const pcs = parseInt(pcsInput.value, 10) || 0;
-            const isEditingThisWeight = (weightCell === activeEl);
-            const isExplicitlyLocked = weightCell.getAttribute('data-locked') === 'true';
+    currentCompartmentsState.forEach((comp, compIdx) => {
+        let compPcs = 0;
+        let compWeight = 0;
 
-            // Если поле веса редактируется пользователем прямо сейчас или заблокировано
-            const isLocked = isExplicitlyLocked || (isEditingThisWeight && weightCell.value.trim() !== '');
+        comp.rows.forEach((row, rowIdx) => {
+            const pcs = parseInt(row.pcs, 10) || 0;
+            let weight = parseFloat(row.weight) || 0;
 
-            if (isLocked) {
-                const w = parseFloat(weightCell.value) || 0;
-                lockedWeightSum += w;
-                lockedPcsSum += pcs;
-            } else {
-                if (pcs > 0) {
-                    unlockedComps.push({ index: i, pcs: pcs, weightCell: weightCell });
-                } else {
-                    // Если мест 0 и отсек не зафиксирован и не редактируется прямо сейчас - сбрасываем вес в 0
-                    if (!isEditingThisWeight && weightCell.value !== '0') {
-                        if (weightCell.tagName === 'INPUT') weightCell.value = '0';
-                        else weightCell.textContent = '0';
+            const pcsInput = document.getElementById(`bulk-pcs-${compIdx}-${rowIdx}`);
+            const weightInput = document.getElementById(`bulk-weight-${compIdx}-${rowIdx}`);
+
+            const isEditingWeight = (weightInput === activeEl);
+            const isLocked = row.locked || (isEditingWeight && weightInput?.value.trim() !== '');
+
+            if (!isLocked) {
+                if (pcs > 0 && avgW > 0) {
+                    weight = Math.round(pcs * avgW);
+                    row.weight = weight;
+                    if (weightInput && !isEditingWeight) {
+                        weightInput.value = String(weight);
                     }
+                } else if (pcs === 0 && !isEditingWeight) {
+                    weight = 0;
+                    row.weight = 0;
+                    if (weightInput) weightInput.value = '0';
                 }
             }
-        }
-    }
 
-    // Расчет удельного веса 1 места на оставшийся свободный вес от общего плана
-    const remainingWeight = Math.max(0, targetWeight - lockedWeightSum);
-    const remainingPcs = Math.max(1, targetPcs - lockedPcsSum);
-    const dynamicAvgBagWeight = targetPcs > 0 ? (remainingWeight / remainingPcs) : 0;
+            compPcs += pcs;
+            compWeight += weight;
+        });
 
-    // Суммарное количество мест, введенных в незафиксированные отсеки
-    const totalUnlockedEnteredPcs = unlockedComps.reduce((acc, c) => acc + c.pcs, 0);
-    // Проверка: распределены ли абсолютно все места (с учетом возможных зафиксированных)
-    const isAllPcsDistributed = (targetPcs > 0) && (totalUnlockedEnteredPcs === (targetPcs - lockedPcsSum));
+        totalPcs += compPcs;
+        totalWeight += compWeight;
 
-    // 2-й проход: Распределение веса по незафиксированным отсекам
-    let allocatedUnlockedWeight = 0;
-
-    unlockedComps.forEach((comp, idx) => {
-        const isLastComp = (idx === unlockedComps.length - 1);
-        let w = 0;
-
-        if (isAllPcsDistributed && isLastComp) {
-            // Последний отсек, закрывающий все оставшиеся места, забирает точный остаток веса!
-            w = Math.max(0, remainingWeight - allocatedUnlockedWeight);
-        } else {
-            w = Math.round(comp.pcs * dynamicAvgBagWeight);
-            allocatedUnlockedWeight += w;
-        }
-
-        if (comp.weightCell && comp.weightCell !== activeEl) {
-            const wStr = String(w);
-            if (comp.weightCell.tagName === 'INPUT') {
-                if (comp.weightCell.value !== wStr) comp.weightCell.value = wStr;
-            } else {
-                if (comp.weightCell.textContent !== wStr) comp.weightCell.textContent = wStr;
-            }
-        }
+        const subtotalPcsEl = document.getElementById(`cpt-subtotal-pcs-${compIdx}`);
+        const subtotalWeightEl = document.getElementById(`cpt-subtotal-weight-${compIdx}`);
+        if (subtotalPcsEl) subtotalPcsEl.textContent = String(compPcs);
+        if (subtotalWeightEl) subtotalWeightEl.textContent = `${compWeight} кг`;
     });
 
-    // 3-й проход: Подсчет итогов по всей таблице
-    let ttlBulkPcs = lockedPcsSum + totalUnlockedEnteredPcs;
-    let ttlBulkWeight = lockedWeightSum;
+    const restPcs = targetPcs - totalPcs;
+    const restWeight = targetWeight - totalWeight;
 
-    for (let i = 1; i <= 12; i++) {
-        const pcsInput = document.getElementById(`bulk-pcs-${i}`);
-        const weightCell = document.getElementById(`bulk-weight-${i}`);
-        if (pcsInput && weightCell) {
-            const isEditingThisWeight = (weightCell === activeEl);
-            const isLocked = weightCell.getAttribute('data-locked') === 'true' || (isEditingThisWeight && weightCell.value.trim() !== '');
-            if (!isLocked) {
-                const w = parseFloat(weightCell.tagName === 'INPUT' ? weightCell.value : weightCell.textContent) || 0;
-                ttlBulkWeight += w;
-            }
-        }
+    const restPcsEl = document.getElementById('bulk-rest-pcs');
+    const restWeightEl = document.getElementById('bulk-rest-weight');
+    const ttlPcsEl = document.getElementById('bulk-ttl-pcs');
+    const ttlWeightEl = document.getElementById('bulk-ttl-weight');
+
+    if (restPcsEl) {
+        restPcsEl.textContent = restPcs;
+        restPcsEl.classList.toggle('negative-rest', restPcs < 0);
     }
-
-    const bulkTtlPcsEl = document.getElementById('bulk-ttl-pcs');
-    const bulkTtlWghtEl = document.getElementById('bulk-ttl-weight');
-    if (bulkTtlPcsEl && bulkTtlPcsEl.textContent !== String(ttlBulkPcs)) bulkTtlPcsEl.textContent = String(ttlBulkPcs);
-    if (bulkTtlWghtEl && bulkTtlWghtEl.textContent !== String(ttlBulkWeight)) bulkTtlWghtEl.textContent = String(ttlBulkWeight);
-
-    const bulkRestPcs = targetPcs - ttlBulkPcs;
-    const bulkRestWeight = targetWeight - ttlBulkWeight;
-
-    const bulkRestPcsCell = document.getElementById('bulk-rest-pcs');
-    const bulkRestWghtCell = document.getElementById('bulk-rest-weight');
-
-    if (bulkRestPcsCell) {
-        if (bulkRestPcsCell.textContent !== String(bulkRestPcs)) bulkRestPcsCell.textContent = String(bulkRestPcs);
-        bulkRestPcsCell.classList.toggle('rest-balanced', bulkRestPcs === 0 && targetPcs > 0);
-        bulkRestPcsCell.classList.toggle('rest-overload', bulkRestPcs < 0);
+    if (restWeightEl) {
+        restWeightEl.textContent = (Math.round(restWeight * 100) / 100);
+        restWeightEl.classList.toggle('negative-rest', restWeight < 0);
     }
-    if (bulkRestWghtCell) {
-        if (bulkRestWghtCell.textContent !== String(bulkRestWeight)) bulkRestWghtCell.textContent = String(bulkRestWeight);
-        bulkRestWghtCell.classList.toggle('rest-balanced', bulkRestWeight === 0 && targetWeight > 0);
-        bulkRestWghtCell.classList.toggle('rest-overload', bulkRestWeight < 0);
-    }
+    if (ttlPcsEl) ttlPcsEl.textContent = totalPcs;
+    if (ttlWeightEl) ttlWeightEl.textContent = (Math.round(totalWeight * 100) / 100);
 }
 
-// Инициализация таблицы коммерческой загрузки (12 отсеков BULK)
 function initLoadPlanningData() {
-    const unifiedBody = document.getElementById('unified-load-tbody');
-    if (unifiedBody) {
-        if (unifiedBody.children.length === 0) {
-            unifiedBody.innerHTML = '';
-            for (let bulkNo = 1; bulkNo <= 12; bulkNo++) {
-                const tr = document.createElement('tr');
-                const bulkTabIndex = 10 + (bulkNo * 2) - 1;
-                const weightTabIndex = 10 + (bulkNo * 2);
-
-                tr.innerHTML = `
-                    <td colspan="2" style="text-align: center;"><strong>${bulkNo}</strong></td>
-                    <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-${bulkNo}" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="${bulkTabIndex}"></td>
-                    <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-${bulkNo}" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="${weightTabIndex}"></td>
-                `;
-                unifiedBody.appendChild(tr);
-            }
-        }
-    }
+    populateAircraftTailDropdown();
+    renderCompartmentsTable();
 
     const btnTransfer = document.getElementById('btn-transfer-preliminary');
     if (btnTransfer && !btnTransfer.dataset.hasLoadListener) {
         btnTransfer.dataset.hasLoadListener = 'true';
         btnTransfer.addEventListener('click', transferToPreliminary);
+    }
+    if (btnTransfer && !btnTransfer.dataset.hasTabListener) {
+        btnTransfer.dataset.hasTabListener = 'true';
         btnTransfer.addEventListener('keydown', (e) => {
             if (e.key === 'Tab' && !e.shiftKey) {
                 e.preventDefault();
-                const targetEl = document.getElementById('bulk-pcs-1');
-                if (targetEl) {
-                    targetEl.focus();
-                    if (typeof targetEl.select === 'function') targetEl.select();
+                const firstSelect = document.querySelector('#unified-load-tbody .bulk-type-select');
+                if (firstSelect) {
+                    firstSelect.focus();
                 }
             }
         });
     }
 
-    // Единая регистрация обработчиков для всех полей ввода таблицы загрузки (LIR и BULK)
-    document.querySelectorAll('.table-input').forEach(input => {
-        if (!input.dataset.hasKeyNavListener) {
+    ['lir-pax', 'lir-pcs', 'lir-weight'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input && !input.dataset.hasKeyNavListener) {
             input.dataset.hasKeyNavListener = 'true';
-
-            // Умное выделение: при первом клике или входе по Tab выделяем число для мгновенной замены,
-            // но при повторном клике внутри поля позволяем свободно ставить курсор в любую позицию
-            let isMouseDown = false;
-            input.addEventListener('mousedown', () => {
-                isMouseDown = (document.activeElement !== input);
-            });
-
-            input.addEventListener('focus', () => {
-                if (!isMouseDown) {
-                    input.select();
-                }
-            });
-
-            input.addEventListener('mouseup', () => {
-                if (isMouseDown) {
-                    isMouseDown = false;
-                    input.select();
-                }
-            });
-
-            input.addEventListener('keydown', (e) => {
-                if (['-', '+', 'e', 'E'].includes(e.key)) {
-                    e.preventDefault();
-                    return;
-                }
-                if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
-                    e.preventDefault();
-                    const curTab = parseInt(input.getAttribute('tabindex'), 10);
-                    if (curTab) {
-                        const nextEl = document.querySelector(`[tabindex="${curTab + 1}"]`);
-                        if (nextEl) {
-                            nextEl.focus();
-                            if (typeof nextEl.select === 'function') nextEl.select();
-                        } else {
-                            input.blur();
-                        }
-                    }
-                } else if (e.key === 'Tab' && e.shiftKey) {
-                    e.preventDefault();
-                    const curTab = parseInt(input.getAttribute('tabindex'), 10);
-                    if (curTab && curTab > 8) {
-                        const prevEl = document.querySelector(`[tabindex="${curTab - 1}"]`);
-                        if (prevEl) {
-                            prevEl.focus();
-                            if (typeof prevEl.select === 'function') prevEl.select();
-                        }
-                    }
-                }
-            });
-
+            input.addEventListener('focus', () => input.select());
             input.addEventListener('input', () => {
-                if (input.classList.contains('bulk-pcs-input')) {
-                    const bulkId = input.id.replace('bulk-pcs-', '');
-                    const weightInput = document.getElementById(`bulk-weight-${bulkId}`);
-                    // При любом изменении количества мест (ввод, стрелочки спиннера, очистка) сбрасываем фиксацию веса
-                    if (weightInput) {
-                        weightInput.removeAttribute('data-locked');
-                        weightInput.classList.remove('weight-locked');
-                    }
-                } else if (input.classList.contains('bulk-weight-input')) {
-                    if (input.value.trim() !== '' && input.value !== '0') {
-                        input.setAttribute('data-locked', 'true');
-                        input.classList.add('weight-locked');
-                    } else {
-                        input.removeAttribute('data-locked');
-                        input.classList.remove('weight-locked');
-                    }
-                }
-
                 recalculateLoadPlanning();
                 debouncedSaveCompartmentsToPrediction();
             });
-
-            ['change', 'blur'].forEach(evt => {
-                input.addEventListener(evt, () => {
-                    let v = input.value.trim();
-                    if (v === '' || isNaN(v) || parseFloat(v) < 0) {
-                        input.value = '0';
-                    } else {
-                        if (input.id === 'lir-weight') {
-                            input.value = String(parseFloat(v));
-                        } else {
-                            input.value = String(parseInt(v, 10));
-                        }
-                    }
-
-                    if (input.classList.contains('bulk-pcs-input')) {
-                        const bulkId = input.id.replace('bulk-pcs-', '');
-                        const weightInput = document.getElementById(`bulk-weight-${bulkId}`);
-                        if (weightInput) {
-                            weightInput.removeAttribute('data-locked');
-                            weightInput.classList.remove('weight-locked');
-                        }
-                    } else if (input.classList.contains('bulk-weight-input') && input.value === '0') {
-                        input.removeAttribute('data-locked');
-                        input.classList.remove('weight-locked');
-                    }
-
-                    recalculateLoadPlanning();
-                    saveCompartmentsToPrediction();
-                });
+            input.addEventListener('change', () => {
+                let v = input.value.trim();
+                if (v === '' || isNaN(v) || parseFloat(v) < 0) {
+                    input.value = '0';
+                } else {
+                    input.value = (id === 'lir-weight') ? String(parseFloat(v)) : String(parseInt(v, 10));
+                }
+                recalculateLoadPlanning();
+                saveCompartmentsToPrediction();
             });
         }
     });
@@ -2772,6 +3817,9 @@ function initLoadPlanningData() {
 
 // --- ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ---
 document.addEventListener('DOMContentLoaded', async () => {
+    if (typeof window !== 'undefined') {
+        window.name = 'AeroBag_Workspace';
+    }
     loadSettings();
     
     const versionTag = document.getElementById('app-version-tag');
@@ -2790,7 +3838,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     await loadBaggageDb();
+    await loadFleetWb();
     loadPredictionsHistory();
+    initDefaultCompartmentsState();
+    renderCompartmentsTable();
     
     // Автоматическая аутентификация пользователя и разграничение прав
     await checkAuthStatus();
@@ -2806,89 +3857,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupDatePickerTrigger();
     initAviationModal();
     initLoadPlanningData();
-    initAeroPlanUrlIntegration();
+
+    // Обработка параметров рейса из внешней системы (AeroPlan W&B)
+    checkIncomingFlightParameters();
+
+    // Автоматическая сверка времени вылета рейсов с суточным планом AeroPlan
+    syncFlightTimesWithAeroPlan();
 });
-
-// Интеграция параметров вызова из суточного плана AeroPlan W&B
-function handleReturnToPlan() {
-    const returnUrl = sessionStorage.getItem('aerobag_return_url');
-    if (returnUrl) {
-        window.location.href = returnUrl;
-    } else if (window.history.length > 1) {
-        window.history.back();
-    } else {
-        window.location.href = '/plan/';
-    }
-}
-
-function initAeroPlanUrlIntegration() {
-    try {
-        const params = new URLSearchParams(window.location.search);
-        const returnUrl = params.get('return_url') || sessionStorage.getItem('aerobag_return_url');
-        if (returnUrl) {
-            sessionStorage.setItem('aerobag_return_url', returnUrl);
-            const btn = document.getElementById('btnBackToPlan');
-            if (btn) btn.style.display = 'inline-flex';
-        }
-
-        const flt = params.get('flight') || params.get('flight_no');
-        const from = params.get('from');
-        const to = params.get('to');
-        const date = params.get('date');
-        const pax = params.get('pax');
-
-        if (flt) {
-            const fltInp = document.getElementById('select-flight');
-            if (fltInp) fltInp.value = flt;
-        }
-        if (date) {
-            const dateInp = document.getElementById('input-date');
-            if (dateInp) dateInp.value = date;
-        }
-        if (pax) {
-            const paxInp = document.getElementById('input-pax');
-            if (paxInp) paxInp.value = pax;
-        }
-
-        if (from) {
-            const selectFrom = document.getElementById('select-from');
-            const selectTo = document.getElementById('select-to');
-            if (selectFrom) {
-                let foundFromVal = '';
-                for (let i = 0; i < selectFrom.options.length; i++) {
-                    const opt = selectFrom.options[i];
-                    if (opt.value === from || (typeof ruToIata === 'function' && ruToIata(opt.value) === from) || (typeof iataToRu === 'function' && iataToRu(opt.value) === from) || opt.text.includes(from)) {
-                        foundFromVal = opt.value;
-                        break;
-                    }
-                }
-                if (foundFromVal) {
-                    selectFrom.value = foundFromVal;
-                    selectFrom.dispatchEvent(new Event('change'));
-
-                    if (to && selectTo) {
-                        setTimeout(() => {
-                            let foundToVal = '';
-                            for (let j = 0; j < selectTo.options.length; j++) {
-                                const optTo = selectTo.options[j];
-                                if (optTo.value === to || (typeof ruToIata === 'function' && ruToIata(optTo.value) === to) || (typeof iataToRu === 'function' && iataToRu(optTo.value) === to) || optTo.text.includes(to)) {
-                                    foundToVal = optTo.value;
-                                    break;
-                                }
-                            }
-                            if (foundToVal) {
-                                selectTo.value = foundToVal;
-                                selectTo.dispatchEvent(new Event('change'));
-                            }
-                        }, 80);
-                    }
-                }
-            }
-        }
-    } catch (e) {
-        console.warn('[AeroBag] Ошибка инициализации параметров AeroPlan:', e);
-    }
-}
 
 // Загрузка настроек темы и языка
 function loadSettings() {
@@ -4114,10 +5089,7 @@ function populateAirportDropdowns() {
 
 // Получение числовой части номера рейса без префиксов авиакомпаний (N4, EO, KL и т.д.)
 function getNumericFlightNo(fltStr) {
-    if (!fltStr) return '';
-    const clean = String(fltStr).trim().toUpperCase().replace(/^(N4|EO|KL|КЛ|Н4|ЕО)\s*[-]?\s*/i, '');
-    const m = clean.match(/\d+/);
-    return m ? m[0] : String(fltStr).replace(/\D+/g, '');
+    return extractNumericFlightNumber(fltStr);
 }
 
 // Поиск маршрута вылета/прилета по номеру рейса (возвращает ИАТА коды)
@@ -4174,6 +5146,16 @@ function applyRouteSelection(route) {
         }
     }
 
+    // Если аэропорта вылета нет в текущих опциях, динамически добавляем его
+    if (!fromOptionFound && targetFromIata) {
+        const opt = document.createElement('option');
+        opt.value = targetFromIata;
+        opt.textContent = targetFromIata;
+        selectFrom.appendChild(opt);
+        selectFrom.value = targetFromIata;
+        fromOptionFound = true;
+    }
+
     // 2. Генерация списка прилетов и выбор аэропорта прилета
     if (fromOptionFound) {
         selectFrom.dispatchEvent(new Event('change'));
@@ -4188,7 +5170,20 @@ function applyRouteSelection(route) {
                 break;
             }
         }
+
+        // Если целевой аэропорт прилета отсутствует в списке направлений для данного вылета,
+        // гарантированно создаем для него опцию и выбираем ее
+        if (!toOptionFound && targetToIata) {
+            const opt = document.createElement('option');
+            opt.value = targetToIata;
+            opt.textContent = targetToIata;
+            selectTo.appendChild(opt);
+            selectTo.value = targetToIata;
+            toOptionFound = true;
+        }
+
         isAutoSelectingRoute = false;
+        selectTo.dispatchEvent(new Event('change'));
         updateDefaultPaxForSelectedFlight();
         return toOptionFound;
     }
@@ -4252,13 +5247,26 @@ function getAveragePaxForFlight(flightNo = '', fromVal = '', toVal = '') {
 }
 
 // Автоподстановка среднего числа пассажиров в поле input-pax
-function updateDefaultPaxForSelectedFlight() {
+function updateDefaultPaxForSelectedFlight(force = false) {
     const inputPax = document.getElementById('input-pax');
     const selectFlight = document.getElementById('select-flight');
     const selectFrom = document.getElementById('select-from');
     const selectTo = document.getElementById('select-to');
 
     if (!inputPax) return;
+
+    // 1. Если количество пассажиров передано из AeroPlan, СТРОГО сохраняем его!
+    if (currentIncomingFlightData && currentIncomingFlightData.pax && parseInt(currentIncomingFlightData.pax, 10) > 0) {
+        inputPax.value = currentIncomingFlightData.pax;
+        updatePaxExpectedHint();
+        return;
+    }
+
+    // 2. Если пользователь уже ввёл значение PAX вручную (отличное от 150), не сбрасываем при blur или подтверждении рейса
+    const currentVal = parseInt(inputPax.value, 10);
+    if (!force && currentVal > 0 && currentVal !== 150) {
+        return;
+    }
 
     const flightVal = selectFlight ? selectFlight.value.trim() : '';
     const fromVal = selectFrom ? selectFrom.value : '';
@@ -4624,21 +5632,35 @@ function setupEventListeners() {
         }
 
         const availableTos = new Set();
-        const fromIata = ruToIata(fromVal);
+        const fromIata = ruToIata(fromVal) || fromVal;
         
         // Из правил (ИАТА)
-        baggageDb.rules.forEach(rule => {
-            if (rule.from === fromIata) {
-                availableTos.add(iataToRu(rule.to));
-            }
-        });
+        if (baggageDb && baggageDb.rules) {
+            baggageDb.rules.forEach(rule => {
+                if (rule.from === fromIata) {
+                    availableTos.add(iataToRu(rule.to) || rule.to);
+                }
+            });
+        }
 
-        // Из загруженных
-        userFlights.forEach(flight => {
-            if (ruToIata(flight.from) === ruToIata(fromVal)) {
-                availableTos.add(flight.to);
-            }
-        });
+        // Из загруженных рейсов
+        if (userFlights && userFlights.length > 0) {
+            userFlights.forEach(flight => {
+                if (ruToIata(flight.from) === fromIata || flight.from === fromIata) {
+                    availableTos.add(flight.to);
+                }
+            });
+        }
+
+        // Если для данного вылета нет связанных направлений в правилах или базе рейсов,
+        // предоставляем доступ ко всем известным направлениям из базы аэропортов
+        if (availableTos.size === 0 && baggageDb && baggageDb.airports) {
+            Object.values(baggageDb.airports).forEach(ap => {
+                if (ap && ap.iata && ap.iata !== fromIata) {
+                    availableTos.add(ap.ru || ap.iata);
+                }
+            });
+        }
 
         selectTo.innerHTML = '';
         const defaultToOpt = document.createElement('option');
@@ -4649,9 +5671,10 @@ function setupEventListeners() {
         Array.from(availableTos)
             .map(toRu => {
                 const ap = baggageDb.airports[toRu] || Object.values(baggageDb.airports).find(a => a.iata === ruToIata(toRu));
-                const iata = ap ? ap.iata : ruToIata(toRu);
+                const iata = ap ? ap.iata : (ruToIata(toRu) || toRu);
                 return { toRu, iata };
             })
+            .filter(item => item.iata && item.iata !== fromIata)
             .sort((a, b) => a.iata.localeCompare(b.iata))
             .forEach(({ toRu, iata }) => {
                 const opt = document.createElement('option');
@@ -4931,6 +5954,31 @@ function setupEventListeners() {
             createServerBackupNow();
         });
     }
+
+    // Межвкладочная авто-синхронизация времен вылета рейсов из AeroPlan (Storage Event & Focus)
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'aeroplan_shift_journal_active_flights' || (e.key && e.key.startsWith('averago_predictions_history_'))) {
+            if (e.key && e.key.startsWith('averago_predictions_history_') && e.key === getUserHistoryStorageKey()) {
+                loadPredictionsHistory();
+            } else {
+                try {
+                    const updatedFlights = e.newValue ? JSON.parse(e.newValue) : null;
+                    if (Array.isArray(updatedFlights)) {
+                        syncFlightTimesWithAeroPlan(updatedFlights);
+                    }
+                } catch (err) {}
+            }
+        }
+    });
+
+    window.addEventListener('focus', () => {
+        syncFlightTimesWithAeroPlan();
+    });
+
+    // Фоновая периодическая сверка раз в 60 секунд
+    setInterval(() => {
+        syncFlightTimesWithAeroPlan();
+    }, 60000);
 }
 
 // Автоматическая/ручная загрузка системной статистики stats_july.xls
@@ -6809,6 +7857,24 @@ function calculateBaggageForecast(logToHistory = false) {
         const dateInputEl = document.getElementById('input-date');
         const targetDateVal = dateInputEl ? dateInputEl.value : '';
 
+        // Формируем отсеки сразу под физическую конфигурацию борта
+        const targetTail = currentIncomingFlightData.ac_num || '';
+        const tailCfg = getAircraftCompartmentConfig(targetTail);
+        let initPositions = [];
+        if (tailCfg.isWidebody) {
+            initPositions = tailCfg.aft.map(n => ({ name: n, sec: 'AFT' }));
+        } else {
+            initPositions = [...tailCfg.fwd.map(n => ({ name: n, sec: 'FWD' })), ...tailCfg.aft.map(n => ({ name: n, sec: 'AFT' }))];
+        }
+        const initialCompartments = initPositions.map((pos, idx) => ({
+            cpt: idx + 1,
+            name: pos.name,
+            section: pos.sec,
+            rows: [
+                { type: 'B', pcs: 0, weight: 0, locked: false }
+            ]
+        }));
+
         const prediction = {
             id: 'pred_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
             from: fromVal,
@@ -6821,24 +7887,33 @@ function calculateBaggageForecast(logToHistory = false) {
             hb_weight: expectedHb,
             flight_date: targetDateVal || new Date().toISOString().split('T')[0],
             calc_date: new Date().toISOString(),
+            dep_time: currentIncomingFlightData.dep_time || '',
+            ac_num: targetTail,
+            show_fwd: false,
             pax_mode: isBookingMode ? 'booking_97' : 'fact_100',
             waterfall_level: coefs.level || 1,
             lir_pax: effectivePaxVal,
             lir_pcs: expectedPcs,
             lir_weight: expectedWeight,
-            compartments: Array.from({ length: 12 }, () => ({ pcs: 0, weight: 0, locked: false }))
+            compartments: initialCompartments,
+            crew: currentIncomingFlightData.crew || '',
+            galley: currentIncomingFlightData.galley || 'D',
+            dow: currentIncomingFlightData.dow || '',
+            doi: currentIncomingFlightData.doi || '',
+            fuel_block: currentIncomingFlightData.to_fuel || '',
+            fuel_trip: currentIncomingFlightData.trip_fuel || ''
         };
         predictionsHistory.unshift(prediction);
         savePredictionsHistory();
         renderPredictionsTable();
 
-        // Если в плане загрузки уже открыт конкретный рейс, сохраняем его выделение;
-        // если план чист, подсвечиваем новый расчет
-        if (currentActivePredictionId) {
-            highlightPredictionRow(currentActivePredictionId);
-        } else {
-            highlightPredictionRow(prediction.id);
-        }
+        // СТРОГО устанавливаем только что рассчитанный рейс текущим активным!
+        currentActivePredictionId = prediction.id;
+        highlightPredictionRow(prediction.id);
+
+        // Обновляем бейдж и отсеки под этот расчет в правой колонке
+        updateActiveFlightBadge(prediction.from, prediction.to, prediction.flight_no, prediction.flight_date, prediction.ac_num, prediction.dep_time);
+        applyAircraftCompartmentConfig(prediction.ac_num, false, prediction.compartments);
     }
 }
 
@@ -7678,8 +8753,6 @@ function handleExportDatabase() {
 function handleImportDatabase(file) {
     if (!file) return;
 
-    // Если пользователь выбрал Excel-файл (.xls/.xlsx) через кнопку импорта базы,
-    // автоматически направляем его в обработчик таблиц регистрации
     const lowerName = (file.name || '').toLowerCase();
     if (lowerName.endsWith('.xls') || lowerName.endsWith('.xlsx')) {
         handleUploadedFiles([file]);
@@ -7971,15 +9044,198 @@ function renderFlightsTable() {
 }
 
 // --- ОТРИСОВКА ТАБЛИЦЫ ПРОГНОЗОВ (История прогнозирования) ---
+
+// Нормализация и форматирование времени вылета (ЧЧ:ММ)
+function normalizeTimeString(timeStr) {
+    if (!timeStr) return '';
+    let clean = String(timeStr).trim().replace(/[^\d:]/g, '');
+    if (!clean) return '';
+    if (clean.includes(':')) {
+        const parts = clean.split(':');
+        let h = parseInt(parts[0], 10);
+        let m = parseInt(parts[1], 10);
+        if (isNaN(h)) h = 0;
+        if (isNaN(m)) m = 0;
+        h = Math.max(0, Math.min(23, h));
+        m = Math.max(0, Math.min(59, m));
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    if (clean.length === 3) {
+        clean = '0' + clean;
+    }
+    if (clean.length === 4) {
+        let h = parseInt(clean.slice(0, 2), 10);
+        let m = parseInt(clean.slice(2, 4), 10);
+        if (isNaN(h)) h = 0;
+        if (isNaN(m)) m = 0;
+        h = Math.max(0, Math.min(23, h));
+        m = Math.max(0, Math.min(59, m));
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    return clean;
+}
+
+// Сортировка истории расчетов по времени вылета: от самого ближайшего к самому позднему
+function sortPredictionsHistoryByDepTime() {
+    if (!predictionsHistory || predictionsHistory.length <= 1) return;
+
+    predictionsHistory.sort((a, b) => {
+        const timeA = normalizeTimeString(a.dep_time);
+        const timeB = normalizeTimeString(b.dep_time);
+
+        if (!timeA && !timeB) {
+            return new Date(b.calc_date || 0) - new Date(a.calc_date || 0);
+        }
+        if (!timeA) return 1;
+        if (!timeB) return -1;
+
+        const dateA = a.flight_date ? String(a.flight_date).split('T')[0] : '';
+        const dateB = b.flight_date ? String(b.flight_date).split('T')[0] : '';
+
+        if (dateA && dateB && dateA !== dateB) {
+            const dateCmp = dateA.localeCompare(dateB);
+            if (dateCmp !== 0) return dateCmp;
+        }
+
+        const [hA, mA] = timeA.split(':').map(n => parseInt(n, 10) || 0);
+        const [hB, mB] = timeB.split(':').map(n => parseInt(n, 10) || 0);
+        const minsA = hA * 60 + mA;
+        const minsB = hB * 60 + mB;
+
+        if (minsA !== minsB) {
+            return minsA - minsB;
+        }
+
+        return String(a.flight_no).localeCompare(String(b.flight_no));
+    });
+}
+
+// Сквозная авто-синхронизация времен вылета рейсов из AeroPlan (Авиабит)
+async function syncFlightTimesWithAeroPlan(explicitFlights = null) {
+    let flights = explicitFlights;
+    if (!flights || !Array.isArray(flights) || flights.length === 0) {
+        // 1. Проверяем LocalStorage (общая активная смена AeroPlan на домене boostandgo.ru)
+        try {
+            const raw = localStorage.getItem('aeroplan_shift_journal_active_flights');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    flights = parsed;
+                }
+            }
+        } catch (e) {}
+    }
+
+    if (!flights || !Array.isArray(flights) || flights.length === 0) {
+        // 2. Если в LocalStorage рейсов нет, запрашиваем активную смену с сервера AeroPlan
+        try {
+            const isTest = window.location.pathname.includes('_test') || window.location.pathname.includes('-test') || window.location.href.includes('8080');
+            const apiEndpoint = isTest ? 'https://boostandgo.ru/plan_test/api/shift/current' : 'https://boostandgo.ru/plan/api/shift/current';
+            const res = await fetch(apiEndpoint, { cache: 'no-store' });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && Array.isArray(data.flights)) {
+                    flights = data.flights;
+                }
+            }
+        } catch (e) {}
+    }
+
+    if (!flights || !Array.isArray(flights) || flights.length === 0) return 0;
+    if (!predictionsHistory || predictionsHistory.length === 0) return 0;
+
+    const normalizeDateStr = (d) => {
+        if (!d) return '';
+        const s = String(d).trim().split('T')[0];
+        if (s.includes('-')) {
+            const p = s.split('-');
+            if (p.length === 3 && p[0].length === 4) return `${p[2].padStart(2, '0')}.${p[1].padStart(2, '0')}`;
+        }
+        if (s.includes('.')) {
+            const p = s.split('.');
+            if (p.length >= 2) return `${p[0].padStart(2, '0')}.${p[1].padStart(2, '0')}`;
+        }
+        return s;
+    };
+
+    const extractFltNum = (flt) => {
+        if (!flt) return '';
+        const m = String(flt).replace(/\D/g, '');
+        return m ? String(parseInt(m, 10)) : '';
+    };
+
+    let updatedCount = 0;
+
+    predictionsHistory.forEach(p => {
+        const pNum = extractFltNum(p.flight_no);
+        if (!pNum) return;
+        const pDate = normalizeDateStr(p.flight_date || p.calc_date);
+
+        const match = flights.find(f => {
+            const fNum = extractFltNum(f.flight);
+            if (fNum !== pNum) return false;
+            const fDate = normalizeDateStr(f.flight_date);
+            if (pDate && fDate && pDate !== fDate) return false;
+            return true;
+        });
+
+        if (match) {
+            const newTime = normalizeTimeString(match.time || match.departure_time);
+            const oldTime = normalizeTimeString(p.dep_time);
+            if (newTime && newTime !== oldTime) {
+                p.dep_time = newTime;
+                updatedCount++;
+
+                // Если открыт этот рейс в интерфейсе, обновляем бейдж и поле
+                if (currentActivePredictionId === p.id) {
+                    currentIncomingFlightData.dep_time = newTime;
+                    updateActiveFlightBadge(p.from, p.to, p.flight_no, p.flight_date || p.calc_date, p.ac_num, newTime);
+                }
+            }
+        }
+    });
+
+    if (updatedCount > 0) {
+        savePredictionsHistory();
+        sortPredictionsHistoryByDepTime();
+        renderPredictionsTable();
+        console.log(`[AeroBag] Автоматически обновлено время вылета для ${updatedCount} рейсов из AeroPlan`);
+    }
+
+    return updatedCount;
+}
+
+// Изменение времени вылета вручную прямо в строке истории
+function handleHistoryTimeChange(predId, rawTime) {
+    if (!predId) return;
+    const p = predictionsHistory.find(item => item.id === predId);
+    if (!p) return;
+
+    const formatted = normalizeTimeString(rawTime);
+    p.dep_time = formatted;
+
+    savePredictionsHistory();
+    sortPredictionsHistoryByDepTime();
+    renderPredictionsTable();
+
+    if (currentActivePredictionId === predId) {
+        currentIncomingFlightData.dep_time = formatted;
+        updateActiveFlightBadge(p.from, p.to, p.flight_no, p.flight_date || p.calc_date, p.ac_num, formatted);
+    }
+}
+
 function renderPredictionsTable() {
     const tbody = document.getElementById('predictions-table-body');
     if (!tbody) return;
+
+    // Автоматическая сортировка по времени вылета (от ближайшего к позднему)
+    sortPredictionsHistoryByDepTime();
 
     tbody.innerHTML = '';
 
     if (predictionsHistory.length === 0) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="8" class="empty-table-text">${translations[currentLang]['empty-predictions-table']}</td>`;
+        tr.innerHTML = `<td colspan="5" class="empty-table-text">${translations[currentLang]['empty-predictions-table']}</td>`;
         tbody.appendChild(tr);
         return;
     }
@@ -7991,7 +9247,7 @@ function renderPredictionsTable() {
         tr.title = currentLang === 'ru' ? 'Нажмите для переноса в Средний вес багажа и данные загрузки' : 'Click to transfer to Load Planning';
 
         tr.addEventListener('click', (e) => {
-            if (e.target.closest('.btn-delete-row')) return;
+            if (e.target.closest('.btn-delete-row') || e.target.closest('.dep-time-input')) return;
             transferPredictionToPreliminary(p.id);
         });
         
@@ -8009,31 +9265,40 @@ function renderPredictionsTable() {
             }
         }
 
-        // Форматирование даты и времени расчета
-        let formattedCalcDate = '';
-        try {
-            const d = new Date(p.calc_date);
-            const day = String(d.getDate()).padStart(2, '0');
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const hours = String(d.getHours()).padStart(2, '0');
-            const minutes = String(d.getMinutes()).padStart(2, '0');
-            formattedCalcDate = `${day}.${month} ${hours}:${minutes}`;
-        } catch (e) {
-            formattedCalcDate = p.calc_date;
-        }
+        const routeText = `${ruToIata(p.from)} ➔ ${ruToIata(p.to)}`;
+        const tailDisplay = p.ac_num ? `RA-${normalizeTailNumber(p.ac_num)}` : '—';
+        const currentTimeVal = p.dep_time || '';
 
         tr.innerHTML = `
-            <td><strong>${ruToIata(p.from)} ➔ ${ruToIata(p.to)}</strong></td>
-            <td><strong>${p.flight_no}</strong><span class="flight-day-tag">${flightDayMonthStr}</span></td>
-            <td>${p.pax}</td>
-            <td>${p.bag_pcs}</td>
-            <td>${p.bag_weight} кг</td>
-            <td>${p.hb_weight} кг</td>
-            <td>${formattedCalcDate}</td>
-            <td>
-                <button class="btn-delete-row" title="Удалить" onclick="deletePrediction('${p.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
+            <td class="history-cell-route" title="${routeText}"><strong>${routeText}</strong></td>
+            <td class="history-cell-flight"><strong>${p.flight_no}</strong><span class="flight-day-tag">${flightDayMonthStr}</span></td>
+            <td class="history-cell-time" title="${currentLang === 'ru' ? 'Время вылета (нажмите для изменения)' : 'Departure Time (click to edit)'}">
+                <input type="text" class="dep-time-input monospace-val" value="${currentTimeVal}" placeholder="--:--" maxlength="5" />
+            </td>
+            <td class="history-cell-tail" title="${currentLang === 'ru' ? 'Бортовой номер' : 'Aircraft Tail'}">${tailDisplay}</td>
+            <td class="history-cell-action">
+                <button class="btn-delete-row" title="${currentLang === 'ru' ? 'Удалить' : 'Delete'}" onclick="deletePrediction('${p.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
             </td>
         `;
+
+        // Обработчик интерактивного изменения времени в инпуте
+        const timeInp = tr.querySelector('.dep-time-input');
+        if (timeInp) {
+            timeInp.addEventListener('click', (e) => e.stopPropagation());
+            timeInp.addEventListener('mousedown', (e) => e.stopPropagation());
+            timeInp.addEventListener('pointerdown', (e) => e.stopPropagation());
+            timeInp.addEventListener('focus', (e) => e.target.select());
+            timeInp.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.target.blur();
+                }
+            });
+            timeInp.addEventListener('change', (e) => {
+                handleHistoryTimeChange(p.id, e.target.value);
+            });
+        }
+
         tbody.appendChild(tr);
     });
 
@@ -8043,16 +9308,16 @@ function renderPredictionsTable() {
 }
 
 // Вспомогательная функция обновления верхней инфо-плашки активного рейса в таблице загрузки
-function updateActiveFlightBadge(from, to, flightNo, flightDate) {
+function updateActiveFlightBadge(from, to, flightNo, flightDate, acNum, depTime) {
     const badgeEl = document.getElementById('active-flight-badge');
     const badgeRoute = document.getElementById('badge-route');
     const badgeFlightNo = document.getElementById('badge-flight-no');
     const badgeFlightDate = document.getElementById('badge-flight-date');
 
-    if (!badgeEl || !from || !to) return;
+    if (!badgeEl) return;
 
-    const fromIata = ruToIata(from) || from;
-    const toIata = ruToIata(to) || to;
+    const fromIata = (from ? ruToIata(from) : '') || from || '';
+    const toIata = (to ? ruToIata(to) : '') || to || '';
 
     let dateTag = '';
     if (flightDate) {
@@ -8064,9 +9329,23 @@ function updateActiveFlightBadge(from, to, flightNo, flightDate) {
         } catch (e) {}
     }
 
-    if (badgeRoute) badgeRoute.textContent = `${fromIata} ➔ ${toIata}`;
-    if (badgeFlightNo) badgeFlightNo.textContent = flightNo || '';
+    if (badgeRoute) badgeRoute.textContent = (fromIata && toIata) ? `${fromIata} ➔ ${toIata}` : (fromIata || toIata || '—');
+    if (badgeFlightNo) badgeFlightNo.textContent = flightNo || '—';
     if (badgeFlightDate) badgeFlightDate.textContent = dateTag;
+
+    let badgeTail = document.getElementById('badge-tail-no');
+    const cleanTail = normalizeTailNumber(acNum);
+    if (cleanTail) {
+        if (!badgeTail) {
+            badgeTail = document.createElement('span');
+            badgeTail.id = 'badge-tail-no';
+            badgeTail.className = 'badge-tail-no';
+            badgeEl.appendChild(badgeTail);
+        }
+        badgeTail.textContent = ` [RA-${cleanTail}]`;
+    } else if (badgeTail) {
+        badgeTail.textContent = '';
+    }
 
     badgeEl.classList.remove('hidden');
 }

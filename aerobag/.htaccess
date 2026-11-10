@@ -1,0 +1,28 @@
+# Отключение кэширования для HTML, HTM и JSON файлов
+<FilesMatch "\.(html|htm|json)$">
+    FileETag None
+    <IfModule mod_headers.c>
+        Header unset ETag
+        Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "Wed, 11 Jan 1984 05:00:00 GMT"
+    </IfModule>
+</FilesMatch>
+
+# Кэширование статических ресурсов с контролем версий через GET-параметры (?v=...)
+<FilesMatch "\.(css|js|svg|png|jpg|jpeg|gif|ico|woff|woff2|ttf)$">
+    <IfModule mod_headers.c>
+        Header set Cache-Control "max-age=31536000, public"
+    </IfModule>
+</FilesMatch>
+
+# Защита чувствительных конфигурационных файлов и фоновых скриптов от прямого чтения
+<FilesMatch "^(db_config\.php|db_config\.example\.php|cron_backup\.php|\.env|\.git)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Deny,Allow
+        Deny from all
+    </IfModule>
+</FilesMatch>

@@ -1,20 +1,25 @@
 @echo off
-chcp 65001 > nul
-title AeroPlan 2.0 - Создание ярлыка
+title AeroPlan 2.0 - Shortcut Creator
 color 0B
 cls
-
-echo ======================================================================
-echo          [ AEROPLAN 2.0 : СОЗДАНИЕ ЯРЛЫКА НА РАБОЧЕМ СТОЛЕ ]
-echo ======================================================================
-echo.
-
 cd /d "%~dp0"
-powershell -ExecutionPolicy Bypass -File "create_shortcut.ps1"
 
-echo.
-echo ======================================================================
-echo Ярлык "AeroPlan 2.0" успешно создан на вашем Рабочем Столе!
-echo ======================================================================
-timeout /t 3 > nul
-exit
+cscript //nologo "create_shortcut.vbs"
+
+if %errorlevel% equ 0 (
+    color 0A
+    echo.
+    echo ======================================================================
+    echo  [SUCCESS] Desktop shortcut 'AeroPlan 2.0' created successfully!
+    echo ======================================================================
+    echo.
+) else (
+    color 0E
+    echo.
+    echo ======================================================================
+    echo  [NOTE] 'AeroPlan 2.0.lnk' is created in the program folder.
+    echo  You can manually copy it to your Desktop.
+    echo ======================================================================
+    echo.
+)
+pause

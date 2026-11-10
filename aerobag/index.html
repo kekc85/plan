@@ -45,7 +45,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=v12.0.197">
+<link rel="stylesheet" href="style.css?v=v12.2.30">
 </head>
 <body>
     <script>
@@ -69,7 +69,6 @@
         <!-- Шапка в стиле Airline Ops Dispatcher -->
         <header class="app-header glass aviation-header">
             <div class="header-left">
-                <button type="button" id="btnBackToPlan" class="btn-back-to-origin" style="display: none;" onclick="handleReturnToPlan()" title="Вернуться в суточный план AeroPlan">↩ В AeroPlan</button>
                 <div class="header-logo">
                     <span class="logo-plane">✈️</span>
                     <span class="logo-accent">AeroBag</span> Predictor
@@ -80,6 +79,11 @@
                     <span class="status-text" id="status-text-label" data-translate="status-dispatch">ДИСПЕТЧЕР ОНЛАЙН</span>
                     <span id="header-server-ping" class="status-ping-badge ping-fast" title="Скорость соединения с сервером (Ping)">⚡ 1ms</span>
                 </div>
+                <a href="#" id="btn-return-aeroplan" class="header-plan-pill" title="Вернуться в суточный план смены AeroPlan" onclick="handleReturnToAeroPlan(event)">
+                    <span class="pill-icon">📋</span>
+                    <span class="pill-text" data-translate="btn-return-plan">AeroPlan W&B</span>
+                    <span class="pill-arrow">↗</span>
+                </a>
             </div>
 
             <div class="header-actions">
@@ -126,6 +130,47 @@
             <!-- ВКЛАДКА 1: ПРОГНОЗИРОВАНИЕ -->
             <div id="tab-content-predict" class="tab-content active">
                 <div class="workspace-grid">
+                    <!-- Колонка 1 (Слева): История расчетов прогнозов -->
+                    <div class="history-column">
+                        <section class="panel glass table-section history-predictions-section aviation-panel">
+                            <div class="hud-corner top-left"></div>
+                            <div class="hud-corner top-right"></div>
+                            <div class="hud-corner bottom-left"></div>
+                            <div class="hud-corner bottom-right"></div>
+                            
+                            <div class="table-header-container history-header-container">
+                                <h2 class="panel-title" data-translate="predictions-table-title">[ FORECAST HISTORY ]</h2>
+                                <div class="table-actions">
+                                    <button type="button" id="btn-clear-predictions" class="btn btn-danger aviation-btn btn-clear-history-compact" data-translate="btn-clear-predictions" onclick="handleClearPredictions(event)" title="Очистить историю расчетов">Очистить</button>
+                                </div>
+                            </div>
+                            <div class="predictions-table-responsive-compact">
+                                <table id="predictions-table" class="flights-table aviation-table predictions-compact-table">
+                                    <colgroup>
+                                        <col style="width: 29%;">
+                                        <col style="width: 25%;">
+                                        <col style="width: 18%;">
+                                        <col style="width: 20%;">
+                                        <col style="width: 8%;">
+                                    </colgroup>
+                                    <thead>
+                                        <tr>
+                                            <th data-translate="th-route">Маршрут</th>
+                                            <th data-translate="th-flight-date">Рейс / Дата</th>
+                                            <th data-translate="th-dep-time" style="text-align: center;">Вылет</th>
+                                            <th data-translate="th-tail" style="text-align: center;">Борт</th>
+                                            <th style="text-align: center;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="predictions-table-body">
+                                        <tr>
+                                            <td colspan="5" class="empty-table-text" data-translate="empty-predictions-table">История пуста.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
                     <!-- Левая панель: Форма прогноза -->
                     <div class="left-column">
                         <section class="panel glass aviation-panel">
@@ -383,9 +428,9 @@
                                 <tr class="header-main-title">
                                     <th colspan="6" class="title-cell title-cell-relative">
                                         <div id="active-flight-badge" class="active-flight-badge hidden">
-                                            <span id="badge-route" class="badge-route">SUI ➔ SVO</span>
-                                            <span id="badge-flight-no" class="badge-flight-no">1294</span>
-                                            <span id="badge-flight-date" class="badge-flight-date">/05.08</span>
+                                            <span id="badge-route" class="badge-route"></span>
+                                            <span id="badge-flight-no" class="badge-flight-no"></span>
+                                            <span id="badge-flight-date" class="badge-flight-date"></span>
                                         </div>
                                         <div class="load-title-text" data-translate="load-planning-title">[ СРЕДНИЙ ВЕС БАГАЖА И ДАННЫЕ ЗАГРУЗКИ ]</div>
                                     </th>
@@ -413,173 +458,100 @@
                                 <!-- Строка 2: LIR OR FINAL -->
                                 <tr class="lir-row">
                                     <td><strong data-translate="row-lir-final" class="cat-label">LIR OR FINAL</strong></td>
-                                    <td style="text-align: center;"><input type="number" id="lir-pax" class="form-control table-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="8"></td>
-                                    <td style="text-align: center;"><input type="number" id="lir-pcs" class="form-control table-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="9"></td>
-                                    <td style="text-align: center;"><input type="number" id="lir-weight" class="form-control table-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="10"></td>
+                                    <td style="text-align: center;"><input type="number" id="lir-pax" class="form-control table-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="100"></td>
+                                    <td style="text-align: center;"><input type="number" id="lir-pcs" class="form-control table-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="101"></td>
+                                    <td style="text-align: center;"><input type="number" id="lir-weight" class="form-control table-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="102"></td>
                                 </tr>
 
-                                <!-- Разделитель: BULK (БАГАЖНИКИ) -->
-                                <tr class="header-sub-title">
-                                    <th colspan="6" class="subtitle-cell" data-translate="header-bulk" style="text-align: center; font-size: 1.1rem; font-weight: 800; letter-spacing: 2px;">BULK (БАГАЖНИКИ)</th>
-                                </tr>
-                                <tr class="header-subcols">
-                                    <th colspan="2" style="text-align: center;" data-translate="th-cpt-sec">ОТСЕК</th>
-                                    <th colspan="2" style="text-align: center;" data-translate="th-pcs">МЕСТА</th>
-                                    <th colspan="2" style="text-align: center;" data-translate="th-weight">ВЕС (кг)</th>
-                                </tr>
                             </tbody>
                         </table>
 
-                        <!-- 2. СРОЛЛИРУЕМЫЙ КОНТЕЙНЕР (12 СТРОК BULK) -->
-                        <div class="load-rows-scroll-container">
-                            <table class="flights-table aviation-table fixed-load-table rows-table">
+                        <!-- 2. ДИНАМИЧЕСКАЯ ТАБЛИЦА BULK С МУЛЬТИ-ЗАГРУЗКОЙ ПОЗИЦИЙ -->
+                        <div class="bulk-planning-wrapper">
+                            <table class="flights-table aviation-table fixed-load-table bulk-header-table">
                                 <colgroup>
-                                    <col style="width: 27%;">
                                     <col style="width: 13%;">
-                                    <col style="width: 13%;">
-                                    <col style="width: 15%;">
-                                    <col style="width: 16%;">
-                                    <col style="width: 16%;">
+                                    <col style="width: 21%;">
+                                    <col style="width: 26%;">
+                                    <col style="width: 30%;">
+                                    <col style="width: 10%;">
                                 </colgroup>
-                                <tbody id="unified-load-tbody">
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>1</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-1" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="11"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-1" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="12"></td>
+                                <thead>
+                                    <tr class="header-sub-title">
+                                        <th colspan="5" class="subtitle-cell" style="padding: 0;">
+                                            <div class="bulk-header-flex">
+                                                <div class="bulk-title-badge-group">
+                                                    <span id="bulk-title-text" style="font-size: 1.05rem; font-weight: 800; letter-spacing: 1.5px;">BULK (БАГАЖНИКИ)</span>
+                                                    <span id="aircraft-model-badge" class="aircraft-model-badge hidden"></span>
+                                                    <select id="select-aircraft-tail" class="select-aircraft-tail" title="Выбрать бортовой номер">
+                                                        <option value="">-- Борт --</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <button type="button" id="btn-toggle-fwd" class="btn-toggle-fwd hidden" onclick="toggleFwdCompartments()">
+                                                        <span>➕ FWD (Передний)</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </th>
                                     </tr>
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>2</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-2" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="13"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-2" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="14"></td>
+                                    <tr class="header-subcols">
+                                        <th style="text-align: center;" data-translate="th-cpt-sec">ОТСЕК</th>
+                                        <th style="text-align: center;" data-translate="th-load-type">ТИП ЗАГРУЗКИ</th>
+                                        <th style="text-align: center;" data-translate="th-pcs">МЕСТА</th>
+                                        <th style="text-align: center;" data-translate="th-weight">ВЕС (кг)</th>
+                                        <th style="text-align: center;"></th>
                                     </tr>
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>3</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-3" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="15"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-3" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="16"></td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>4</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-4" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="17"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-4" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="18"></td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>5</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-5" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="19"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-5" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="20"></td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>6</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-6" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="21"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-6" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="22"></td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>7</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-7" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="23"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-7" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="24"></td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>8</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-8" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="25"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-8" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="26"></td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>9</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-9" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="27"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-9" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="28"></td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>10</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-10" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="29"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-10" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="30"></td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>11</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-11" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="31"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-11" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="32"></td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2" style="text-align: center;"><strong>12</strong></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-pcs-12" class="form-control table-input bulk-pcs-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="33"></td>
-                                        <td colspan="2" style="text-align: center;"><input type="number" id="bulk-weight-12" class="form-control table-input bulk-weight-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="34"></td>
-                                    </tr>
-                                </tbody>
+                                </thead>
                             </table>
-                        </div>
 
-                        <!-- 3. НЕПОДВИЖНЫЙ НИЖНИЙ ПОДВАЛ (REST И TTL) -->
-                        <table class="flights-table aviation-table fixed-load-table footer-table">
-                            <colgroup>
-                                <col style="width: 27%;">
-                                <col style="width: 13%;">
-                                <col style="width: 13%;">
-                                <col style="width: 15%;">
-                                <col style="width: 16%;">
-                                <col style="width: 16%;">
-                            </colgroup>
-                            <tfoot>
-                                <!-- Строка REST -->
-                                <tr class="rest-row">
-                                    <td colspan="2"><strong data-translate="row-rest">ОСТАТОК</strong></td>
-                                    <td colspan="2" id="bulk-rest-pcs" class="monospace-val rest-cell super-val-cyan" style="text-align: center;">0</td>
-                                    <td colspan="2" id="bulk-rest-weight" class="monospace-val rest-cell super-val-gold" style="text-align: center;">0</td>
-                                </tr>
-                                <!-- Строка TTL -->
-                                <tr class="ttl-row">
-                                    <td colspan="2"><strong data-translate="row-ttl">ИТОГО</strong></td>
-                                    <td colspan="2" id="bulk-ttl-pcs" class="monospace-val super-val-cyan" style="text-align: center;">0</td>
-                                    <td colspan="2" id="bulk-ttl-weight" class="monospace-val super-val-gold" style="text-align: center;">0</td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                            <div class="load-rows-scroll-container">
+                                <table class="flights-table aviation-table fixed-load-table rows-table">
+                                    <colgroup>
+                                        <col style="width: 14%;">
+                                        <col style="width: 32%;">
+                                        <col style="width: 20%;">
+                                        <col style="width: 24%;">
+                                        <col style="width: 10%;">
+                                    </colgroup>
+                                    <tbody id="unified-load-tbody">
+                                        <!-- Динамически рендерится через renderCompartmentsTable() -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- 3. НЕПОДВИЖНЫЙ НИЖНИЙ ПОДВАЛ (REST И TTL) -->
+                            <table class="flights-table aviation-table fixed-load-table footer-table bulk-footer-table">
+                                <colgroup>
+                                    <col style="width: 34%;">
+                                    <col style="width: 26%;">
+                                    <col style="width: 30%;">
+                                    <col style="width: 10%;">
+                                </colgroup>
+                                <tfoot>
+                                    <tr class="rest-row">
+                                        <td><strong data-translate="row-rest">ОСТАТОК</strong></td>
+                                        <td id="bulk-rest-pcs" class="monospace-val rest-cell super-val-cyan" style="text-align: center;">0</td>
+                                        <td id="bulk-rest-weight" class="monospace-val rest-cell super-val-gold" style="text-align: center;">0</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr class="ttl-row">
+                                        <td><strong data-translate="row-ttl">ИТОГО</strong></td>
+                                        <td id="bulk-ttl-pcs" class="monospace-val super-val-cyan" style="text-align: center;">0</td>
+                                        <td id="bulk-ttl-weight" class="monospace-val super-val-gold" style="text-align: center;">0</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <div class="bulk-actions-toolbar" style="margin-top: 12px; display: flex; justify-content: flex-end; gap: 10px; padding: 4px 0;">
+                                <button type="button" class="btn btn-primary" id="btn-open-loadsheet" onclick="openWbLoadsheet()" title="Сформировать W&amp;B LoadSheet с расчетными весами коммерческой загрузки по отсекам" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 13px; font-weight: 800; border-radius: 8px;">
+                                    <span>📄 Сформировать W&amp;B LoadSheet</span>
+                                </button>
+                            </div>
+                        </div>
                         </section>
                     </div>
                 </div>
-
-                <!-- Таблица: История спрогнозированных рейсов (во всю ширину) -->
-                <section class="panel glass table-section history-predictions-section aviation-panel margin-top-20" style="margin-top: 20px;">
-                    <div class="hud-corner top-left"></div>
-                    <div class="hud-corner top-right"></div>
-                    <div class="hud-corner bottom-left"></div>
-                    <div class="hud-corner bottom-right"></div>
-                    
-                    <div class="table-header-container">
-                        <h2 class="panel-title" data-translate="predictions-table-title">[ FORECAST CALCULATION HISTORY ]</h2>
-                        <div class="table-actions">
-                            <button type="button" id="btn-clear-predictions" class="btn btn-danger aviation-btn" data-translate="btn-clear-predictions" onclick="handleClearPredictions(event)">Очистить историю</button>
-                        </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table id="predictions-table" class="flights-table aviation-table">
-                            <colgroup>
-                                <col style="width: 19%;">
-                                <col style="width: 15%;">
-                                <col style="width: 12%;">
-                                <col style="width: 10%;">
-                                <col style="width: 13%;">
-                                <col style="width: 11%;">
-                                <col style="width: 14%;">
-                                <col style="width: 6%;">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th data-translate="th-route">Маршрут</th>
-                                    <th data-translate="th-flight">Рейс</th>
-                                    <th data-translate="th-pax-count">Пассажиры (PAX)</th>
-                                    <th data-translate="th-bag-pcs">Багаж мест</th>
-                                    <th data-translate="th-bag-weight">Вес багажа</th>
-                                    <th data-translate="th-hb-weight">Вес р/к</th>
-                                    <th data-translate="th-calc-date">Дата расчета</th>
-                                    <th data-translate="th-action">Действие</th>
-                                </tr>
-                            </thead>
-                            <tbody id="predictions-table-body">
-                                <tr>
-                                    <td colspan="8" class="empty-table-text" data-translate="empty-predictions-table">История прогнозов пуста. Сделайте расчет выше.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
             </div>
 
             <!-- ВКЛАДКА 2: ДАШБОРД АНАЛИТИКИ И МАСШТАБИРОВАНИЯ -->
@@ -1799,15 +1771,15 @@
     </div>
 
     <footer class="app-footer" style="text-align: center; padding: 20px; font-size: 0.8rem; color: var(--text-secondary); font-family: var(--font-mono); opacity: 0.7; border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 40px; display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <span>AeroBag Predictor <span id="app-version-tag">v12.0.197</span> (<span id="app-build-date">31.10.2026</span>)</span>
+<span>AeroBag Predictor <span id="app-version-tag">v12.2.30</span> (<span id="app-build-date">01.11.2026</span>)</span>
         <span style="opacity: 0.4;">•</span>
         <span data-translate="footer-developer">Разработчик: Andrey Zubkov</span>
     </footer>
 
     <!-- Загрузка локальных библиотек -->
     <script src="xlsx.full.min.js"></script>
-    <script src="app.js?v=v12.0.197"></script>
-    <script src="dcs_sync.js?v=v12.0.197"></script>
+<script src="app.js?v=v12.2.30"></script>
+    <script src="dcs_sync.js?v=v12.2.30"></script>
 </body>
 </html>
 
