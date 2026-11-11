@@ -2217,35 +2217,81 @@ async def dcs_sync_post(request: Request):
                     if not isinstance(cur_db, list): cur_db = []
             except Exception:
                 cur_db = []
-        db_map = {f"{it.get('flight_no','')}_{it.get('date','')}_{it.get('from','')}_{it.get('to','')}": i for i, it in enumerate(cur_db)}
+
+        def _norm_f_key(fn, dt, fr, to):
+            fn_clean = re.sub(r'\D', '', str(fn or ''))
+            dt_clean = str(dt or '').strip()[:10]
+            fr_clean = str(fr or '').strip().upper()
+            to_clean = str(to or '').strip().upper()
+            return f"{fn_clean}_{dt_clean}_{fr_clean}_{to_clean}"
+
+        db_map = {}
+        for i, it in enumerate(cur_db):
+            k = _norm_f_key(
+                it.get('flight_no') or it.get('flight'),
+                it.get('date') or it.get('flight_date'),
+                it.get('from') or it.get('departure_code'),
+                it.get('to') or it.get('dest_code')
+            )
+            db_map[k] = i
+
         for f in flights:
+            flt_no = str(f.get("flight_no") or f.get("flight") or "").strip()
+            flt_digits = re.sub(r'\D', '', flt_no) or flt_no
+            flt_date = str(f.get("flight_date") or f.get("date") or "").strip()
+            dep_code = str(f.get("departure_code") or f.get("from") or "").strip().upper()
+            arr_code = str(f.get("dest_code") or f.get("to") or "").strip().upper()
+
+            vz_val = int(f.get("vz") or 0)
+            men_val = int(f.get("men") or 0)
+            women_val = int(f.get("women") or 0)
+            if vz_val == 0 and (men_val > 0 or women_val > 0):
+                vz_val = men_val + women_val
+
+            rb_val = int(f.get("rb") or 0)
+            rm_val = int(f.get("rm") or 0)
+            pax_val = int(f.get("pax") or 0)
+            if pax_val == 0:
+                pax_val = vz_val + rb_val
+
+            bag_pcs_val = int(float(f.get("bag_pcs") or 0))
+            bag_wt_val = float(f.get("bag_weight") or 0.0)
+            hb_wt_val = float(f.get("hb_weight") or 0.0)
+
             clean_item = {
-                "id": f.get("id", f"dcs_{os.urandom(4).hex()}"),
-                "airline": f.get("airline", "N4"),
-                "flight_no": f.get("flight_no", ""),
-                "date": f.get("flight_date", ""),
-                "from": f.get("departure_code", "DYU"),
-                "to": f.get("dest_code", "UFA"),
-                "men": int(f.get("men", 0)),
-                "women": int(f.get("women", 0)),
-                "rb": int(f.get("rb", 0)),
-                "rm": int(f.get("rm", 0)),
-                "pax": int(f.get("pax", 0)),
-                "bag_pcs": int(f.get("bag_pcs", 0)),
-                "bag_weight": float(f.get("bag_weight", 0)),
-                "hb_weight": float(f.get("hb_weight", 0)),
+                "id": f.get("id") or f"dcs_{flt_digits}_{flt_date}_{dep_code}_{arr_code}",
+                "airline": f.get("airline") or (flt_no[:2] if len(flt_no) >= 2 and not flt_no[:2].isdigit() else "N4"),
+                "flight_no": flt_no,
+                "flight": flt_digits,
+                "date": flt_date,
+                "from": dep_code,
+                "to": arr_code,
+                "men": vz_val,
+                "women": 0,
+                "rb": rb_val,
+                "rm": rm_val,
+                "pax": pax_val,
+                "bag_pcs": bag_pcs_val,
+                "bag_weight": bag_wt_val,
+                "hb_weight": hb_wt_val,
                 "source": "Lydia DCS",
                 "active": True
             }
-            k = f"{clean_item['flight_no']}_{clean_item['date']}_{clean_item['from']}_{clean_item['to']}"
+            k = _norm_f_key(flt_no, flt_date, dep_code, arr_code)
             if k in db_map:
                 cur_db[db_map[k]].update(clean_item)
             else:
                 cur_db.append(clean_item)
                 db_map[k] = len(cur_db) - 1
-        with open(db_path, "w", encoding="utf-8") as f:
-            json.dump(cur_db, f, ensure_ascii=False, indent=2)
-        return {"success": True, "saved_count": len(flights)}
+
+        try:
+            tmp_path = db_path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(cur_db, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, db_path)
+            return {"success": True, "saved_count": len(flights), "message": f"Успешно сохранено {len(flights)} рейсов в общую базу"}
+        except Exception as e:
+            return {"success": False, "error": f"Ошибка сохранения в базу данных: {str(e)}"}
 
     return {"success": False, "error": f"Неизвестное действие: {action}"}
 

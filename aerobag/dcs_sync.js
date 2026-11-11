@@ -1190,49 +1190,16 @@
             const data = await resp.json();
 
             if (data.success) {
-                // Мгновенно обновляем базу в оперативной памяти AeroBag
-                if (typeof window.userFlights !== 'undefined' && Array.isArray(window.userFlights)) {
-                    selectedFlights.forEach(flt => {
-                        const item = {
-                            id: flt.id || ('dcs_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)),
-                            airline: flt.airline || 'N4',
-                            flight_no: flt.flight_no,
-                            date: flt.flight_date,
-                            from: flt.departure_code,
-                            to: flt.dest_code,
-                            men: flt.vz || (flt.men + flt.women),
-                            women: 0,
-                            rb: flt.rb || 0,
-                            rm: flt.rm || 0,
-                            pax: flt.pax || ((flt.vz || 0) + (flt.rb || 0)),
-                            bag_pcs: flt.bag_pcs || 0,
-                            bag_weight: flt.bag_weight || 0,
-                            hb_weight: flt.hb_weight || 0,
-                            source: 'Lydia DCS',
-                            active: true
-                        };
-
-                        const exIdx = window.userFlights.findIndex(u => 
-                            String(u.flight_no).replace(/\D/g,'') === String(item.flight_no).replace(/\D/g,'') && 
-                            u.date === item.date && 
-                            u.from === item.from && 
-                            u.to === item.to
-                        );
-
-                        if (exIdx !== -1) {
-                            window.userFlights[exIdx] = Object.assign({}, window.userFlights[exIdx], item);
-                        } else {
-                            window.userFlights.push(item);
-                        }
-                    });
-
-                    if (typeof window.saveUserFlights === 'function') window.saveUserFlights();
-                    if (typeof window.populateAirportDropdowns === 'function') window.populateAirportDropdowns();
-                    if (typeof window.updateActiveDateRangeAndCounts === 'function') window.updateActiveDateRangeAndCounts();
-                    if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
-                    if (typeof window.renderUploadedFilesList === 'function') window.renderUploadedFilesList();
-                    if (typeof window.populateAllFlightsDropdown === 'function') window.populateAllFlightsDropdown();
+                // Синхронизируем обновленную базу рейсов с сервера в AeroBag
+                if (typeof window.loadUserFlights === 'function') {
+                    await window.loadUserFlights();
+                } else if (typeof window.loadUserFlightsSilent === 'function') {
+                    await window.loadUserFlightsSilent();
                 }
+                if (typeof window.renderFlightsTable === 'function') window.renderFlightsTable();
+                if (typeof window.updateActiveDateRangeAndCounts === 'function') window.updateActiveDateRangeAndCounts();
+                if (typeof window.populateAirportDropdowns === 'function') window.populateAirportDropdowns();
+                if (typeof window.populateAllFlightsDropdown === 'function') window.populateAllFlightsDropdown();
 
                 alert(`✅ ${data.message || 'Рейсы успешно импортированы в базу!'}`);
                 closeDcsModal();

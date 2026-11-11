@@ -4051,6 +4051,7 @@ function getCustomAirportFilters() {
                 return {
                     departures: Array.from(new Set(parsed.departures)),
                     arrivals: Array.from(new Set(parsed.arrivals)),
+                    strict_departures: !!parsed.strict_departures,
                     strict_arrivals: !!parsed.strict_arrivals
                 };
             }
@@ -4062,7 +4063,15 @@ function getCustomAirportFilters() {
     // Исходные предустановленные списки
     const defaultDeps = (baggageDb && Array.isArray(baggageDb.departures_filter) && baggageDb.departures_filter.length > 0)
         ? baggageDb.departures_filter
-        : ['AER', 'СОЧ', 'CCC', 'DYU', 'ДШБ', 'GOX', 'HOG', 'HRG', 'KQT', 'КГТ', 'LBD', 'ХДТ', 'OSS', 'ОШШ', 'PMV', 'REN', 'ОНГ', 'SSH', 'SUI', 'СУИ', 'TAS', 'ТАС', 'UTP', 'VRA'];
+        : [
+            'AER', 'СОЧ', 'CCC', 'DYU', 'ДШБ', 'GOX', 'HOG', 'HRG', 'KQT', 'КГТ',
+            'LBD', 'ХДТ', 'OSS', 'ОШШ', 'PMV', 'REN', 'ОНГ', 'SSH', 'SUI', 'СУИ',
+            'TAS', 'ТАС', 'UTP', 'VRA', 'SVO', 'ШРМ', 'LED', 'ПЛК', 'KZN', 'КЗН',
+            'UFA', 'УФА', 'SVX', 'КЛЦ', 'MRV', 'МРВ', 'ROV', 'РОВ', 'KUF', 'КУФ',
+            'OVB', 'ТЛЧ', 'ASF', 'АСР', 'ARH', 'АХГ', 'BAX', 'БАН', 'CEK', 'ЧЛБ',
+            'OMS', 'ОМС', 'PEE', 'ПРЬ', 'GOI', 'ISB', 'CXR', 'PMW', 'XIY', 'UUD',
+            'HTA', 'NMA', 'TJU', 'SKD'
+        ];
 
     const defaultArrs = (baggageDb && Array.isArray(baggageDb.arrivals_filter) && baggageDb.arrivals_filter.length > 0)
         ? baggageDb.arrivals_filter
@@ -4071,6 +4080,7 @@ function getCustomAirportFilters() {
     return {
         departures: Array.from(new Set(defaultDeps)),
         arrivals: Array.from(new Set(defaultArrs)),
+        strict_departures: false,
         strict_arrivals: false
     };
 }
@@ -4817,8 +4827,20 @@ async function saveUserFlights() {
     return false;
 }
 
-// Экспорт базы рейсов и методов синхронизации в window
-window.userFlights = userFlights;
+// Экспорт базы рейсов и методов синхронизации в window (динамический getter/setter против рассинхронизации)
+try {
+    Object.defineProperty(window, 'userFlights', {
+        get() { return userFlights; },
+        set(val) {
+            if (Array.isArray(val)) {
+                userFlights = val;
+            }
+        },
+        configurable: true
+    });
+} catch (e) {
+    window.userFlights = userFlights;
+}
 window.saveUserFlights = saveUserFlights;
 window.loadUserFlights = loadUserFlights;
 window.loadUserFlightsSilent = loadUserFlightsSilent;
@@ -9542,10 +9564,10 @@ function processRegistrationData(filename, rows, options = {}) {
     if (colMap.direction === -1) colMap.direction = 4;   // Столбец E (Аэропорт прилёта)
     if (colMap.vz === -1) colMap.vz = 15;                // Столбец P (Взрослые)
     if (colMap.rb === -1) colMap.rb = 16;                // Столбец Q (РБ)
-    if (colMap.rm === -1) colMap.rm = 18;                // Столбец S (РМ)
-    if (colMap.hbWeight === -1) colMap.hbWeight = 19;    // Столбец T (Р/кладь вес)
-    if (colMap.bagPcs === -1) colMap.bagPcs = 20;        // Столбец U (Багаж мест)
-    if (colMap.bagWeight === -1) colMap.bagWeight = 21;    // Столбец V (Багаж вес)
+    if (colMap.rm === -1) colMap.rm = 17;                // Столбец R (РМ)
+    if (colMap.hbWeight === -1) colMap.hbWeight = 18;    // Столбец S (Р/кладь вес)
+    if (colMap.bagPcs === -1) colMap.bagPcs = 19;        // Столбец T (Багаж мест)
+    if (colMap.bagWeight === -1) colMap.bagWeight = 20;    // Столбец U (Багаж вес)
 
     let addedCount = 0;
     const customFilters = getCustomAirportFilters();
@@ -9583,8 +9605,8 @@ function processRegistrationData(filename, rows, options = {}) {
         const toIata = toInfo ? toInfo.iata : (ruToIata(cleanDirection) || cleanDirection);
         const toRu = toInfo ? toInfo.ru : (iataToRu(toIata) || cleanDirection);
 
-        // 1. Проверка по фильтру вылетов (Departures Filter)
-        if (allowedDeparturesSet.size > 0) {
+        // 1. Проверка по фильтру вылетов (Departures Filter, только если включен строгий режим)
+        if (customFilters.strict_departures && allowedDeparturesSet.size > 0) {
             const isAllowedDep = allowedDeparturesSet.has(fromIata.toUpperCase()) || 
                                  allowedDeparturesSet.has(fromRu.toUpperCase()) || 
                                  allowedDeparturesSet.has(cleanFrom.toUpperCase()) || 
