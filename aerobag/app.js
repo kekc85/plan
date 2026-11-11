@@ -1,6 +1,6 @@
 // Версия приложения AeroBag Predictor
-const APP_VERSION = 'v12.2.30';
-const APP_BUILD_DATE = '01.11.2026';
+const APP_VERSION = 'v12.2.31';
+const APP_BUILD_DATE = '12.11.2026';
 
 // Глобальное состояние
 // Встроенная справочная база аэропортов и правил для гарантированной оффлайн-работы

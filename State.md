@@ -544,3 +544,12 @@
   * В AeroBag (handleBulkInput) обеспечен автоматический сброс фиксации веса (locked) при изменении мест на позиции отсека;
   * В AeroBag кнопка «Сформировать W&B LoadSheet» переведена на локальный роутинг /loadsheet/ вместо boostandgo.ru;
   * Пересобран дистрибутив на Рабочем столе AeroPlan_2.0_Standalone.zip со всеми исправлениями.
+  * Синхронизация и исправление сохранения рейсов Lydia DCS и отчетов Astra DCS:
+    - Скопирована полная база рейсов aerobag_db.json (8976 рейсов) в репозиторий aerobag/;
+    - В api_server.py и dcs_server.py реализовано единое безопасное атомное сохранение через .tmp с поддержкой конвертов {"flights": [...]};
+    - В dcs_sync.js удален деструктивный вызов saveUserFlights() после save_to_database, заменен на автоматический loadUserFlights() и обновление UI;
+    - Централизован getDcsEndpoint(action) с относительными путями (api/dcs_sync?action= и lydia_dcs_sync.php?action=) для исключения CORS-блокировок в Chrome;
+    - Исправлен парсинг Astra DCS (strict_departures: false, корректные индексы столбцов FastReport);
+    - Обновлена портативная версия AeroBag на Рабочем столе (C:\Users\kekc85\Desktop\AeroBag_Portable RAB), перезапущен сервер на 8080;
+    - Версии бандлов подняты до v12.2.31 для сброса кэша браузера;
+    - Дистрибутив AeroPlan_2.0_Standalone.zip на Рабочем столе полностью пересобран и готов к переносу на рабочий ПК.

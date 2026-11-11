@@ -22,6 +22,16 @@
     let scannedFlights = [];
     let isScanning = false;
 
+    function getDcsEndpoint(action) {
+        if (window.location.protocol === 'file:') {
+            return `http://127.0.0.1:8080/api/dcs_sync?action=${action}`;
+        }
+        if (window.location.port === '8080') {
+            return `api/dcs_sync?action=${action}`;
+        }
+        return `lydia_dcs_sync.php?action=${action}`;
+    }
+
     function loadCachedDcsCredentials() {
         try {
             const saved = localStorage.getItem('averago_dcs_credentials');
@@ -37,11 +47,9 @@
 
     async function fetchServerDcsCredentials() {
         try {
-            const endpoint = (window.location.port === '8080' || window.location.protocol === 'file:')
-                ? 'http://localhost:8080/api/dcs_sync?action=get_dcs_credentials'
-                : 'lydia_dcs_sync.php?action=get_dcs_credentials';
+            const endpoint = getDcsEndpoint('get_dcs_credentials');
 
-            const resp = await fetch(endpoint, { method: 'GET', credentials: 'same-origin' });
+            const resp = await fetch(endpoint, { method: 'GET' });
             if (resp.ok) {
                 const data = await resp.json();
                 if (data && data.success) {
@@ -79,13 +87,10 @@
 
     async function fetchServerDcsStations() {
         try {
-            const endpoint = (window.location.port === '8080' || window.location.protocol === 'file:')
-                ? 'http://localhost:8080/api/dcs_sync?action=get_dcs_stations'
-                : 'lydia_dcs_sync.php?action=get_dcs_stations';
+            const endpoint = getDcsEndpoint('get_dcs_stations');
 
             const resp = await fetch(endpoint, {
-                method: 'GET',
-                credentials: 'same-origin'
+                method: 'GET'
             });
             if (resp.ok) {
                 const data = await resp.json();
@@ -118,13 +123,10 @@
         }
 
         try {
-            const endpoint = (window.location.port === '8080' || window.location.protocol === 'file:')
-                ? 'http://localhost:8080/api/dcs_sync?action=save_dcs_stations'
-                : 'lydia_dcs_sync.php?action=save_dcs_stations';
+            const endpoint = getDcsEndpoint('save_dcs_stations');
 
             await fetch(endpoint, {
                 method: 'POST',
-                credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ stations: list })
             });
@@ -528,13 +530,10 @@
         }
 
         try {
-            const endpoint = (window.location.port === '8080' || window.location.protocol === 'file:')
-                ? 'http://localhost:8080/api/dcs_sync?action=save_dcs_credentials'
-                : 'lydia_dcs_sync.php?action=save_dcs_credentials';
+            const endpoint = getDcsEndpoint('save_dcs_credentials');
 
             const resp = await fetch(endpoint, {
                 method: 'POST',
-                credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password, airline })
             });
@@ -613,13 +612,10 @@
         }
 
         try {
-            const endpoint = (window.location.port === '8080' || window.location.protocol === 'file:')
-                ? 'http://localhost:8080/api/dcs_sync?action=test_connection'
-                : 'lydia_dcs_sync.php?action=test_connection';
+            const endpoint = getDcsEndpoint('test_connection');
 
             const resp = await fetch(endpoint, {
                 method: 'POST',
-                credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password, airline })
             });
@@ -1002,10 +998,7 @@
         scannedFlights = [];
 
         try {
-            // Определяем эндпоинт (локальный Python сервер или PHP на хостинге)
-            const endpoint = (window.location.port === '8080' || window.location.protocol === 'file:') 
-                ? 'http://localhost:8080/api/dcs_sync?action=scan_flights' 
-                : 'lydia_dcs_sync.php?action=scan_flights';
+            const endpoint = getDcsEndpoint('scan_flights');
 
             const totalStations = checkedStations.length;
             const seenIds = new Set();
@@ -1176,13 +1169,10 @@
         btnSave.innerHTML = `⏳ Сохранение ${selectedFlights.length} рейсов...`;
 
         try {
-            const endpoint = (window.location.port === '8080' || window.location.protocol === 'file:') 
-                ? 'http://localhost:8080/api/dcs_sync?action=save_to_database' 
-                : 'lydia_dcs_sync.php?action=save_to_database';
+            const endpoint = getDcsEndpoint('save_to_database');
 
             const resp = await fetch(endpoint, {
                 method: 'POST',
-                credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ flights: selectedFlights })
             });

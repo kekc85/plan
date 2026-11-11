@@ -2138,7 +2138,56 @@ from dcs_sync_server import (
     DcsScraper,
 )
 
+def get_aerobag_db_path():
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag")
+    p1 = os.path.join(base, "aerobag_db.json")
+    p2 = os.path.join(base, "dcs_saved_flights.json")
+    if os.path.exists(p1):
+        return p1
+    if os.path.exists(p2):
+        return p2
+    return p1
+
+def load_aerobag_flights_data():
+    path = get_aerobag_db_path()
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict) and "flights" in data:
+                return data["flights"]
+            elif isinstance(data, list):
+                return data
+    except Exception as e:
+        print(f"Error loading {path}: {e}")
+    return []
+
+def save_aerobag_flights_data(flights_list):
+    path = get_aerobag_db_path()
+    envelope = None
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict) and "flights" in data:
+                    envelope = data
+        except Exception:
+            pass
+    if envelope is not None:
+        envelope["flights"] = flights_list
+        save_obj = envelope
+    else:
+        save_obj = flights_list
+
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(save_obj, f, ensure_ascii=False)
+    os.replace(tmp_path, path)
+    return len(flights_list)
+
 @app.get("/api/dcs_sync")
+@app.get("/aerobag/api/dcs_sync")
 @app.get("/lydia_dcs_sync.php")
 @app.get("/aerobag/lydia_dcs_sync.php")
 def dcs_sync_get(action: str = ""):
@@ -2208,15 +2257,7 @@ async def dcs_sync_post(request: Request):
 
     elif action == "save_to_database":
         flights = body.get("flights", [])
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
-        cur_db = []
-        if os.path.exists(db_path):
-            try:
-                with open(db_path, "r", encoding="utf-8") as f:
-                    cur_db = json.load(f)
-                    if not isinstance(cur_db, list): cur_db = []
-            except Exception:
-                cur_db = []
+        cur_db = load_aerobag_flights_data()
 
         def _norm_f_key(fn, dt, fr, to):
             fn_clean = re.sub(r'\D', '', str(fn or ''))
@@ -2285,11 +2326,8 @@ async def dcs_sync_post(request: Request):
                 db_map[k] = len(cur_db) - 1
 
         try:
-            tmp_path = db_path + ".tmp"
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(cur_db, f, ensure_ascii=False, indent=2)
-            os.replace(tmp_path, db_path)
-            return {"success": True, "saved_count": len(flights), "message": f"Успешно сохранено {len(flights)} рейсов в общую базу"}
+            total_saved = save_aerobag_flights_data(cur_db)
+            return {"success": True, "saved_count": len(flights), "total_count": total_saved, "message": f"Успешно сохранено {len(flights)} рейсов в общую базу"}
         except Exception as e:
             return {"success": False, "error": f"Ошибка сохранения в базу данных: {str(e)}"}
 
@@ -2383,56 +2421,33 @@ async def aerobag_api_php_compat(request: Request):
         return {"success": True}
 
     elif action == "get_flights":
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
-        flts = []
-        if os.path.exists(db_path):
-            try:
-                with open(db_path, "r", encoding="utf-8") as f:
-                    flts = json.load(f)
-                    if not isinstance(flts, list):
-                        flts = []
-            except Exception:
-                flts = []
+        flts = load_aerobag_flights_data()
         return {"success": True, "flights": flts}
 
     elif action == "save_flights":
         flts = body if isinstance(body, list) else (body.get("flights") if isinstance(body, dict) else [])
         if not isinstance(flts, list):
             flts = []
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
         try:
-            tmp_path = db_path + ".tmp"
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(flts, f, ensure_ascii=False, indent=2)
-            os.replace(tmp_path, db_path)
-            return {"success": True, "count": len(flts), "message": f"Успешно сохранено {len(flts)} рейсов"}
+            total = save_aerobag_flights_data(flts)
+            return {"success": True, "count": total, "message": f"Успешно сохранено {total} рейсов"}
         except Exception as e:
             return {"success": False, "error": f"Ошибка сохранения рейсов: {str(e)}"}
 
     elif action == "delete_flight":
         target_id = request.query_params.get("id") or (body.get("id") if isinstance(body, dict) else "")
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
-        if os.path.exists(db_path) and target_id:
+        if target_id:
             try:
-                with open(db_path, "r", encoding="utf-8") as f:
-                    flts = json.load(f)
-                if isinstance(flts, list):
-                    flts = [fl for fl in flts if str(fl.get("id")) != str(target_id)]
-                    tmp_path = db_path + ".tmp"
-                    with open(tmp_path, "w", encoding="utf-8") as f:
-                        json.dump(flts, f, ensure_ascii=False, indent=2)
-                    os.replace(tmp_path, db_path)
+                flts = load_aerobag_flights_data()
+                flts = [fl for fl in flts if str(fl.get("id")) != str(target_id)]
+                save_aerobag_flights_data(flts)
             except Exception as e:
                 return {"success": False, "error": str(e)}
         return {"success": True, "message": "Рейс удален"}
 
     elif action == "clear_db":
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
         try:
-            tmp_path = db_path + ".tmp"
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump([], f, ensure_ascii=False, indent=2)
-            os.replace(tmp_path, db_path)
+            save_aerobag_flights_data([])
             return {"success": True, "message": "База рейсов очищена"}
         except Exception as e:
             return {"success": False, "error": str(e)}
