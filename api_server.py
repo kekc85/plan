@@ -72,37 +72,6 @@ from parser import (
     detect_plane_type
 )
 
-def _set_process_idle_priority():
-    """
-    Устанавливает минимальный приоритет для Python-процесса и его потоков в Windows.
-    IDLE_PRIORITY_CLASS (0x40): Windows отдаёт CPU этому процессу только когда
-    все остальные процессы простаивают — Excel, браузер и т.д. никогда не тормозят.
-    """
-    if sys.platform != "win32":
-        return
-    try:
-        import ctypes
-        import os as _os
-        kernel32 = ctypes.windll.kernel32
-        pid = _os.getpid()
-
-        # Открываем реальный handle процесса (GetCurrentProcess возвращает псевдо-handle)
-        PROCESS_ALL_ACCESS = 0x1F0FFF
-        proc_handle = kernel32.OpenProcess(PROCESS_ALL_ACCESS, False, pid)
-        if proc_handle:
-            # IDLE_PRIORITY_CLASS = 0x00000040 — самый низкий приоритет CPU
-            kernel32.SetPriorityClass(proc_handle, 0x00000040)
-            kernel32.CloseHandle(proc_handle)
-
-        # Понижаем приоритет текущего потока (главный поток uvicorn)
-        # THREAD_PRIORITY_IDLE = -15
-        thread_handle = kernel32.GetCurrentThread()
-        kernel32.SetThreadPriority(thread_handle, -15)
-    except Exception:
-        pass
-
-_set_process_idle_priority()
-
 # Инициализируем таблицы БД при запуске
 init_db()
 
@@ -1856,15 +1825,18 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
     user_avb = get_setting("aviabit_username", DEFAULT_USERNAME or "a.zubkov")
     pass_avb = get_setting("aviabit_password", DEFAULT_PASSWORD or "SoLnCeVo1985")
 
+    # Расширяем диапазон выборки на 24 часа назад для точного определения входящих плеч и статуса ВС
+    fetch_start = start_dt - timedelta(hours=24)
+
     # Nordwind
     if req.airline in ("both", "nordwind"):
         try:
             url_nw = get_setting("aviabit_url_nordwind", BASE_URL_NORDWIND)
             client_nw = AviaBitClient(username=user_avb, password=pass_avb, base_url=url_nw, session_filename=".session.json", name="Nordwind")
             client_nw.login()
-            # Запрашиваем полный флот без шаблона на стороне AviaBit,
+            # Запрашиваем полный флот без шаблона на стороне AviaBit с запасом 24 часа назад,
             # чтобы движок отслеживания воздушных судов видел входящие плечи борта из любых городов
-            flights_nw = client_nw.fetch_schedule(start_dt, end_dt)
+            flights_nw = client_nw.fetch_schedule(fetch_start, end_dt)
             for fl in flights_nw:
                 fl["_client"] = client_nw
                 all_raw_flights.append(fl)
@@ -1877,7 +1849,7 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
             url_ik = get_setting("aviabit_url_ikar", BASE_URL_IKAR)
             client_ik = AviaBitClient(username=user_avb, password=pass_avb, base_url=url_ik, session_filename=".session_ikar.json", name="Икар")
             client_ik.login()
-            flights_ik = client_ik.fetch_schedule(start_dt, end_dt)
+            flights_ik = client_ik.fetch_schedule(fetch_start, end_dt)
             for fl in flights_ik:
                 fl["_client"] = client_ik
                 all_raw_flights.append(fl)
