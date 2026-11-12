@@ -1,3 +1,6 @@
+- 2026-11-12: Контур `plan_2` полностью поднят и развернут на Beget:
+  - Папка `plan_2` подготовлена на хостинге, ветка `plan_2` сбилжена и выгружена через GitHub Actions.
+  - Проверено: `https://boostandgo.ru/plan_2/` отдаёт 200 OK, `https://boostandgo.ru/plan_2/api/health` возвращает `{"status":"ok","database":"connected"}`.
 - 2026-11-12: Проверено и подтверждено восстановление автодеплоя GitHub Actions на Beget:
   - Секреты `BEGET_FTP_USERNAME` и `BEGET_FTP_PASSWORD` обновлены на новый аккаунт `kekc8584_deploy`.
   - Тестовый пайплайн (ветка `dev` -> контур `plan_test`) успешно прошёл все шаги: сборка, `Sync Built Files to Beget` (success) и `Sync Loadsheet to Beget` (success). Автодеплой полностью восстановлен.
