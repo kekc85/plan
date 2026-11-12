@@ -1,3 +1,6 @@
+- 2026-11-12: Исправлен вызов кнопки Loadsheet в `aerobag-test`:
+  - В `index.html` обновлена версия скриптов на `?v=v12.2.35_loadsheet` для принудительного сброса дискового кэша браузера.
+  - В `app.js` функция `openWbLoadsheet` экспортирована в `window.openWbLoadsheet` и привязана через слушатель `btn-open-loadsheet.addEventListener('click')`.
 - 2026-11-12: Синхронизирована база и восстановлен Loadsheet в `aerobag-test`:
   - В `boostandgo.ru/public_html/aerobag-test/db_config.php` переключено подключение на единую боевую БД `kekc8584_aerobag` (пользователь `kekc8584_aerobag`). Восстановлены все 8 981 рейс и все 6 учетных записей пользователей/диспетчеров.
   - В `index.html` и `app.js` восстановлена кнопка `btn-open-loadsheet` и обработчик `openWbLoadsheet` под таблицей отсеков BULK.
