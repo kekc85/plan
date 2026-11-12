@@ -1,3 +1,6 @@
+- 2026-11-12: Исправлен вызов `applyAircraftCompartmentConfig` и синхронизирован GitHub:
+  - В `aerobag-test/app.js` вызов `applyAircraftCompartmentConfig` обернут в `typeof === 'function'` с сохранением бейджа борта `[acNum]`.
+  - Ветка `local-standalone` со всеми локальными доработками и журналом `State.md` успешно отправлена в удаленный репозиторий GitHub (`origin/local-standalone`).
 - 2026-11-12: Исправлен перенос DOW, DOI и заправки при переходе AeroPlan -> AeroBag -> LoadSheet:
   - В `boostandgo.ru/public_html/aerobag-test/app.js` в `checkIncomingFlightParameters` добавлен полный разбор параметров: `dow`, `doi`, `galley`, `crew`, `pax_m/f/ch/inf`, `to_fuel`, `trip_fuel`, `cargo`, `mail`, `ac_config`.
   - Загружен справочник флота `fleet_wb.json` в `aerobag-test` для автоматического расчета DOW/DOI по бортовому номеру.
