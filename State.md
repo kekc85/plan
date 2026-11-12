@@ -1,3 +1,6 @@
+- 2026-11-12: Проверено и подтверждено восстановление автодеплоя GitHub Actions на Beget:
+  - Секреты `BEGET_FTP_USERNAME` и `BEGET_FTP_PASSWORD` обновлены на новый аккаунт `kekc8584_deploy`.
+  - Тестовый пайплайн (ветка `dev` -> контур `plan_test`) успешно прошёл все шаги: сборка, `Sync Built Files to Beget` (success) и `Sync Loadsheet to Beget` (success). Автодеплой полностью восстановлен.
 - 2026-11-12: Проверено FTP-подключение Beget:
   - Создан независимый FTP-аккаунт `kekc8584_deploy` с сервером `kekc8584.beget.tech`. Доступ к корню и `boostandgo.ru/public_html` проверен, работает на 100%.
   - В `public_html` обнаружено отсутствие директории `plan_2` (присутствуют `plan`, `plan_test`, `aerobag`).
