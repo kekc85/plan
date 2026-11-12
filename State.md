@@ -1,3 +1,6 @@
+- 2026-11-12: Синхронизирована база и восстановлен Loadsheet в `aerobag-test`:
+  - В `boostandgo.ru/public_html/aerobag-test/db_config.php` переключено подключение на единую боевую БД `kekc8584_aerobag` (пользователь `kekc8584_aerobag`). Восстановлены все 8 981 рейс и все 6 учетных записей пользователей/диспетчеров.
+  - В `index.html` и `app.js` восстановлена кнопка `btn-open-loadsheet` и обработчик `openWbLoadsheet` под таблицей отсеков BULK.
 - 2026-11-12: Исправлена ошибка `selectTo is not defined` и восстановлена вкладка Администрирование в `aerobag-test`:
   - В `boostandgo.ru/public_html/aerobag-test/app.js` объявлена переменная `selectTo = document.getElementById('select-to')` в `populateAirportDropdowns`, исключен сбой JS при старте.
   - Входные параметры рейса (`flight`, `from`, `to`, `pax`, `date`) теперь корректно переносятся из AeroPlan в форму прогноза.
