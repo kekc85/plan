@@ -1,3 +1,7 @@
+- 2026-11-12: Исправлен перенос DOW, DOI и заправки при переходе AeroPlan -> AeroBag -> LoadSheet:
+  - В `boostandgo.ru/public_html/aerobag-test/app.js` в `checkIncomingFlightParameters` добавлен полный разбор параметров: `dow`, `doi`, `galley`, `crew`, `pax_m/f/ch/inf`, `to_fuel`, `trip_fuel`, `cargo`, `mail`, `ac_config`.
+  - Загружен справочник флота `fleet_wb.json` в `aerobag-test` для автоматического расчета DOW/DOI по бортовому номеру.
+  - В `index.html` поднята версия `?v=v12.2.36_dow_doi_fuel` для сброса кэша.
 - 2026-11-12: Исправлен вызов кнопки Loadsheet в `aerobag-test`:
   - В `index.html` обновлена версия скриптов на `?v=v12.2.35_loadsheet` для принудительного сброса дискового кэша браузера.
   - В `app.js` функция `openWbLoadsheet` экспортирована в `window.openWbLoadsheet` и привязана через слушатель `btn-open-loadsheet.addEventListener('click')`.
