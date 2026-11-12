@@ -1,3 +1,7 @@
+- 2026-11-12: Исправлена ошибка `selectTo is not defined` и восстановлена вкладка Администрирование в `aerobag-test`:
+  - В `boostandgo.ru/public_html/aerobag-test/app.js` объявлена переменная `selectTo = document.getElementById('select-to')` в `populateAirportDropdowns`, исключен сбой JS при старте.
+  - Входные параметры рейса (`flight`, `from`, `to`, `pax`, `date`) теперь корректно переносятся из AeroPlan в форму прогноза.
+  - В `aerobag-test` открыта вкладка «Администрирование» в HUD-навигации; клик по статусу `ДИСПЕТЧЕР ОНЛАЙН` или по вкладке вызывает окно ввода пароля администратора при необходимости.
 - 2026-11-12: Контур `plan_2` полностью поднят и развернут на Beget:
   - Папка `plan_2` подготовлена на хостинге, ветка `plan_2` сбилжена и выгружена через GitHub Actions.
   - Проверено: `https://boostandgo.ru/plan_2/` отдаёт 200 OK, `https://boostandgo.ru/plan_2/api/health` возвращает `{"status":"ok","database":"connected"}`.
