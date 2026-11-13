@@ -1,3 +1,8 @@
+- 2026-11-13: Таблица «История расчетов» AeroBag растянута на полную высоту:
+  - В `aerobag/style.css` установлено `align-items: stretch` в `#tab-content-predict .workspace-grid`, а `.history-column`, `.history-predictions-section` и `.predictions-table-responsive-compact` переведены на 100% высоту (`flex: 1 1 auto; height: 100%; min-height: 0; max-height: none !important`).
+  - Устранено искусственное ограничение `max-height: 250px` из адаптивных медиа-запросов десктопа: таблица тянется до конца правых таблиц.
+  - Полоса прокрутки отсутствует при малом количестве записей и появляется только при переполнении до нижней границы приложения.
+  - В `index.html` поднята версия `style.css?v=v12.2.38_full_height` для сброса кэша; файлы выгружены на Beget в `aerobag` и `aerobag-test`.
 - 2026-11-13: Устранено повторное появление 16 изменений и оптимизирован MySQL:
   - В `web_app/public/api/index.php` убрано циклическое выполнение 21 `ALTER TABLE` при каждом запросе: добавлена разовая проверка через маркер `.db_schema_v2_ready`, что полностью устранило `SQLSTATE[HY000] [1040] Too many connections` и блокировки таблиц на Beget.
   - В `web_app/src/App.jsx` в `handleAcknowledgeAll` добавлен вызов `setChangeToast(null)` для немедленного скрытия плашки уведомления, а также реализовано мгновенное сохранение подтверждённых рейсов в БД без 2-секундного ожидания.

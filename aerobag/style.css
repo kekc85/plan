@@ -467,18 +467,32 @@ body.light-theme .tab-btn.active {
 .predictions-table-responsive-compact {
     width: 100%;
     flex: 1 1 auto;
+    height: 100%;
     min-height: 0 !important;
     max-height: none !important;
     overflow-y: auto;
     overflow-x: hidden;
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 240, 255, 0.4) rgba(0, 0, 0, 0.25);
 }
 
 .predictions-table-responsive-compact::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
+    width: 6px;
+}
+
+.predictions-table-responsive-compact::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.predictions-table-responsive-compact::-webkit-scrollbar-thumb {
+    background: rgba(0, 240, 255, 0.35);
+    border-radius: 4px;
+}
+
+.predictions-table-responsive-compact::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 240, 255, 0.7);
 }
 
 .predictions-compact-table {
@@ -567,34 +581,21 @@ body.light-theme .predictions-compact-table .history-cell-tail {
     opacity: 1;
 }
 
-@media (max-width: 1440px) and (min-width: 1101px) {
+@media (max-width: 1440px) and (min-width: 1025px) {
     #tab-content-predict .workspace-grid {
-        grid-template-columns: 380px minmax(340px, 400px) minmax(0, 1fr);
+        grid-template-columns: 380px minmax(330px, 390px) minmax(0, 1fr);
         gap: 12px;
+        align-items: stretch;
+    }
+    .history-column,
+    .history-predictions-section {
+        height: 100%;
+    }
+    .predictions-table-responsive-compact {
+        max-height: none !important;
     }
     .predictions-compact-table {
         font-size: 0.76rem;
-    }
-}
-
-@media (max-width: 1100px) and (min-width: 769px) {
-    #tab-content-predict .workspace-grid {
-        grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
-    }
-    .history-column {
-        grid-column: 1 / -1;
-    }
-    .predictions-table-responsive-compact {
-        max-height: 250px;
-    }
-}
-
-@media (max-width: 768px) {
-    #tab-content-predict .workspace-grid {
-        grid-template-columns: minmax(0, 1fr) !important;
-    }
-    .predictions-table-responsive-compact {
-        max-height: 250px;
     }
 }
 
@@ -602,8 +603,17 @@ body.light-theme .predictions-compact-table .history-cell-tail {
     .workspace-grid,
     #tab-content-predict .workspace-grid {
         grid-template-columns: minmax(0, 1fr) !important;
+        gap: 16px;
+        align-items: start;
         width: 100% !important;
         max-width: 100% !important;
+    }
+    .history-column,
+    .history-predictions-section {
+        height: auto;
+    }
+    .predictions-table-responsive-compact {
+        max-height: 380px !important;
     }
 }
 
