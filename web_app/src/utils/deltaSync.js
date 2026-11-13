@@ -16,8 +16,6 @@ export const TRACKED_AVIABIT_FIELDS = [
   'ac_type',
   'ac_config',
   'pax',
-  'pax_ch',
-  'pax_inf',
   'crew',
   'cargo',
   'mail',
@@ -578,17 +576,22 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
 
     // 2.1 Строго сохраняем остальные ручные поля диспетчера центровки
     // Категории пассажиров: если в новом расписании есть детальные данные, берем их;
-    // иначе бережно сохраняем имеющиеся из old, чтобы не затирать РБ/РМ при фоновых обновлениях
+    // иначе бережно сохраняем имеющиеся из old, чтобы не затирать РБ/РМ при фоновых обновлениях.
+    // Если данных нет вовсе — выставляем '0', чтобы не плодить пустые строки.
     if (inc.pax_ch !== undefined && inc.pax_ch !== null && inc.pax_ch !== '') {
       merged.pax_ch = String(inc.pax_ch);
     } else if (old.pax_ch !== undefined && old.pax_ch !== null && old.pax_ch !== '') {
       merged.pax_ch = String(old.pax_ch);
+    } else {
+      merged.pax_ch = '0';
     }
 
     if (inc.pax_inf !== undefined && inc.pax_inf !== null && inc.pax_inf !== '') {
       merged.pax_inf = String(inc.pax_inf);
     } else if (old.pax_inf !== undefined && old.pax_inf !== null && old.pax_inf !== '') {
       merged.pax_inf = String(old.pax_inf);
+    } else {
+      merged.pax_inf = '0';
     }
 
     if (inc.pax_m !== undefined && inc.pax_m !== null && inc.pax_m !== '') {
@@ -659,11 +662,11 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
       merged.status = inc.status || 'pending';
     }
 
-    // 5. Прикрепляем неподтвержденные изменения
-    if (Object.keys(changes).length > 0) {
-      merged.unread_changes = changes;
-    } else if (old.unread_changes && Object.keys(old.unread_changes).length > 0) {
-      merged.unread_changes = old.unread_changes;
+    // 5. Прикрепляем неподтвержденные изменения (без фантомных детей/младенцев)
+    const targetChanges = Object.keys(changes).length > 0 ? changes : (old.unread_changes || {});
+    const safeChanges = getSafeUnreadChanges({ unread_changes: targetChanges });
+    if (Object.keys(safeChanges).length > 0) {
+      merged.unread_changes = safeChanges;
     } else {
       delete merged.unread_changes;
     }
@@ -755,7 +758,12 @@ export function getSafeUnreadChanges(flight) {
       return {};
     }
   }
-  return (unread && typeof unread === 'object') ? unread : {};
+  if (!unread || typeof unread !== 'object') return {};
+  const clean = { ...unread };
+  // Исключаем устаревшие или фантомные ключи детей/младенцев, которые теперь обновляются бесшовно
+  delete clean.pax_ch;
+  delete clean.pax_inf;
+  return clean;
 }
 
 /**

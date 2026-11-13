@@ -110,10 +110,10 @@ function normalizeFlight(f) {
 
   let pax_ch = (f.pax_ch !== undefined && f.pax_ch !== null && f.pax_ch !== '')
     ? String(f.pax_ch)
-    : (f.pax && typeof f.pax === 'string' && f.pax.includes('/') ? f.pax.split('/')[1]?.trim() : (f.notes?.match(/(\d+)\s*(?:рб|дети|дет|chd)/i)?.[1] || ''));
+    : (f.pax && typeof f.pax === 'string' && f.pax.includes('/') ? (f.pax.split('/')[1]?.trim() || '0') : (f.notes?.match(/(\d+)\s*(?:рб|дети|дет|chd)/i)?.[1] || '0'));
   let pax_inf = (f.pax_inf !== undefined && f.pax_inf !== null && f.pax_inf !== '')
     ? String(f.pax_inf)
-    : (f.pax && typeof f.pax === 'string' && f.pax.includes('/') && f.pax.split('/').length > 2 ? f.pax.split('/')[2]?.trim() : (f.notes?.match(/(\d+)\s*(?:рм|млад|inf)/i)?.[1] || ''));
+    : (f.pax && typeof f.pax === 'string' && f.pax.includes('/') && f.pax.split('/').length > 2 ? (f.pax.split('/')[2]?.trim() || '0') : (f.notes?.match(/(\d+)\s*(?:рм|млад|inf)/i)?.[1] || '0'));
 
   const unread_changes = getSafeUnreadChanges(f);
   const hasUnread = Object.keys(unread_changes).length > 0;
@@ -132,8 +132,8 @@ function normalizeFlight(f) {
     astra_times_sent, 
     crew_manual,
     ac_type,
-    pax_ch: pax_ch || f.pax_ch || '',
-    pax_inf: pax_inf || f.pax_inf || '',
+    pax_ch: (pax_ch !== undefined && pax_ch !== null && pax_ch !== '') ? String(pax_ch) : '0',
+    pax_inf: (pax_inf !== undefined && pax_inf !== null && pax_inf !== '') ? String(pax_inf) : '0',
     unread_changes: hasUnread ? unread_changes : undefined,
     is_new_flight: hasUnread ? !!f.is_new_flight : false
   };

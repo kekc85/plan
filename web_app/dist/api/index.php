@@ -1303,6 +1303,13 @@ if ($route === '/shift/current') {
             }
         }
 
+        if ($rCh === '' && $rPax !== '') {
+            $rCh = '0';
+        }
+        if ($rInf === '' && $rPax !== '') {
+            $rInf = '0';
+        }
+
         $flItem = [
             'id' => (string)$r['id'],
             'flight' => (string)($r['flight_number'] ?? ''),
@@ -1349,8 +1356,11 @@ if ($route === '/shift/current') {
         ];
         if (!empty($r['unread_changes'])) {
             $parsedUnread = json_decode($r['unread_changes'], true);
-            if ($parsedUnread) {
-                $flItem['unread_changes'] = $parsedUnread;
+            if (is_array($parsedUnread)) {
+                unset($parsedUnread['pax_ch'], $parsedUnread['pax_inf']);
+                if (!empty($parsedUnread)) {
+                    $flItem['unread_changes'] = $parsedUnread;
+                }
             }
         }
         $flights[] = $flItem;
@@ -1523,8 +1533,19 @@ if ($route === '/shift/save') {
         ");
 
         foreach ($flights as $index => $f) {
-            $unreadChangesJson = !empty($f['unread_changes']) ? json_encode($f['unread_changes'], JSON_UNESCAPED_UNICODE) : null;
+            $unreadChangesJson = null;
+            if (!empty($f['unread_changes'])) {
+                $rawUnread = is_array($f['unread_changes']) ? $f['unread_changes'] : json_decode($f['unread_changes'], true);
+                if (is_array($rawUnread)) {
+                    unset($rawUnread['pax_ch'], $rawUnread['pax_inf']);
+                    if (!empty($rawUnread)) {
+                        $unreadChangesJson = json_encode($rawUnread, JSON_UNESCAPED_UNICODE);
+                    }
+                }
+            }
             $flightId = !empty($f['id']) ? (string)$f['id'] : ('fl_' . time() . '_' . $index . '_' . mt_rand(100, 999));
+            $paxChVal = isset($f['pax_ch']) && $f['pax_ch'] !== '' ? (string)$f['pax_ch'] : '0';
+            $paxInfVal = isset($f['pax_inf']) && $f['pax_inf'] !== '' ? (string)$f['pax_inf'] : '0';
             $insertFlight->execute([
                 $flightId,
                 $shiftId,
@@ -1540,8 +1561,8 @@ if ($route === '/shift/save') {
                 (string)($f['pax'] ?? ''),
                 (string)($f['pax_m'] ?? ''),
                 (string)($f['pax_f'] ?? ''),
-                (string)($f['pax_ch'] ?? ''),
-                (string)($f['pax_inf'] ?? ''),
+                $paxChVal,
+                $paxInfVal,
                 (string)($f['crew'] ?? ''),
                 (string)($f['fuel_block'] ?? ''),
                 (string)($f['fuel_trip'] ?? ''),
@@ -2695,6 +2716,13 @@ if ($route === '/fetch_schedule') {
             }
         } elseif ($inboundDep !== '') {
             $planeStatus = 'scheduled';
+        }
+
+        if ($paxCh === '' && $paxCount !== '') {
+            $paxCh = '0';
+        }
+        if ($paxInf === '' && $paxCount !== '') {
+            $paxInf = '0';
         }
 
         $processed[] = [

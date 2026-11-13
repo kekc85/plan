@@ -1052,7 +1052,7 @@ function FlightRow({
               return `Пассажиры (PAX): ${flight.pax || 0} (РБ: ${ch}, РМ: ${inf})`;
             })()}
             className={`bg-transparent focus:bg-white dark:focus:bg-slate-800 focus:ring-1 focus:ring-sky-500 rounded px-0.5 py-0.5 w-11 text-center font-mono font-black text-sm text-slate-950 dark:text-white outline-none cursor-text ${
-              getChangedStyle('pax') || ((isChanged('pax_ch') || isChanged('pax_inf')) ? 'ring-2 ring-amber-400/80 bg-amber-50 dark:bg-amber-950/40' : '')
+              getChangedStyle('pax')
             }`}
           />
           {(() => {
@@ -1061,28 +1061,14 @@ function FlightRow({
             const numCh = parseInt(ch, 10) || 0;
             const numInf = parseInt(inf, 10) || 0;
             const hasChOrInf = numCh > 0 || numInf > 0;
-            const isChChanged = isChanged('pax_ch');
-            const isInfChanged = isChanged('pax_inf');
 
-            if (!hasChOrInf && !isChChanged && !isInfChanged) return null;
+            if (!hasChOrInf) return null;
 
             return (
               <div className="flex flex-col items-center mt-0.5 gap-0.5">
-                {hasChOrInf && (
-                  <span className={`text-[8px] tracking-tight leading-none px-1 py-0.2 rounded ${
-                    (isChChanged || isInfChanged)
-                      ? 'bg-amber-100 dark:bg-amber-950/90 text-amber-950 dark:text-amber-200 border border-amber-400 font-black'
-                      : 'text-sky-600 dark:text-sky-400 font-bold'
-                  }`} title={`Дети: ${numCh} рб, Младенцы: ${numInf} рм`}>
-                    {numCh > 0 ? `${numCh}рб` : ''}{numCh > 0 && numInf > 0 ? ' ' : ''}{numInf > 0 ? `${numInf}рм` : ''}
-                  </span>
-                )}
-                {isChChanged && (
-                  <ChangeBadge change={unread.pax_ch} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'pax_ch')} />
-                )}
-                {isInfChanged && (
-                  <ChangeBadge change={unread.pax_inf} onAcknowledge={() => onAcknowledgeField?.(flight.id, 'pax_inf')} />
-                )}
+                <span className="text-[8px] tracking-tight leading-none px-1 py-0.2 rounded text-sky-600 dark:text-sky-400 font-bold" title={`Дети: ${numCh} рб, Младенцы: ${numInf} рм`}>
+                  {numCh > 0 ? `${numCh}рб` : ''}{numCh > 0 && numInf > 0 ? ' ' : ''}{numInf > 0 ? `${numInf}рм` : ''}
+                </span>
               </div>
             );
           })()}

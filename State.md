@@ -1,3 +1,9 @@
+- 2026-11-13: Устранено циклическое появление ложных обновлений детей/младенцев (pax_ch, pax_inf):
+  - Поля `pax_ch` и `pax_inf` выведены из `TRACKED_AVIABIT_FIELDS` в `deltaSync.js`: появление и уточнение количества детей/младенцев из регистрации AviaBit теперь обновляет счетчики и бейдж `[Xрб Yрм]` бесшовно без генерации тревожных уведомлений `unread_changes` и кнопок `[--]`.
+  - Тревожные уведомления сохраняются только для ключевых оперативных параметров: общего числа пассажиров (`pax`), времени, борта, экипажа, груза, почты и маршрута.
+  - В `FlightRow.jsx` удалены кнопки-плашки `ChangeBadge` для `pax_ch`/`pax_inf`, отображавшиеся как `[--]`, убран жёлтый контур поля PAX при изменении детей; бейдж `ChangeBadge` для общего `pax` сохранён.
+  - В `normalizeFlight` (`App.jsx`), `smartMergeWithDelta` (`deltaSync.js`) и в API (`index.php`: `/fetch_schedule`, `/shift/current`, `/shift/save`) обеспечена инициализация `pax_ch`/`pax_inf` числом `'0'` вместо пустой строки `""`, а также санитизация `unread_changes` от фантомных ключей детей.
+  - В боевой БД на Beget для текущих 6 рейсов прописаны актуальные значения детей/младенцев из AviaBit, очищены старые фантомные `unread_changes`.
 - 2026-11-13: Таблица «История расчетов» AeroBag растянута на полную высоту:
   - В `aerobag/style.css` установлено `align-items: stretch` в `#tab-content-predict .workspace-grid`, а `.history-column`, `.history-predictions-section` и `.predictions-table-responsive-compact` переведены на 100% высоту (`flex: 1 1 auto; height: 100%; min-height: 0; max-height: none !important`).
   - Устранено искусственное ограничение `max-height: 250px` из адаптивных медиа-запросов десктопа: таблица тянется до конца правых таблиц.
