@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#040814">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AeroBag">
+    
+    <!-- Фавиконы и PWA Манифест -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <title data-translate="app-title">AeroBag Predictor: Расчет Веса Багажа</title>
+    <!-- Мгновенная инициализация темы без мелькания (Zero-Flicker Theme Init) -->
+    <script>
+        (function() {
+            var savedTheme = null;
+            try {
+                var profileStr = localStorage.getItem('averago_current_user_profile') || localStorage.getItem('averago_local_auth_user');
+                if (profileStr) {
+                    var p = JSON.parse(profileStr);
+                    if (p && p.theme) savedTheme = p.theme;
+                }
+            } catch(e) {}
+            if (!savedTheme) {
+                savedTheme = localStorage.getItem('averago_theme');
+            }
+            if (savedTheme === 'light') {
+                document.documentElement.classList.add('light-theme');
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else {
+                document.documentElement.classList.remove('light-theme');
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+    <!-- Подключение шрифтов Montserrat, Outfit и высокотехнологичного JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=v12.2.31">
+</head>
+<body>
+    <script>
+        (function() {
+            var bodyTheme = null;
+            try {
+                var pStr = localStorage.getItem('averago_current_user_profile') || localStorage.getItem('averago_local_auth_user');
+                if (pStr) {
+                    var prof = JSON.parse(pStr);
+                    if (prof && prof.theme) bodyTheme = prof.theme;
+                }
+            } catch(e) {}
+            if (!bodyTheme) bodyTheme = localStorage.getItem('averago_theme');
+            if (bodyTheme === 'light' || document.documentElement.classList.contains('light-theme')) {
+                document.body.className = (document.body.className ? document.body.className + ' ' : '') + 'light-theme';
+            }
+        })();
+    </script>
+    <div class="aviation-grid-overlay"></div>
+    <div class="app-container">
+        <!-- Шапка в стиле Airline Ops Dispatcher -->
+        <header class="app-header glass aviation-header">
+            <div class="header-left">
+                <div class="header-logo">
+                    <span class="logo-plane">✈️</span>
+                    <span class="logo-accent">AeroBag</span> Predictor
+                </div>
+                <span class="logo-sub" data-translate="logo-sub">FLIGHT OPS CONTROL</span>
+                <div class="header-status-indicator">
+                    <span class="status-pulse"></span>
+                    <span class="status-text" id="status-text-label" data-translate="status-dispatch">ДИСПЕТЧЕР ОНЛАЙН</span>
+                    <span id="header-server-ping" class="status-ping-badge ping-fast" title="Скорость соединения с сервером (Ping)">⚡ 1ms</span>
+                </div>
+                <a href="#" id="btn-return-aeroplan" class="header-plan-pill" title="Вернуться в суточный план смены AeroPlan" onclick="handleReturnToAeroPlan(event)">
+                    <span class="pill-icon">📋</span>
+                    <span class="pill-text" data-translate="btn-return-plan">AeroPlan W&B</span>
+                    <span class="pill-arrow">↗</span>
+                </a>
+            </div>
+
+            <div class="header-actions">
+                <!-- Профиль авторизованного пользователя -->
+                <div id="header-user-profile" class="header-user-profile hidden">
+                    <span id="user-role-badge" class="badge-role badge-role-admin">ADMIN</span>
+                    <span id="user-fullname" class="user-fullname">Администратор</span>
+                    <button type="button" id="btn-logout" class="btn btn-secondary btn-logout" title="Выйти из системы">
+                        <span>🚪</span>
+                        <span data-translate="btn-logout">Выход</span>
+                    </button>
+                </div>
+
+                <!-- Селектор языка -->
+                <div class="lang-selector">
+                    <button id="btn-lang-ru" class="btn btn-lang active">RU</button>
+                    <button id="btn-lang-en" class="btn btn-lang">EN</button>
+                </div>
+                
+                <!-- Переключатель темы -->
+                <button id="btn-theme-toggle" class="btn btn-secondary btn-theme">
+                    <span class="theme-emoji">🌙</span>
+                    <span class="theme-text" data-translate="theme-dark">Темная тема</span>
+                </button>
+
+                <!-- Скачивание руководства -->
+                <a href="USER_MANUAL.docx" download="USER_MANUAL.docx" id="btn-download-manual" class="btn btn-secondary btn-theme" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                    <span class="theme-emoji">📄</span>
+                    <span class="theme-text" data-translate="btn-manual">Руководство</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- Навигация по вкладкам (Авиационный стиль HUD) -->
+        <div class="tab-navigation glass aviation-tabs">
+            <button id="tab-btn-predict" class="tab-btn active" data-translate="tab-predict">Прогнозирование</button>
+            <button id="tab-btn-dashboard" class="tab-btn" data-translate="tab-dashboard">Дашборд аналитики</button>
+            <button id="tab-btn-admin" class="tab-btn hidden" data-translate="tab-admin" style="display: none;">Администрирование</button>
+        </div>
+
+        <!-- Основная область -->
+        <main class="main-workspace">
+            
+            <!-- ВКЛАДКА 1: ПРОГНОЗИРОВАНИЕ -->
+            <div id="tab-content-predict" class="tab-content active">
+                <div class="workspace-grid">
+                    <!-- Колонка 1 (Слева): История расчетов прогнозов -->
+                    <div class="history-column">
+                        <section class="panel glass table-section history-predictions-section aviation-panel">
+                            <div class="hud-corner top-left"></div>
+                            <div class="hud-corner top-right"></div>
+                            <div class="hud-corner bottom-left"></div>
+                            <div class="hud-corner bottom-right"></div>
+                            
+                            <div class="table-header-container history-header-container">
+                                <h2 class="panel-title" data-translate="predictions-table-title">[ FORECAST HISTORY ]</h2>
+                                <div class="table-actions">
+                                    <button type="button" id="btn-clear-predictions" class="btn btn-danger aviation-btn btn-clear-history-compact" data-translate="btn-clear-predictions" onclick="handleClearPredictions(event)" title="Очистить историю расчетов">Очистить</button>
+                                </div>
+                            </div>
+                            <div class="predictions-table-responsive-compact">
+                                <table id="predictions-table" class="flights-table aviation-table predictions-compact-table">
+                                    <colgroup>
+                                        <col style="width: 29%;">
+                                        <col style="width: 25%;">
+                                        <col style="width: 18%;">
+                                        <col style="width: 20%;">
+                                        <col style="width: 8%;">
+                                    </colgroup>
+                                    <thead>
+                                        <tr>
+                                            <th data-translate="th-route">Маршрут</th>
+                                            <th data-translate="th-flight-date">Рейс / Дата</th>
+                                            <th data-translate="th-dep-time" style="text-align: center;">Вылет</th>
+                                            <th data-translate="th-tail" style="text-align: center;">Борт</th>
+                                            <th style="text-align: center;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="predictions-table-body">
+                                        <tr>
+                                            <td colspan="5" class="empty-table-text" data-translate="empty-predictions-table">История пуста.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                    <!-- Левая панель: Форма прогноза -->
+                    <div class="left-column">
+                        <section class="panel glass aviation-panel">
+                            <div class="hud-corner top-left"></div>
+                            <div class="hud-corner top-right"></div>
+                            <div class="hud-corner bottom-left"></div>
+                            <div class="hud-corner bottom-right"></div>
+                            
+                            <h2 class="panel-title" data-translate="predict-title">[ FORECAST DATA ENTRY ]</h2>
+                            <div class="form-group custom-autocomplete-wrapper">
+                                <label for="select-flight" data-translate="label-flight-no">Номер рейса (FLT NO)</label>
+                                <div class="input-with-dropdown">
+                                    <input type="text" id="select-flight" class="form-control" tabindex="1" placeholder="Введите номер рейса (напр. 505)" data-translate="placeholder-flight-no" autocomplete="off">
+                                    <span id="btn-toggle-flight-dropdown" class="dropdown-chevron">▼</span>
+                                    <div id="flight-suggestions-dropdown" class="custom-dropdown-panel hidden"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group col-6">
+                                    <label for="select-from" data-translate="label-from">Аэропорт вылета (DEP / FROM)</label>
+                                    <select id="select-from" class="form-control" tabindex="2">
+                                        <!-- Заполняется динамически -->
+                                    </select>
+                                </div>
+                                <div class="form-group col-6">
+                                    <label for="select-to" data-translate="label-to">Аэропорт прилета (ARR / TO)</label>
+                                    <select id="select-to" class="form-control" tabindex="3" disabled>
+                                        <option value="" data-translate="select-from-first">Сначала выберите аэропорт вылета</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group col-6">
+                                    <label for="input-pax" data-translate="label-pax">Пассажиры (PAX)</label>
+                                    <input type="number" id="input-pax" class="form-control" tabindex="4" min="1" max="1000" value="150">
+                                    <div class="pax-mode-toggle-group">
+                                        <label class="pax-mode-option">
+                                            <input type="radio" name="pax-mode" id="pax-mode-fact" value="1.0" checked>
+                                            <span class="pax-mode-btn" data-translate="pax-mode-fact">Факт (100%)</span>
+                                        </label>
+                                        <label class="pax-mode-option">
+                                            <input type="radio" name="pax-mode" id="pax-mode-booking" value="0.97">
+                                            <span class="pax-mode-btn" data-translate="pax-mode-booking">Бронь (97% явка)</span>
+                                        </label>
+                                    </div>
+                                    <div id="pax-expected-hint" class="pax-expected-hint hidden"></div>
+                                </div>
+                                <div class="form-group col-6">
+                                    <label for="input-date" data-translate="label-flight-date">Дата рейса</label>
+                                    <input type="date" id="input-date" class="form-control" tabindex="5">
+                                </div>
+                            </div>
+
+                            <button id="btn-calculate" class="btn btn-primary btn-block aviation-btn" tabindex="6" data-translate="btn-calculate">Рассчитать</button>
+
+                            <!-- Настройки анализа данных -->
+                            <div class="analysis-settings-container">
+                                <button id="btn-toggle-settings" class="btn btn-block btn-toggle-settings">
+                                    <span class="settings-icon">⚙️</span>
+                                    <span data-translate="analysis-settings-title">ПАРАМЕТРЫ АНАЛИЗА И СЕЗОННОСТИ</span>
+                                    <span class="arrow-icon">▼</span>
+                                </button>
+                                
+                                <div id="analysis-settings-panel" class="analysis-settings-panel hidden">
+                                    <!-- Область сопоставления (Matching Scope) -->
+                                    <div class="form-group">
+                                        <label for="select-analysis-scope" data-translate="label-analysis-scope">Область сопоставления (Matching Scope)</label>
+                                        <select id="select-analysis-scope" class="form-control">
+                                            <option value="auto" data-translate="opt-scope-auto">Умный каскад (Авто)</option>
+                                            <option value="flight" data-translate="opt-scope-flight">Только выбранный рейс</option>
+                                            <option value="route" data-translate="opt-scope-route">Всё направление (Маршрут)</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Период анализа данных (Data Period) -->
+                                    <div class="form-group">
+                                        <label for="select-period-type" data-translate="label-period-type">Период анализа данных (Data Period)</label>
+                                        <select id="select-period-type" class="form-control">
+                                            <option value="auto" data-translate="opt-period-auto" selected>Умный каскад (180 дн., α=0.3, сезонность)</option>
+                                            <option value="all_history" data-translate="opt-period-all-history">Вся история базы (3 года)</option>
+                                            <option value="custom" data-translate="opt-period-custom">Произвольный диапазон дат</option>
+                                            <option value="seasonal" data-translate="opt-period-seasonal">Сезонный срез (месяц / год)</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Дополнительные поля для произвольного диапазона -->
+                                    <div id="custom-range-inputs" class="form-row hidden">
+                                        <div class="form-group col-6">
+                                            <label for="input-analysis-start-date" data-translate="label-start-date">Дата начала (From)</label>
+                                            <input type="date" id="input-analysis-start-date" class="form-control">
+                                        </div>
+                                        <div class="form-group col-6">
+                                            <label for="input-analysis-end-date" data-translate="label-end-date">Дата окончания (To)</label>
+                                            <input type="date" id="input-analysis-end-date" class="form-control">
+                                        </div>
+                                    </div>
+
+                                    <!-- Дополнительные поля для сезонного месяца -->
+                                    <div id="seasonal-inputs" class="form-row hidden">
+                                        <div class="form-group col-6">
+                                            <label for="select-seasonal-month" data-translate="label-month">Месяц (Month)</label>
+                                            <select id="select-seasonal-month" class="form-control">
+                                                <option value="0" data-translate="month-jan">Январь</option>
+                                                <option value="1" data-translate="month-feb">Февраль</option>
+                                                <option value="2" data-translate="month-mar">Март</option>
+                                                <option value="3" data-translate="month-apr">Апрель</option>
+                                                <option value="4" data-translate="month-may">Май</option>
+                                                <option value="5" data-translate="month-jun">Июнь</option>
+                                                <option value="6" data-translate="month-jul">Июль</option>
+                                                <option value="7" data-translate="month-aug">Август</option>
+                                                <option value="8" data-translate="month-sep">Сентябрь</option>
+                                                <option value="9" data-translate="month-oct">Октябрь</option>
+                                                <option value="10" data-translate="month-nov">Ноябрь</option>
+                                                <option value="11" data-translate="month-dec">Декабрь</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group col-6">
+                                            <label for="select-seasonal-year" data-translate="label-year">Год (Year)</label>
+                                            <select id="select-seasonal-year" class="form-control">
+                                                <!-- Будет заполняться динамически -->
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        <!-- 2. Результаты прогноза (Карточки ожидаемых параметров багажа) -->
+                        <section class="panel glass results-wrapper aviation-panel margin-top-10" style="margin-top: 10px;">
+                            <div class="hud-corner top-left"></div>
+                            <div class="hud-corner top-right"></div>
+                            <div class="hud-corner bottom-left"></div>
+                            <div class="hud-corner bottom-right"></div>
+
+                            <h2 class="panel-title" data-translate="results-title">[ EXPECTED BAGGAGE LOAD ]</h2>
+                            
+                            <button type="button" id="btn-transfer-preliminary" class="btn btn-secondary btn-block aviation-btn" style="margin-bottom: 12px;" tabindex="7" data-translate="btn-transfer-preliminary">[ ⬇️ ПЕРЕНЕСТИ В PRELIMINARY ]</button>
+
+                            <!-- Предупреждение о датах -->
+                            <div id="date-warning" class="warning-box hidden">
+                                <span class="warning-icon">⚠</span>
+                                <span id="warning-text" class="warning-text"></span>
+                            </div>
+
+                            <div class="results-grid">
+                                <!-- Карточка: Места багажа -->
+                                <div class="result-card glass-card purple-glow aviation-result">
+                                    <div class="card-icon">🧳</div>
+                                    <div class="card-info">
+                                        <span class="card-label" data-translate="res-bag-pcs">Мест багажа (PCS)</span>
+                                        <span id="res-pcs" class="card-value monospace-val">0</span>
+                                    </div>
+                                </div>
+
+                                <!-- Карточка: Вес багажа -->
+                                <div class="result-card glass-card blue-glow aviation-result">
+                                    <div class="card-icon">⚖️</div>
+                                    <div class="card-info">
+                                        <span class="card-label" data-translate="res-bag-weight">Вес багажа (BAG WEIGHT)</span>
+                                        <span class="value-container">
+                                            <span id="res-weight" class="card-value monospace-val">0</span>
+                                            <span class="unit" data-translate="unit-kg">кг</span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Карточка: Вес ручной клади -->
+                                <div class="result-card glass-card green-glow aviation-result">
+                                    <div class="card-icon">🎒</div>
+                                    <div class="card-info">
+                                        <span class="card-label" data-translate="res-hb-weight">Ручная кладь (CABIN BAG)</span>
+                                        <span class="value-container">
+                                            <span id="res-hb" class="card-value monospace-val">0</span>
+                                            <span class="unit" data-translate="unit-kg">кг</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Информационная таблица коэффициентов -->
+                            <div class="coefficients-panel aviation-subpanel">
+                                <h3 class="subsection-title" data-translate="applied-coeffs">Примененные коэффициенты</h3>
+                                <div class="coef-grid">
+                                    <div class="coef-item">
+                                        <span class="coef-label" data-translate="coef-pcs-pax">Мест на 1 пасс. (PCS/PAX)</span>
+                                        <span id="coef-pcs-pax" class="coef-value monospace-val">-</span>
+                                    </div>
+                                    <div class="coef-item">
+                                        <span class="coef-label" data-translate="coef-weight-pc">Вес 1 места (Weight/PC)</span>
+                                        <span id="coef-weight-pc" class="coef-value monospace-val">-</span>
+                                    </div>
+                                    <div class="coef-item">
+                                        <span class="coef-label" data-translate="coef-hb-pax">Ручная кладь на 1 пасс. (HB/PAX)</span>
+                                        <span id="coef-hb-pax" class="coef-value monospace-val">-</span>
+                                    </div>
+                                </div>
+
+                                <!-- Детализация отобранных рейсов и расчётных показателей -->
+                                <div id="sampled-flights-container" class="sampled-flights-container hidden collapsed">
+                                    <div id="sampled-flights-toggle" class="sampled-flights-header clickable" title="Нажмите, чтобы развернуть или скрыть детализацию">
+                                        <div class="sampled-flights-header-left">
+                                            <span class="sampled-flights-icon">📊</span>
+                                            <span id="sampled-flights-title" class="sampled-flights-title" data-translate="sampled-flights-title">Отобранные рейсы для расчета:</span>
+                                        </div>
+                                        <span class="sampled-flights-arrow">►</span>
+                                    </div>
+                                    <div id="sampled-flights-body" class="sampled-flights-table-wrapper">
+                                        <table class="sampled-flights-table">
+                                            <thead>
+                                                <tr>
+                                                    <th data-translate="th-sample-date">Дата (день)</th>
+                                                    <th data-translate="th-sample-flight">Рейс</th>
+                                                    <th data-translate="th-sample-pax">Пасс.</th>
+                                                    <th data-translate="th-sample-pcs">Багаж</th>
+                                                    <th data-translate="th-sample-weight">Вес баг.</th>
+                                                    <th data-translate="th-sample-hb">Р/кладь</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="sampled-flights-tbody"></tbody>
+                                            <tfoot id="sampled-flights-tfoot"></tfoot>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div class="coef-source-info" style="margin-top: 6px;">
+                                    <span data-translate="coef-source-label">Источник данных:</span>
+                                    <strong id="calc-source-desc">-</strong>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Правая панель: Таблица коммерческой загрузки багажа и распределения (AVERAGE BAGGAGE WEIGHT TABLE & BULK) -->
+                    <div class="right-column">
+                        <section class="panel glass table-section load-planning-section aviation-panel">
+                    <div class="hud-corner top-left"></div>
+                    <div class="hud-corner top-right"></div>
+                    <div class="hud-corner bottom-left"></div>
+                    <div class="hud-corner bottom-right"></div>
+
+                    <div class="unified-load-wrapper">
+                        <!-- 1. НЕПОДВИЖНАЯ ВЕРХНЯЯ ШАПКА -->
+                        <table class="flights-table aviation-table fixed-load-table header-table">
+                            <colgroup>
+                                <col style="width: 27%;">
+                                <col style="width: 13%;">
+                                <col style="width: 13%;">
+                                <col style="width: 15%;">
+                                <col style="width: 16%;">
+                                <col style="width: 16%;">
+                            </colgroup>
+                            <thead>
+                                <!-- Заголовок 1: AVERAGE BAGGAGE WEIGHT TABLE -->
+                                <tr class="header-main-title">
+                                    <th colspan="6" class="title-cell title-cell-relative">
+                                        <div id="active-flight-badge" class="active-flight-badge hidden">
+                                            <span id="badge-route" class="badge-route"></span>
+                                            <span id="badge-flight-no" class="badge-flight-no"></span>
+                                            <span id="badge-flight-date" class="badge-flight-date"></span>
+                                        </div>
+                                        <div class="load-title-text" data-translate="load-planning-title">[ СРЕДНИЙ ВЕС БАГАЖА И ДАННЫЕ ЗАГРУЗКИ ]</div>
+                                    </th>
+                                </tr>
+                                <!-- Заголовки показателей -->
+                                <tr class="header-cols">
+                                    <th></th>
+                                    <th style="text-align: center;" data-translate="th-pax-no">PAX NO</th>
+                                    <th style="text-align: center;" data-translate="th-pcs">PCS</th>
+                                    <th style="text-align: center;" data-translate="th-weight">WEIGHT (кг)</th>
+                                    <th style="text-align: center;" data-translate="th-avg-bag-weight">AVERAGE BAG WEIGHT</th>
+                                    <th style="text-align: center;" data-translate="th-avg-bag-pax">AVERAGE BAG NO/PAX</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Строка 1: PRELIMINARY -->
+                                <tr class="preliminary-row">
+                                    <td><strong data-translate="row-preliminary" class="cat-label">PRELIMINARY</strong></td>
+                                    <td id="prelim-pax" class="monospace-val text-center super-val-cyan">0</td>
+                                    <td id="prelim-pcs" class="monospace-val text-center super-val-cyan">0</td>
+                                    <td id="prelim-weight" class="monospace-val text-center super-val-gold">0</td>
+                                    <td id="prelim-avg-weight" class="monospace-val highlight-cell-gold" rowspan="2" style="vertical-align: middle; text-align: center; font-size: 1.35rem; font-weight: 800; color: var(--secondary); background: rgba(255, 183, 0, 0.06); padding: 4px; overflow: hidden;">0,00</td>
+                                    <td id="prelim-avg-pax" class="monospace-val highlight-cell-cyan" rowspan="2" style="vertical-align: middle; text-align: center; font-size: 1.35rem; font-weight: 800; color: var(--primary); background: rgba(0, 242, 255, 0.06); padding: 4px; overflow: hidden;">0,00</td>
+                                </tr>
+                                <!-- Строка 2: LIR OR FINAL -->
+                                <tr class="lir-row">
+                                    <td><strong data-translate="row-lir-final" class="cat-label">LIR OR FINAL</strong></td>
+                                    <td style="text-align: center;"><input type="number" id="lir-pax" class="form-control table-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="100"></td>
+                                    <td style="text-align: center;"><input type="number" id="lir-pcs" class="form-control table-input monospace-val super-input-cyan" min="0" max="1000" value="0" tabindex="101"></td>
+                                    <td style="text-align: center;"><input type="number" id="lir-weight" class="form-control table-input monospace-val super-input-gold" min="0" max="50000" value="0" tabindex="102"></td>
+                                </tr>
+
+                            </tbody>
+                        </table>
+
+                        <!-- 2. ДИНАМИЧЕСКАЯ ТАБЛИЦА BULK С МУЛЬТИ-ЗАГРУЗКОЙ ПОЗИЦИЙ -->
+                        <div class="bulk-planning-wrapper">
+                            <table class="flights-table aviation-table fixed-load-table bulk-header-table">
+                                <colgroup>
+                                    <col style="width: 13%;">
+                                    <col style="width: 21%;">
+                                    <col style="width: 26%;">
+                                    <col style="width: 30%;">
+                                    <col style="width: 10%;">
+                                </colgroup>
+                                <thead>
+                                    <tr class="header-sub-title">
+                                        <th colspan="5" class="subtitle-cell" style="padding: 0;">
+                                            <div class="bulk-header-flex">
+                                                <div class="bulk-title-badge-group">
+                                                    <span id="bulk-title-text" style="font-size: 1.05rem; font-weight: 800; letter-spacing: 1.5px;">BULK (БАГАЖНИКИ)</span>
+                                                    <span id="aircraft-model-badge" class="aircraft-model-badge hidden"></span>
+                                                    <select id="select-aircraft-tail" class="select-aircraft-tail" title="Выбрать бортовой номер">
+                                                        <option value="">-- Борт --</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <button type="button" id="btn-toggle-fwd" class="btn-toggle-fwd hidden" onclick="toggleFwdCompartments()">
+                                                        <span>➕ FWD (Передний)</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </th>
+                                    </tr>
+                                    <tr class="header-subcols">
+                                        <th style="text-align: center;" data-translate="th-cpt-sec">ОТСЕК</th>
+                                        <th style="text-align: center;" data-translate="th-load-type">ТИП ЗАГРУЗКИ</th>
+                                        <th style="text-align: center;" data-translate="th-pcs">МЕСТА</th>
+                                        <th style="text-align: center;" data-translate="th-weight">ВЕС (кг)</th>
+                                        <th style="text-align: center;"></th>
+                                    </tr>
+                                </thead>
+                            </table>
+
+                            <div class="load-rows-scroll-container">
+                                <table class="flights-table aviation-table fixed-load-table rows-table">
+                                    <colgroup>
+                                        <col style="width: 14%;">
+                                        <col style="width: 32%;">
+                                        <col style="width: 20%;">
+                                        <col style="width: 24%;">
+                                        <col style="width: 10%;">
+                                    </colgroup>
+                                    <tbody id="unified-load-tbody">
+                                        <!-- Динамически рендерится через renderCompartmentsTable() -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- 3. НЕПОДВИЖНЫЙ НИЖНИЙ ПОДВАЛ (REST И TTL) -->
+                            <table class="flights-table aviation-table fixed-load-table footer-table bulk-footer-table">
+                                <colgroup>
+                                    <col style="width: 34%;">
+                                    <col style="width: 26%;">
+                                    <col style="width: 30%;">
+                                    <col style="width: 10%;">
+                                </colgroup>
+                                <tfoot>
+                                    <tr class="rest-row">
+                                        <td><strong data-translate="row-rest">ОСТАТОК</strong></td>
+                                        <td id="bulk-rest-pcs" class="monospace-val rest-cell super-val-cyan" style="text-align: center;">0</td>
+                                        <td id="bulk-rest-weight" class="monospace-val rest-cell super-val-gold" style="text-align: center;">0</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr class="ttl-row">
+                                        <td><strong data-translate="row-ttl">ИТОГО</strong></td>
+                                        <td id="bulk-ttl-pcs" class="monospace-val super-val-cyan" style="text-align: center;">0</td>
+                                        <td id="bulk-ttl-weight" class="monospace-val super-val-gold" style="text-align: center;">0</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <div class="bulk-actions-toolbar" style="margin-top: 12px; display: flex; justify-content: flex-end; gap: 10px; padding: 4px 0;">
+                                <button type="button" class="btn btn-primary" id="btn-open-loadsheet" onclick="openWbLoadsheet()" title="Сформировать W&amp;B LoadSheet с расчетными весами коммерческой загрузки по отсекам" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 13px; font-weight: 800; border-radius: 8px;">
+                                    <span>📄 Сформировать W&amp;B LoadSheet</span>
+                                </button>
+                            </div>
+                        </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ВКЛАДКА 2: ДАШБОРД АНАЛИТИКИ И МАСШТАБИРОВАНИЯ -->
+            <div id="tab-content-dashboard" class="tab-content hidden">
+                <div class="dashboard-workspace">
+                    <!-- Панель управления фильтрацией аналитики -->
+                    <section class="panel glass aviation-panel dashboard-header-panel">
+                        <div class="hud-corner top-left"></div>
+                        <div class="hud-corner top-right"></div>
+                        <div class="hud-corner bottom-left"></div>
+                        <div class="hud-corner bottom-right"></div>
+
+                        <div class="dashboard-controls-grid">
+                            <div class="dash-title-group">
+                                <h2 class="panel-title" data-translate="dashboard-title">[ ANALYTICS & SCALING DASHBOARD ]</h2>
+                                <p class="dash-subtext" data-translate="dash-subtext">Аналитический обзор коммерческих нормативов багажа за весь период загруженной базы данных</p>
+                            </div>
+                            <div class="dash-filters-group">
+                                <div class="filter-item">
+                                    <label for="dash-filter-route" data-translate="dash-label-route">Маршрут / Аэропорт</label>
+                                    <select id="dash-filter-route" class="form-control compact-select">
+                                        <option value="all" data-translate="dash-opt-all-routes">Все направления</option>
+                                    </select>
+                                </div>
+                                <div class="filter-item">
+                                    <label for="dash-filter-period" data-translate="dash-label-period">Период времени</label>
+                                    <select id="dash-filter-period" class="form-control compact-select">
+                                        <option value="all" data-translate="dash-opt-all-period">За весь период</option>
+                                        <option value="30" data-translate="dash-opt-30-days">За последние 30 дней</option>
+                                        <option value="60" data-translate="dash-opt-60-days">За последние 60 дней</option>
+                                        <option value="90" data-translate="dash-opt-90-days">За последние 90 дней</option>
+                                        <option value="year" data-translate="dash-opt-current-year">За текущий год</option>
+                                        <option value="custom" data-translate="dash-opt-custom-range">Произвольный интервал...</option>
+                                    </select>
+                                </div>
+                                <div id="dash-custom-date-container" class="filter-item hidden" style="display: flex; gap: 6px; align-items: flex-end;">
+                                    <div>
+                                        <label for="dash-date-from" data-translate="dash-label-date-from">С даты</label>
+                                        <input type="date" id="dash-date-from" class="form-control compact-select">
+                                    </div>
+                                    <div>
+                                        <label for="dash-date-to" data-translate="dash-label-date-to">По дату</label>
+                                        <input type="date" id="dash-date-to" class="form-control compact-select">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Блок KPI Карточек -->
+                    <div class="dashboard-kpi-grid">
+                        <div class="kpi-card glass highlight-cyan">
+                            <div class="kpi-header">
+                                <span class="kpi-icon">✈️</span>
+                                <span class="kpi-title" data-translate="dashboard-kpi-total-flights">Проанализировано рейсов</span>
+                            </div>
+                            <div id="dash-kpi-flights" class="kpi-value">0</div>
+                            <div class="kpi-sub font-mono" data-translate="dashboard-kpi-period-all">За весь период базы данных</div>
+                        </div>
+
+                        <div class="kpi-card glass highlight-cyan">
+                            <div class="kpi-header">
+                                <span class="kpi-icon">📋</span>
+                                <span class="kpi-title" data-translate="dashboard-kpi-routes">Номеров рейсов</span>
+                            </div>
+                            <div id="dash-kpi-routes" class="kpi-value">0</div>
+                            <div class="kpi-sub font-mono" data-translate="dashboard-kpi-period-all">За весь период базы данных</div>
+                        </div>
+
+                        <div class="kpi-card glass highlight-gold">
+                            <div class="kpi-header">
+                                <span class="kpi-icon">⚖️</span>
+                                <span class="kpi-title" data-translate="dashboard-kpi-avg-weight">Средний вес на 1 пассажира</span>
+                            </div>
+                            <div id="dash-kpi-weight" class="kpi-value">0.00 <span class="kpi-unit">кг/пассажира</span></div>
+                            <div class="kpi-sub font-mono" data-translate="dashboard-kpi-period-all">За весь период базы данных</div>
+                        </div>
+
+                        <div class="kpi-card glass highlight-gold">
+                            <div class="kpi-header">
+                                <span class="kpi-icon">🧳</span>
+                                <span class="kpi-title" data-translate="dashboard-kpi-avg-pcs">Среднее мест на 1 пассажира</span>
+                            </div>
+                            <div id="dash-kpi-pcs" class="kpi-value">0.00 <span class="kpi-unit">мест/пассажира</span></div>
+                            <div class="kpi-sub font-mono" data-translate="dashboard-kpi-period-all">За весь период базы данных</div>
+                        </div>
+                    </div>
+
+                    <!-- Сетка графиков и визуализаций (2x2 Компактная) -->
+                    <div class="dashboard-charts-grid">
+                        <!-- График 1: Топ маршрутов по нормативу веса -->
+                        <section class="panel glass aviation-panel dash-chart-panel">
+                            <div class="hud-corner top-left"></div>
+                            <div class="hud-corner top-right"></div>
+                            <h3 class="panel-title" data-translate="dash-chart1-title">[ ВЕС НА 1 PAX ПО МАРШРУТАМ (КГ) ]</h3>
+                            <div id="dash-chart-weight-container" class="chart-bars-list">
+                                <!-- Динамические бары -->
+                            </div>
+                        </section>
+
+                        <!-- График 2: Норматив мест по направлениям -->
+                        <section class="panel glass aviation-panel dash-chart-panel">
+                            <div class="hud-corner top-left"></div>
+                            <div class="hud-corner top-right"></div>
+                            <h3 class="panel-title" data-translate="dash-chart2-title">[ МЕСТА НА 1 PAX ПО МАРШРУТАМ (PCS) ]</h3>
+                            <div id="dash-chart-pcs-container" class="chart-bars-list">
+                                <!-- Динамические бары -->
+                            </div>
+                        </section>
+
+                        <!-- График 3: Сравнение по дням недели (Пн - Вс) -->
+                        <section class="panel glass aviation-panel dash-chart-panel">
+                            <div class="hud-corner top-left"></div>
+                            <div class="hud-corner top-right"></div>
+                            <h3 class="panel-title" data-translate="dash-chart3-title">[ ДИНАМИКА ПО ДНЯМ НЕДЕЛИ (КГ/PAX) ]</h3>
+                            <div id="dash-chart-weekdays-container" class="weekday-chart-container">
+                                <!-- Динамические бары (Пн -> Вс) -->
+                            </div>
+                        </section>
+
+                        <!-- График 4: Процентное распределение вылетов по направлениям -->
+                        <section class="panel glass aviation-panel dash-chart-panel">
+                            <div class="hud-corner top-left"></div>
+                            <div class="hud-corner top-right"></div>
+                            <h3 class="panel-title" data-translate="dash-chart4-title">[ ДОЛИ ВЫЛЕТОВ ПО МАРШРУТАМ (%) ]</h3>
+                            <div id="dash-chart-shares-container" class="chart-bars-list">
+                                <!-- Динамические процентные бары -->
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ВКЛАДКА 3: АДМИНИСТРИРОВАНИЕ -->
+            <div id="tab-content-admin" class="tab-content hidden">
+                <div class="workspace-grid">
+                    <!-- Левая панель: Ручной ввод рейса -->
+                    <div class="left-column">
+                        <section class="panel glass aviation-panel">
+                            <div class="hud-corner top-left"></div>
+                            <div class="hud-corner top-right"></div>
+                            <div class="hud-corner bottom-left"></div>
+                            <div class="hud-corner bottom-right"></div>
+
+                            <h2 class="panel-title" data-translate="manual-title">[ MANUAL FLIGHT ENTRY ]</h2>
+                            <form id="form-manual-flight">
+                                <div class="form-row">
+                                    <div class="form-group col-4">
+                                        <label for="manual-airline" data-translate="label-airline">Авиакомпания</label>
+                                        <select id="manual-airline" class="form-control">
+                                            <option value="N4">N4</option>
+                                            <option value="EO">EO</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group col-4">
+                                        <label for="manual-flight-no" data-translate="label-flight-num">Рейс №</label>
+                                        <input type="text" id="manual-flight-no" class="form-control" placeholder="Напр. 432" required>
+                                    </div>
+                                    <div class="form-group col-4">
+                                        <label for="manual-date" data-translate="label-date">Дата</label>
+                                        <input type="date" id="manual-date" class="form-control" required>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group col-6">
+                                        <label for="manual-from" data-translate="label-from-airport">Вылет (DEP / FROM)</label>
+                                        <select id="manual-from" class="form-control" required></select>
+                                        <input type="text" id="manual-from-custom" class="form-control text-uppercase hidden" placeholder="Код ИАТА (напр. DXB)" maxlength="3" style="margin-top: 6px;">
+                                    </div>
+                                    <div class="form-group col-6">
+                                        <label for="manual-to" data-translate="label-to-airport">Прилет (ARR / TO)</label>
+                                        <select id="manual-to" class="form-control" required></select>
+                                        <input type="text" id="manual-to-custom" class="form-control text-uppercase hidden" placeholder="Код ИАТА (напр. MOW)" maxlength="3" style="margin-top: 6px;">
+                                    </div>
+                                </div>
+
+                                <h3 class="subsection-title" data-translate="pax-distribution">Распределение пассажиров (PAX)</h3>
+                                <div class="pax-grid">
+                                    <div class="form-group compact">
+                                        <label for="manual-men" data-translate="pax-men">Мужчины</label>
+                                        <input type="number" id="manual-men" class="form-control" min="0" max="1000" value="0">
+                                    </div>
+                                    <div class="form-group compact">
+                                        <label for="manual-women" data-translate="pax-women">Женщины</label>
+                                        <input type="number" id="manual-women" class="form-control" min="0" max="1000" value="0">
+                                    </div>
+                                    <div class="form-group compact">
+                                        <label for="manual-rb" data-translate="pax-rb">РБ (Дети)</label>
+                                        <input type="number" id="manual-rb" class="form-control" min="0" max="1000" value="0">
+                                    </div>
+                                    <div class="form-group compact">
+                                        <label for="manual-rm" data-translate="pax-rm">РМ (Млад.)</label>
+                                        <input type="number" id="manual-rm" class="form-control" min="0" max="1000" value="0">
+                                    </div>
+                                </div>
+
+                                <h3 class="subsection-title" data-translate="actual-baggage-title">Фактические данные (для базы)</h3>
+                                <div class="form-row">
+                                    <div class="form-group col-4 compact">
+                                        <label for="manual-bag-pcs" data-translate="label-bag-pcs">Мест багажа</label>
+                                        <input type="number" id="manual-bag-pcs" class="form-control" min="0" value="0">
+                                    </div>
+                                    <div class="form-group col-4 compact">
+                                        <label for="manual-bag-weight" data-translate="label-bag-weight">Вес багажа (кг)</label>
+                                        <input type="number" id="manual-bag-weight" class="form-control" min="0" step="0.1" value="0">
+                                    </div>
+                                    <div class="form-group col-4 compact">
+                                        <label for="manual-hb-weight" data-translate="label-hb-weight">Р/кладь (кг)</label>
+                                        <input type="number" id="manual-hb-weight" class="form-control" min="0" step="0.1" value="0">
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-secondary btn-block aviation-btn" data-translate="btn-add-flight">Добавить рейс в базу</button>
+                            </form>
+                        </section>
+                    </div>
+
+                    <!-- Правая панель: Загрузка файлов -->
+                    <div class="right-column">
+                        <section class="panel glass aviation-panel">
+                            <div class="hud-corner top-left"></div>
+                            <div class="hud-corner top-right"></div>
+                            <div class="hud-corner bottom-left"></div>
+                            <div class="hud-corner bottom-right"></div>
+
+                            <h2 class="panel-title" data-translate="upload-title">[ STATISTICS FILE INGESTION ]</h2>
+                            
+                            <!-- Зона Drag & Drop -->
+                            <div id="drop-zone" class="drop-zone aviation-drop-zone">
+                                <div class="drop-zone-content">
+                                    <div class="drop-icon">📥</div>
+                                    <p class="drop-text" data-translate="drop-text">Перетащите файлы .xls / .xlsx сюда или нажмите для выбора</p>
+                                    <span class="drop-sub" data-translate="drop-sub">Поддержка SpreadsheetML 2003 (.xls) и Excel (.xlsx)</span>
+                                    <input type="file" id="file-input" accept=".xls,.xlsx" multiple style="display: none;">
+                                </div>
+                            </div>
+
+                            <button type="button" id="btn-load-sample" class="btn btn-secondary btn-block aviation-btn" style="margin-top: 10px;" data-translate="btn-load-sample">Загрузить системную статистику</button>
+
+                            <!-- Статус базы данных -->
+                            <div class="db-status-bar aviation-status-bar" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+                                <span data-translate="total-flights-label">Всего рейсов в базе:</span>
+                                <strong id="total-flights-count" class="monospace-val">0</strong>
+                                <span style="opacity: 0.3; margin: 0 4px;">|</span>
+                                <span data-translate="active-flights-label">Активных (30 дней):</span>
+                                <strong id="active-flights-count" class="monospace-val">0</strong>
+                                <span class="date-range-badge" id="active-date-range">-</span>
+                            </div>
+                        </section>
+
+                        <!-- Кнопка синхронизации с Lydia DCS под окном загрузки -->
+                        <button type="button" id="btn-open-dcs-sync" class="btn-dcs-sync-trigger" style="margin-top: 14px;" onclick="window.openDcsModal()">
+                            <span class="btn-dcs-icon">📡</span>
+                            <span class="btn-dcs-text">
+                                <strong data-translate="dcs-sync-btn-title">Синхронизация с Lydia DCS</strong>
+                                <small data-translate="dcs-sync-btn-sub">Парсинг закрытых рейсов в 1 клик</small>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Секция: Управление фильтрами импорта рейсов (Departures / Arrivals Filters) -->
+                <section class="panel glass aviation-panel airport-filters-section collapsed" id="airport-filters-panel" style="margin-bottom: 20px;">
+                    <div class="hud-corner top-left"></div>
+                    <div class="hud-corner top-right"></div>
+                    <div class="hud-corner bottom-left"></div>
+                    <div class="hud-corner bottom-right"></div>
+                    
+                    <div class="table-header-container airport-filters-header" onclick="toggleAirportFiltersAccordion(event)" style="padding-bottom: 6px;">
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <h2 class="panel-title" style="margin: 0;" data-translate="filters-title">[ INGESTION ROUTE & CITY FILTERS ]</h2>
+                            <div class="filters-summary-badges" style="display: flex; align-items: center; gap: 8px;">
+                                <span id="filters-summary-deps" class="badge-role badge-role-dispatcher" style="font-size: 0.72rem;">🛫 0 вылетов</span>
+                                <span id="filters-summary-arrs" class="badge-role badge-role-admin" style="font-size: 0.72rem;">🛬 0 прилетов</span>
+                            </div>
+                        </div>
+                        <div class="table-actions" style="display: flex; align-items: center; gap: 8px;">
+                            <button type="button" id="btn-reset-filters-default" class="btn btn-secondary aviation-btn" data-translate="btn-reset-filters-default" title="Сбросить фильтры к исходным заводским настройкам" onclick="handleResetAirportFilters(event)">
+                                <span>↺</span> <span data-translate="btn-reset-filters">Сбросить по умолчанию</span>
+                            </button>
+                            <button type="button" id="btn-toggle-filters-collapse" class="btn btn-secondary aviation-btn btn-collapse-toggle" title="Развернуть/свернуть панель">
+                                <span class="collapse-icon">▼</span> <span class="collapse-text" data-translate="btn-expand">Развернуть</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Скрываемое тело панели (по умолчанию сложено) -->
+                    <div class="airport-filters-body" style="margin-top: 12px;">
+                        <p class="dash-subtext" style="margin-bottom: 14px;" data-translate="filters-subtext">Настройка разрешенных направлений для импорта из отчетов регистрации (Astra DCS / Excel). Поддерживаются коды IATA, коды РФ и названия городов.</p>
+
+                        <div class="airport-filters-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+                            <!-- Колонка 1: Фильтр пунктов вылета (Departures) -->
+                            <div class="filter-card glass aviation-subpanel" style="padding: 14px; border-radius: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 1.1rem;">🛫</span>
+                                        <strong style="color: var(--accent-cyan); font-family: var(--font-mono); font-size: 0.9rem;" data-translate="filter-departures-title">АЭРОПОРТЫ ВЫЛЕТА (FROM)</strong>
+                                    </div>
+                                    <span id="departures-count-badge" class="badge-role badge-role-dispatcher" style="font-size: 0.7rem;">0 городов</span>
+                                </div>
+                                
+                                <!-- Кнопка вызова модального окна добавления вылета -->
+                                <button type="button" class="btn btn-primary aviation-btn" style="width: 100%; margin-bottom: 12px; padding: 7px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="openAddAirportModal('departures')">
+                                    <span>➕</span> <span data-translate="btn-add-departure-airport">Добавить аэропорт вылета</span>
+                                </button>
+
+                                <!-- Контейнер строк вылета (вертикальный список в столбец) -->
+                                <div id="departures-chips-container" class="chips-container" style="display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; padding: 4px; padding-right: 6px;">
+                                    <!-- Заполняется динамически строками -->
+                                </div>
+                            </div>
+
+                            <!-- Колонка 2: Фильтр пунктов прилета (Arrivals) -->
+                            <div class="filter-card glass aviation-subpanel" style="padding: 14px; border-radius: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 1.1rem;">🛬</span>
+                                        <strong style="color: var(--accent-gold); font-family: var(--font-mono); font-size: 0.9rem;" data-translate="filter-arrivals-title">АЭРОПОРТЫ ПРИЛЕТА (TO)</strong>
+                                    </div>
+                                    <span id="arrivals-count-badge" class="badge-role badge-role-admin" style="font-size: 0.7rem;">0 городов</span>
+                                </div>
+
+                                <!-- Чекбокс строгого фильтра по прилетам (Вариант А) -->
+                                <div style="margin-bottom: 10px;">
+                                    <label class="aviation-checkbox-container" style="font-size: 0.78rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                                        <input type="checkbox" id="chk-strict-arrivals" onchange="handleToggleStrictArrivals(this.checked)">
+                                        <span data-translate="chk-strict-arrivals" style="color: var(--text-secondary);">Включить строгий фильтр по прилетам</span>
+                                    </label>
+                                </div>
+                                
+                                <!-- Кнопка вызова модального окна добавления прилета -->
+                                <button type="button" class="btn btn-primary aviation-btn" style="width: 100%; margin-bottom: 12px; padding: 7px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="openAddAirportModal('arrivals')">
+                                    <span>➕</span> <span data-translate="btn-add-arrival-airport">Добавить аэропорт прилета</span>
+                                </button>
+
+                                <!-- Контейнер строк прилета (вертикальный список в столбец) -->
+                                <div id="arrivals-chips-container" class="chips-container" style="display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; padding: 4px; padding-right: 6px;">
+                                    <!-- Заполняется динамически строками -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datalist со всеми доступными городами и кодами для автодополнения -->
+                    <datalist id="airports-datalist">
+                    </datalist>
+                </section>
+
+                <!-- Секция 1: Управление учетными записями и доступом (RBAC) -->
+                <section class="panel glass aviation-panel rbac-section" style="margin-bottom: 20px;">
+                    <div class="hud-corner top-left"></div>
+                    <div class="hud-corner top-right"></div>
+                    <div class="hud-corner bottom-left"></div>
+                    <div class="hud-corner bottom-right"></div>
+                    
+                    <div class="table-header-container">
+                        <div>
+                            <h2 class="panel-title" data-translate="rbac-title">[ ACCESS CONTROL & USER MANAGEMENT ]</h2>
+                            <p class="dash-subtext" data-translate="rbac-subtext">Управление учетными записями, назначение ролей и выдача паролей</p>
+                        </div>
+                        <div class="table-actions">
+                            <button type="button" id="btn-add-user" class="btn btn-primary aviation-btn">
+                                <span>➕</span> <span data-translate="btn-add-user">Добавить пользователя</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive" style="margin-top: 10px;">
+                        <table id="users-table" class="flights-table aviation-table">
+                            <thead>
+                                <tr>
+                                    <th data-translate="th-user-login">Логин</th>
+                                    <th data-translate="th-user-name">ФИО / Диспетчер</th>
+                                    <th data-translate="th-user-role">Роль</th>
+                                    <th data-translate="th-user-status">Статус</th>
+                                    <th data-translate="th-user-last-login">Последний вход</th>
+                                    <th data-translate="th-user-actions" style="text-align: right;">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr>
+                                    <td colspan="6" class="empty-table-text">Загрузка списка пользователей...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Секция 2: Автоматические резервные копии (Хранение 30 дней) -->
+                <section class="panel glass aviation-panel auto-backups-section collapsed" id="auto-backups-panel" style="margin-bottom: 20px;">
+                    <div class="hud-corner top-left"></div>
+                    <div class="hud-corner top-right"></div>
+                    <div class="hud-corner bottom-left"></div>
+                    <div class="hud-corner bottom-right"></div>
+                    
+                    <div class="table-header-container auto-backups-header" onclick="toggleAutoBackupsAccordion(event)" style="padding-bottom: 6px;">
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <h2 class="panel-title" style="margin: 0;" data-translate="autobackup-title">[ AUTOMATED DATABASE BACKUPS (30 DAYS) ]</h2>
+                            <div class="backups-summary-badges" style="display: flex; align-items: center; gap: 8px;">
+                                <span id="backups-count-badge" class="badge-role badge-role-admin" style="font-size: 0.72rem;">💾 0 копий</span>
+                                <span id="backups-last-date-badge" class="badge-role badge-role-dispatcher" style="font-size: 0.72rem;">Последняя: —</span>
+                            </div>
+                        </div>
+                        <div class="table-actions" style="display: flex; align-items: center; gap: 8px;">
+                            <button type="button" id="btn-create-server-backup" class="btn btn-secondary aviation-btn highlight-cyan-btn" style="padding: 6px 14px;">
+                                <span>⚡</span> <span data-translate="btn-create-server-backup">Создать бэкап сейчас</span>
+                            </button>
+                            <button type="button" id="btn-toggle-backups-collapse" class="btn btn-secondary aviation-btn btn-collapse-toggle" title="Развернуть/свернуть панель">
+                                <span class="collapse-icon">▼</span> <span class="collapse-text" data-translate="btn-expand">Развернуть</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Скрываемое тело панели бэкапов -->
+                    <div class="auto-backups-body" style="margin-top: 12px;">
+                        <p class="dash-subtext" style="margin-bottom: 12px;" data-translate="autobackup-subtext">Ежедневные снимки базы рейсов на сервере. Ротация и хранение последних 30 дней.</p>
+
+                        <div class="table-responsive" style="max-height: 260px; overflow-y: auto;">
+                            <table id="backups-table" class="flights-table aviation-table">
+                                <thead>
+                                    <tr>
+                                        <th data-translate="th-backup-file">Имя файла архива</th>
+                                        <th data-translate="th-backup-date">Дата создания</th>
+                                        <th data-translate="th-backup-size">Размер</th>
+                                        <th data-translate="th-backup-actions" style="text-align: right;">Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="backups-table-body">
+                                    <tr>
+                                        <td colspan="4" class="empty-table-text">Загрузка списка бэкапов...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                
+                <!-- Секция 3: Telegram-уведомления и мониторинг сбоев -->
+                <section class="panel glass aviation-panel telegram-section collapsed" id="telegram-panel" style="margin-bottom: 20px;">
+                    <div class="hud-corner top-left"></div>
+                    <div class="hud-corner top-right"></div>
+                    <div class="hud-corner bottom-left"></div>
+                    <div class="hud-corner bottom-right"></div>
+                    
+                    <div class="table-header-container telegram-header" onclick="toggleTelegramAccordion(event)" style="padding-bottom: 6px; cursor: pointer;">
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <h2 class="panel-title" style="margin: 0;" data-translate="telegram-title">[ TELEGRAM ALERTING & OBSERVABILITY ]</h2>
+                            <div class="telegram-summary-badges" style="display: flex; align-items: center; gap: 8px;">
+                                <span id="telegram-status-badge" class="badge-role badge-role-dispatcher" style="font-size: 0.72rem;">⚪ Отключено</span>
+                                <span id="telegram-chat-badge" class="badge-role badge-role-admin" style="font-size: 0.72rem; display: none;">ID: —</span>
+                            </div>
+                        </div>
+                        <div class="table-actions" style="display: flex; align-items: center; gap: 8px;">
+                            <button type="button" id="btn-toggle-telegram-collapse" class="btn btn-secondary aviation-btn btn-collapse-toggle" title="Развернуть/свернуть панель">
+                                <span class="collapse-icon">▼</span> <span class="collapse-text" data-translate="btn-expand">Развернуть</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Скрываемое тело панели Telegram -->
+                    <div class="telegram-body" style="margin-top: 12px;">
+                        <p class="dash-subtext" style="margin-bottom: 14px;" data-translate="telegram-subtext">Мгновенная отправка алертов о критических ошибках и сбоях системы диспетчеров прямо в Telegram администратора.</p>
+
+                        <form id="form-telegram-settings" onsubmit="handleSaveTelegramConfig(event)">
+                            <div class="telegram-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                                <!-- Поле: Bot Token -->
+                                <div class="form-group" style="margin: 0;">
+                                    <label for="input-telegram-token" style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span data-translate="label-telegram-token">Токен Telegram-бота (Bot Token):</span>
+                                        <span style="font-size: 0.72rem; color: var(--accent-cyan);">От @BotFather</span>
+                                    </label>
+                                    <div class="password-input-wrapper" style="position: relative; display: flex; align-items: center;">
+                                        <input type="password" id="input-telegram-token" class="form-control" placeholder="1234567890:AAHfj..." autocomplete="off" style="padding-right: 40px; font-family: var(--font-mono); font-size: 0.85rem;">
+                                        <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('input-telegram-token', this)" title="Показать/скрыть токен" style="position: absolute; right: 8px; background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text-muted);">👁️</button>
+                                    </div>
+                                </div>
+
+                                <!-- Поле: Chat ID -->
+                                <div class="form-group" style="margin: 0;">
+                                    <label for="input-telegram-chatid" style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span data-translate="label-telegram-chatid">ID чата / группы (Chat ID):</span>
+                                        <span style="font-size: 0.72rem; color: var(--accent-gold);">Личный или группы (-100...)</span>
+                                    </label>
+                                    <input type="text" id="input-telegram-chatid" class="form-control" placeholder="например, 123456789 или -100123456789" autocomplete="off" style="font-family: var(--font-mono); font-size: 0.85rem;">
+                                </div>
+                            </div>
+
+                            <!-- Чекбокс активности и кнопки управления -->
+                            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding-top: 8px; border-top: 1px solid rgba(0, 240, 255, 0.15);">
+                                <label class="aviation-checkbox-container" style="cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                                    <input type="checkbox" id="chk-telegram-enable">
+                                    <strong style="color: var(--accent-cyan); font-size: 0.88rem;" data-translate="chk-telegram-enable">Включить автоматическую отправку алертов об ошибках</strong>
+                                </label>
+
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <button type="button" id="btn-test-telegram" class="btn btn-secondary aviation-btn highlight-cyan-btn" onclick="handleTestTelegramConnection(event)">
+                                        <span>🧪</span> <span data-translate="btn-test-telegram">Тест соединения</span>
+                                    </button>
+                                    <button type="submit" id="btn-save-telegram" class="btn btn-primary aviation-btn">
+                                        <span>💾</span> <span data-translate="btn-save-telegram">Сохранить настройки</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <!-- Инструкция-шпаргалка -->
+                        <div class="telegram-hint-box" style="margin-top: 14px; padding: 10px 14px; background: rgba(0, 240, 255, 0.05); border: 1px dashed rgba(0, 240, 255, 0.25); border-radius: 6px; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5;">
+                            💡 <strong>Как быстро настроить бота:</strong>
+                            1. Откройте в Telegram <code>@BotFather</code> и отправьте команду <code>/newbot</code>. Скопируйте полученный <strong>API Token</strong>.
+                            2. Отправьте боту любое сообщение в личку (или добавьте в группу диспетчеров).
+                            3. Узнайте свой <strong>Chat ID</strong> через бота <code>@userinfobot</code> или <code>@getmyid_bot</code> и вставьте в поле выше.
+                            4. Нажмите <strong>«Тест соединения»</strong> для проверки отправки.
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Секция 3: Системный журнал аудита и логирования ошибок (Ротация 7 / 15 / 30 дней) -->
+                <section class="panel glass aviation-panel system-logs-section collapsed" id="system-logs-panel" style="margin-bottom: 20px;">
+                    <div class="hud-corner top-left"></div>
+                    <div class="hud-corner top-right"></div>
+                    <div class="hud-corner bottom-left"></div>
+                    <div class="hud-corner bottom-right"></div>
+                    
+                    <div class="table-header-container system-logs-header" onclick="toggleSystemLogsAccordion(event)" style="padding-bottom: 6px;">
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <h2 class="panel-title" style="margin: 0;" data-translate="logs-title">[ SYSTEM AUDIT & ERROR LOGS ]</h2>
+                            <div class="logs-summary-badges" style="display: flex; align-items: center; gap: 8px;">
+                                <span id="logs-badge-errors" class="badge-role badge-role-admin" style="font-size: 0.72rem; background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.5); color: #ef4444;">🔴 0 ошибок</span>
+                                <span id="logs-badge-warnings" class="badge-role badge-role-dispatcher" style="font-size: 0.72rem; background: rgba(245, 158, 11, 0.2); border-color: rgba(245, 158, 11, 0.5); color: #f59e0b;">🟡 0 пред.</span>
+                                <span id="logs-badge-total" class="badge-role" style="font-size: 0.72rem; background: rgba(0, 240, 255, 0.15); border-color: rgba(0, 240, 255, 0.4); color: var(--accent-cyan);">📄 0 всего</span>
+                            </div>
+                        </div>
+                        <div class="table-actions" style="display: flex; align-items: center; gap: 8px;">
+                            <button type="button" id="btn-refresh-logs" class="btn btn-secondary aviation-btn" style="padding: 6px 12px;" title="Обновить журнал логов" onclick="handleRefreshLogs(event)">
+                                <span>🔄</span> <span data-translate="btn-refresh-logs">Обновить</span>
+                            </button>
+                            <button type="button" id="btn-export-logs" class="btn btn-secondary aviation-btn highlight-gold-btn" style="padding: 6px 12px;" title="Скачать выгрузку логов" onclick="handleExportLogsPrompt(event)">
+                                <span>📥</span> <span data-translate="btn-export-logs">Экспорт</span>
+                            </button>
+                            <button type="button" id="btn-clear-logs" class="btn btn-danger aviation-btn" style="padding: 6px 12px;" title="Очистить все логи" onclick="handleClearLogsClick(event)">
+                                <span>🗑️</span> <span data-translate="btn-clear-logs">Очистить</span>
+                            </button>
+                            <button type="button" id="btn-toggle-logs-collapse" class="btn btn-secondary aviation-btn btn-collapse-toggle" title="Развернуть/свернуть панель">
+                                <span class="collapse-icon">▼</span> <span class="collapse-text" data-translate="btn-expand">Развернуть</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Скрываемое тело панели логов -->
+                    <div class="system-logs-body" style="margin-top: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+                            <p class="dash-subtext" style="margin: 0;" data-translate="logs-subtext">Аудит действий пользователей, авторизации, операций с базой и автоматический перехват ошибок JavaScript.</p>
+                            
+                            <!-- Настройка глубины хранения логов (7 / 15 / 30 дней) -->
+                            <div class="log-retention-control" style="display: flex; align-items: center; gap: 8px;">
+                                <label for="select-log-retention" style="font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase;" data-translate="label-log-retention">Хранение логов:</label>
+                                <select id="select-log-retention" class="form-control" style="width: auto; padding: 4px 10px; font-size: 0.8rem; font-family: var(--font-mono);" onchange="handleLogRetentionChange(this.value)">
+                                    <option value="7">7 дней (по умолчанию)</option>
+                                    <option value="15">15 дней</option>
+                                    <option value="30">30 дней</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Панель фильтрации и поиска по логам -->
+                        <div class="logs-filter-bar" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; padding: 10px 14px; border-radius: 6px;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label for="filter-log-level" style="font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-mono);">УРОВЕНЬ:</label>
+                                <select id="filter-log-level" class="form-control" style="width: auto; padding: 4px 8px; font-size: 0.8rem;" onchange="handleFilterLogs()">
+                                    <option value="all">Все уровни</option>
+                                    <option value="ERROR">🔴 Ошибки (ERROR)</option>
+                                    <option value="WARNING">🟡 Предупреждения (WARN)</option>
+                                    <option value="INFO">🔵 Инфо / События (INFO)</option>
+                                </select>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label for="filter-log-category" style="font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-mono);">КАТЕГОРИЯ:</label>
+                                <select id="filter-log-category" class="form-control" style="width: auto; padding: 4px 8px; font-size: 0.8rem;" onchange="handleFilterLogs()">
+                                    <option value="all">Все категории</option>
+                                    <option value="AUTH">🔐 Авторизация (AUTH)</option>
+                                    <option value="DATABASE">🗄️ База рейсов (DATABASE)</option>
+                                    <option value="BACKUP">💾 Бэкапы (BACKUP)</option>
+                                    <option value="CLIENT_JS">💻 Ошибки JS (CLIENT_JS)</option>
+                                    <option value="SYSTEM">⚙️ Система (SYSTEM)</option>
+                                    <option value="IMPORT">📥 Импорт (IMPORT)</option>
+                                </select>
+                            </div>
+
+                            <div style="flex: 1; min-width: 200px;">
+                                <input type="text" id="input-search-logs" class="form-control" placeholder="Поиск по сообщению, пользователю или IP..." style="padding: 4px 10px; font-size: 0.8rem;" oninput="handleSearchLogs(this.value)">
+                            </div>
+                        </div>
+
+                        <!-- Таблица логов -->
+                        <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                            <table id="system-logs-table" class="flights-table aviation-table system-logs-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 140px;" data-translate="th-log-time">Время</th>
+                                        <th style="width: 90px;" data-translate="th-log-level">Уровень</th>
+                                        <th style="width: 110px;" data-translate="th-log-cat">Категория</th>
+                                        <th style="width: 140px;" data-translate="th-log-user">Пользователь / IP</th>
+                                        <th data-translate="th-log-msg">Событие / Ошибка</th>
+                                        <th style="width: 90px; text-align: right;" data-translate="th-log-details">Детали</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="system-logs-table-body">
+                                    <tr>
+                                        <td colspan="6" class="empty-table-text">Загрузка системного журнала...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                
+                <!-- Секция 5: Диагностика и технические метрики системы (System Diagnostics) -->
+                <section class="panel glass aviation-panel diagnostics-section collapsed" id="diagnostics-panel" style="margin-bottom: 20px;">
+                    <div class="hud-corner top-left"></div>
+                    <div class="hud-corner top-right"></div>
+                    <div class="hud-corner bottom-left"></div>
+                    <div class="hud-corner bottom-right"></div>
+                    
+                    <div class="table-header-container diagnostics-header" onclick="toggleDiagnosticsAccordion(event)" style="padding-bottom: 6px; cursor: pointer;">
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <h2 class="panel-title" style="margin: 0;" data-translate="diagnostics-title">[ SYSTEM HEALTH & DATABASE DIAGNOSTICS&nbsp;]</h2>
+                            <div class="diagnostics-summary-badges" style="display: flex; align-items: center; gap: 8px;">
+                                <span id="diag-db-size-badge" class="badge-role badge-role-dispatcher" style="font-size: 0.72rem;">DB: — MB</span>
+                                <span id="diag-php-badge" class="badge-role badge-role-admin" style="font-size: 0.72rem;">PHP: —</span>
+                            </div>
+                        </div>
+                        <div class="table-actions" style="display: flex; align-items: center; gap: 8px;">
+                            <button type="button" id="btn-refresh-diagnostics" class="btn btn-secondary aviation-btn" onclick="handleRefreshDiagnostics(event)" title="Обновить диагностику">
+                                <span>🔄</span> <span data-translate="btn-refresh">Обновить</span>
+                            </button>
+                            <button type="button" id="btn-toggle-diagnostics-collapse" class="btn btn-secondary aviation-btn btn-collapse-toggle" title="Развернуть/свернуть панель">
+                                <span class="collapse-icon">▼</span> <span class="collapse-text" data-translate="btn-expand">Развернуть</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Скрываемое тело панели диагностики -->
+                    <div class="diagnostics-body" style="margin-top: 12px;">
+                        <p class="dash-subtext" style="margin-bottom: 14px;" data-translate="diagnostics-subtext">Сводные технические метрики производительности, целостности базы данных и системного окружения хостинга.</p>
+
+                        <div class="diagnostics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                            <div class="diag-card glass aviation-subpanel" style="padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(0, 240, 255, 0.2);">
+                                <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Объем базы MySQL</span>
+                                <div style="display: flex; align-items: baseline; gap: 6px; margin-top: 4px;">
+                                    <strong id="diag-val-db-size" style="font-size: 1.4rem; color: var(--accent-cyan); font-family: var(--font-mono);">0.00</strong>
+                                    <span style="font-size: 0.8rem; color: var(--text-secondary);">MB</span>
+                                </div>
+                                <span id="diag-val-db-flights" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; display: block;">0 рейсов в базе</span>
+                            </div>
+
+                            <div class="diag-card glass aviation-subpanel" style="padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.2);">
+                                <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Резервные копии</span>
+                                <div style="display: flex; align-items: baseline; gap: 6px; margin-top: 4px;">
+                                    <strong id="diag-val-backup-count" style="font-size: 1.4rem; color: var(--accent-gold); font-family: var(--font-mono);">0</strong>
+                                    <span style="font-size: 0.8rem; color: var(--text-secondary);">файлов</span>
+                                </div>
+                                <span id="diag-val-backup-size" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; display: block;">Объем: 0 MB</span>
+                            </div>
+
+                            <div class="diag-card glass aviation-subpanel" style="padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2);">
+                                <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Диапазон истории</span>
+                                <div style="margin-top: 4px;">
+                                    <strong id="diag-val-date-range" style="font-size: 0.92rem; color: var(--accent-green, #10b981); font-family: var(--font-mono);">-</strong>
+                                </div>
+                                <span id="diag-val-airlines" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; display: block;">АК: —</span>
+                            </div>
+
+                            <div class="diag-card glass aviation-subpanel" style="padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(139, 92, 246, 0.2);">
+                                <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Окружение сервера</span>
+                                <div style="margin-top: 4px;">
+                                    <strong id="diag-val-server-env" style="font-size: 0.92rem; color: #a78bfa; font-family: var(--font-mono);">PHP / Linux</strong>
+                                </div>
+                                <span id="diag-val-log-size" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; display: block;">Лог ошибок: 0 KB</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Нижняя секция: Таблица рейсов в базе -->
+                <section class="panel glass table-section aviation-panel">
+                    <div class="hud-corner top-left"></div>
+                    <div class="hud-corner top-right"></div>
+                    <div class="hud-corner bottom-left"></div>
+                    <div class="hud-corner bottom-right"></div>
+
+                    <div class="table-header-container">
+                        <h2 class="panel-title" data-translate="flights-table-title">[ DATABASE FLIGHT LOG (LAST 10 DAYS) ]</h2>
+                        <div class="table-actions">
+                            <label class="aviation-checkbox-container">
+                                <input type="checkbox" id="chk-show-all-flights">
+                                <span data-translate="chk-show-all-flights">Показать все рейсы</span>
+                            </label>
+                            <input type="file" id="backup-file-input" accept=".json,.xls,.xlsx" style="display: none;">
+                            <button type="button" id="btn-open-backtest" class="btn btn-secondary aviation-btn highlight-cyan-btn" data-translate="btn-open-backtest">🔬 Тест точности (Backtest)</button>
+                            <button type="button" id="btn-export-db" class="btn btn-secondary aviation-btn" data-translate="btn-export-db">Экспорт базы (Backup)</button>
+                            <button type="button" id="btn-import-db" class="btn btn-secondary aviation-btn" data-translate="btn-import-db">Импорт базы (Restore)</button>
+                            <button type="button" id="btn-clear-db" class="btn btn-danger aviation-btn" data-translate="btn-clear-db" onclick="handleClearDb(event)">Очистить базу</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="flights-table aviation-table">
+                            <thead>
+                                <tr>
+                                    <th data-translate="th-airline">АК</th>
+                                    <th data-translate="th-flight">Рейс</th>
+                                    <th data-translate="th-date">Дата</th>
+                                    <th data-translate="th-route">Маршрут</th>
+                                    <th data-translate="th-pax">Пассажиры (ВЗ / РБ / РМ)</th>
+                                    <th data-translate="th-bag-pcs">Багаж мест</th>
+                                    <th data-translate="th-bag-weight">Вес багажа</th>
+                                    <th data-translate="th-hb-weight">Вес р/к</th>
+                                    <th data-translate="th-status">Статус</th>
+                                    <th data-translate="th-action">Действие</th>
+                                </tr>
+                            </thead>
+                            <tbody id="flights-table-body">
+                                <!-- Строки рейсов заполняются динамически -->
+                                <tr>
+                                    <td colspan="10" class="empty-table-text" data-translate="empty-table">База данных пуста. Загрузите отчеты или введите рейс вручную.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Авиационное модальное окно верификации точности прогнозов (Backtesting & Calibration) -->
+    <div id="backtest-modal" class="modal-overlay hidden">
+        <div class="modal-content glass aviation-panel backtest-modal-content" style="max-width: 1280px; width: 98%; max-height: 94vh; display: flex; flex-direction: column;">
+            <div class="hud-corner top-left"></div>
+            <div class="hud-corner top-right"></div>
+            <div class="hud-corner bottom-left"></div>
+            <div class="hud-corner bottom-right"></div>
+
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0, 240, 255, 0.2); padding-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="color: var(--accent-cyan); font-size: 1.2rem;">🔬</span>
+                    <span class="modal-title-text" data-translate="backtest-modal-title">[ FORECAST ACCURACY VERIFICATION & CALIBRATION ]</span>
+                </div>
+                <button type="button" id="btn-close-backtest" class="btn-modal-close" style="background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; padding: 2px 8px;">✕</button>
+            </div>
+
+            <div class="modal-body" style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+                <!-- Панель фильтров и параметров тестирования -->
+                <div class="backtest-controls-bar">
+                    <div class="backtest-param-group" style="display: flex; flex-direction: column; gap: 4px;">
+                        <label for="backtest-period-select" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;" data-translate="backtest-label-period">Период анализа:</label>
+                        <select id="backtest-period-select" class="form-control" style="min-width: 180px;">
+                            <option value="1">За сутки (1 день)</option>
+                            <option value="7">Последняя неделя (7 дней)</option>
+                            <option value="30" selected>Последний месяц (30 дней)</option>
+                            <option value="90">Последние 3 месяца (90 дней)</option>
+                            <option value="180">Последние 6 месяцев (180 дней)</option>
+                            <option value="365">Последний 1 год</option>
+                            <option value="all">Вся база данных</option>
+                            <option value="custom">Произвольный период...</option>
+                        </select>
+                    </div>
+
+                    <div id="backtest-custom-dates-wrap" style="display: none; align-items: center; gap: 8px;">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted);">С даты:</label>
+                            <input type="date" id="backtest-date-from" class="form-control" style="width: 135px; padding: 4px 8px;">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted);">По дату:</label>
+                            <input type="date" id="backtest-date-to" class="form-control" style="width: 135px; padding: 4px 8px;">
+                        </div>
+                    </div>
+
+                    <div class="backtest-param-group" style="display: flex; flex-direction: column; gap: 4px;">
+                        <label for="backtest-airline-select" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Авиакомпания:</label>
+                        <select id="backtest-airline-select" class="form-control" style="min-width: 130px;">
+                            <option value="all">Все АК</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-left: auto; display: flex; gap: 8px;">
+                        <button type="button" id="btn-start-backtest" class="btn btn-primary aviation-btn highlight-cyan-btn" style="min-width: 180px; padding: 8px 18px;" data-translate="btn-start-backtest">
+                            <span>▶</span> <span>Запустить тест точности</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Индикатор прогресса -->
+                <div id="backtest-progress-container" class="backtest-progress-container hidden" style="margin-top: 14px;">
+                    <div class="backtest-progress-header" style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px;">
+                        <span id="backtest-progress-status" class="highlight-cyan">Выполнение исторической симуляции...</span>
+                        <span id="backtest-progress-percent" class="monospace-val">0%</span>
+                    </div>
+                    <div class="backtest-progress-track" style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                        <div id="backtest-progress-fill" class="backtest-progress-fill" style="width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.1s ease;"></div>
+                    </div>
+                </div>
+
+                <!-- Контейнер результатов -->
+                <div id="backtest-results-container" class="backtest-results-container hidden" style="margin-top: 18px;">
+                    <!-- Раздельные аналитические карточки KPI: Вес багажа vs Места багажа -->
+                    <div class="backtest-kpi-grid">
+                        
+                        <!-- Карточка 1: ТОЧНОСТЬ ВЕСА БАГАЖА (КГ) -->
+                        <div class="backtest-kpi-card kpi-weight">
+                            <div class="backtest-kpi-badge" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-weight: 700; font-size: 0.8rem; color: var(--accent-cyan); border-bottom: 1px solid rgba(0, 240, 255, 0.15); padding-bottom: 6px;">
+                                <span>⚖️ ТОЧНОСТЬ ВЕСА БАГАЖА</span>
+                                <span class="badge-role badge-role-admin" style="font-size: 0.7rem;">КГ</span>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Ср. ошибка веса (MAE):</span>
+                                <strong id="bt-weight-mae" class="monospace-val highlight-gold" style="font-size: 0.95rem;">0 кг</strong>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Попадание в ±10% (Хорошо):</span>
+                                <strong id="bt-weight-acc-10" class="monospace-val highlight-green" style="font-size: 0.95rem;">0%</strong>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Попадание в ±15% (Допустимо):</span>
+                                <strong id="bt-weight-acc-15" class="monospace-val highlight-cyan" style="font-size: 0.95rem;">0%</strong>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Суммарный баланс (Bias):</span>
+                                <strong id="bt-weight-bias" class="monospace-val">0.0%</strong>
+                            </div>
+                        </div>
+
+                        <!-- Карточка 2: ТОЧНОСТЬ МЕСТ БАГАЖА (ШТ) -->
+                        <div class="backtest-kpi-card kpi-pcs">
+                            <div class="backtest-kpi-badge" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-weight: 700; font-size: 0.8rem; color: var(--accent-gold); border-bottom: 1px solid rgba(255, 183, 0, 0.15); padding-bottom: 6px;">
+                                <span>🧳 ТОЧНОСТЬ МЕСТ БАГАЖА</span>
+                                <span class="badge-role badge-role-dispatcher" style="font-size: 0.7rem;">ШТ</span>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Ср. ошибка мест (MAE):</span>
+                                <strong id="bt-pcs-mae" class="monospace-val highlight-gold" style="font-size: 0.95rem;">0 шт</strong>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Попадание в ±10% (Хорошо):</span>
+                                <strong id="bt-pcs-acc-10" class="monospace-val highlight-green" style="font-size: 0.95rem;">0%</strong>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Попадание в ±15% (Допустимо):</span>
+                                <strong id="bt-pcs-acc-15" class="monospace-val highlight-cyan" style="font-size: 0.95rem;">0%</strong>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Суммарный баланс (Bias):</span>
+                                <strong id="bt-pcs-bias" class="monospace-val">0.0%</strong>
+                            </div>
+                        </div>
+
+                        <!-- Карточка 3: ОБЩАЯ СВОДКА И АНОМАЛИИ -->
+                        <div class="backtest-kpi-card kpi-summary">
+                            <div class="backtest-kpi-badge" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-weight: 700; font-size: 0.8rem; color: #10b981; border-bottom: 1px solid rgba(16, 185, 129, 0.15); padding-bottom: 6px;">
+                                <span>📊 СВОДКА ВЫБОРКИ РЕЙСОВ</span>
+                                <span class="badge-role badge-role-admin" style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.2); color: #10b981;">ИТОГИ</span>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Проверено рейсов:</span>
+                                <strong id="bt-total-tested" class="monospace-val" style="font-size: 0.95rem;">0</strong>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Хорошо (≤10%):</span>
+                                <strong id="bt-count-good" class="monospace-val highlight-green" style="font-size: 0.95rem;">0</strong>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Допустимо (10–15%):</span>
+                                <strong id="bt-count-acceptable" class="monospace-val highlight-cyan" style="font-size: 0.95rem;">0</strong>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Отклонения (>15%):</span>
+                                <strong id="bt-count-warning" class="monospace-val highlight-gold" style="font-size: 0.95rem;">0</strong>
+                            </div>
+                            <div class="backtest-metric-row" style="display: flex; justify-content: space-between; font-size: 0.82rem;">
+                                <span style="color: var(--text-muted);">Аномалии (>25%):</span>
+                                <strong id="bt-count-danger" class="monospace-val" style="color: #ef4444; font-size: 0.95rem;">0</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Панель управления таблицей результатов -->
+                    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-top: 20px; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <label style="font-size: 0.8rem; color: var(--text-muted);">Фильтр строк:</label>
+                            <select id="backtest-table-filter" class="form-control" style="width: auto; padding: 5px 12px; font-size: 0.82rem;">
+                                <option value="all">Все проверенные рейсы</option>
+                                <option value="good">Только хорошие (до ±10%)</option>
+                                <option value="acceptable">Только допустимые (10–15%)</option>
+                                <option value="warning">Только с отклонением > 15%</option>
+                                <option value="danger">Только аномалии > 25%</option>
+                            </select>
+
+                            <input type="text" id="backtest-table-search" placeholder="Поиск по рейсу / направлению..." class="form-control" style="width: 240px; padding: 5px 12px; font-size: 0.82rem;">
+                        </div>
+
+                        <button type="button" id="btn-export-backtest-excel" class="btn btn-secondary aviation-btn highlight-gold-btn" style="padding: 6px 16px; font-size: 0.82rem;">
+                            <span>📥</span> <span>Экспорт в Excel (.xlsx)</span>
+                        </button>
+                    </div>
+
+                    <!-- Таблица детализации результатов -->
+                    <div class="table-responsive backtest-table-container">
+                        <table class="flights-table aviation-table backtest-table">
+                            <thead>
+                                <tr>
+                                    <th style="cursor: pointer;" onclick="sortBacktestTable('date')">Дата ⇕</th>
+                                    <th style="cursor: pointer;" onclick="sortBacktestTable('flight')">Рейс ⇕</th>
+                                    <th style="cursor: pointer;" onclick="sortBacktestTable('route')">Маршрут ⇕</th>
+                                    <th>Пасс.</th>
+                                    <th style="color: var(--accent-gold);">Факт Вес</th>
+                                    <th style="color: var(--accent-cyan);">Прогноз Вес</th>
+                                    <th style="cursor: pointer;" onclick="sortBacktestTable('diff_weight')">Δ Вес ⇕</th>
+                                    <th style="color: var(--accent-gold);">Факт Мест</th>
+                                    <th style="color: var(--accent-cyan);">Прогноз Мест</th>
+                                    <th style="cursor: pointer;" onclick="sortBacktestTable('diff_pcs')">Δ Мест ⇕</th>
+                                    <th style="text-align: center;">Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody id="backtest-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Авиационное модальное окно подтверждения удаления -->
+    <div id="aviation-confirm-modal" class="modal-overlay hidden">
+        <div class="modal-content glass aviation-panel">
+            <div class="hud-corner top-left"></div>
+            <div class="hud-corner top-right"></div>
+            <div class="hud-corner bottom-left"></div>
+            <div class="hud-corner bottom-right"></div>
+            
+            <div class="modal-header">
+                <span class="warning-blink">⚠</span>
+                <span class="modal-title-text" data-translate="modal-confirm-title">[&nbsp;ACTION&nbsp;REQUIRED:&nbsp;SYSTEM&nbsp;PURGE&nbsp;]</span>
+            </div>
+            
+            <div class="modal-body">
+                <p id="aviation-confirm-message">Вы уверены, что хотите выполнить это действие?</p>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" id="modal-btn-cancel" class="btn btn-secondary" data-translate="modal-confirm-cancel">[&nbsp;CANCEL&nbsp;]</button>
+                <button type="button" id="modal-btn-confirm" class="btn btn-danger" data-translate="modal-confirm-submit">[&nbsp;CONFIRM&nbsp;PURGE&nbsp;]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Авиационное модальное окно авторизации в системе AeroBag (HUD) -->
+    <div id="app-auth-modal" class="modal-overlay hidden">
+        <div class="modal-content glass aviation-panel" style="max-width: 420px; width: 90%;">
+            <div class="hud-corner top-left"></div>
+            <div class="hud-corner top-right"></div>
+            <div class="hud-corner bottom-left"></div>
+            <div class="hud-corner bottom-right"></div>
+            
+            <div class="modal-header" style="text-align: center; justify-content: center; flex-direction: column; gap: 6px;">
+                <div style="font-size: 2rem;">✈️</div>
+                <div class="modal-title-text" data-translate="auth-modal-title" style="font-size: 1rem; color: var(--accent-cyan);">[ AEROBAG ACCESS CONTROL ]</div>
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">FLIGHT OPERATIONS AUTHORIZATION</span>
+            </div>
+            
+            <form id="app-auth-form">
+                <div class="modal-body" style="padding: 16px 20px;">
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="auth-username" data-translate="label-auth-username" style="font-family: var(--font-mono); font-size: 0.8rem;">ЛОГИН / ПОЗЫВНОЙ</label>
+                        <input type="text" id="auth-username" class="form-control text-uppercase" placeholder="Введите логин..." autocomplete="username" required style="font-family: var(--font-mono); font-size: 1.05rem;">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="auth-password" data-translate="label-auth-password" style="font-family: var(--font-mono); font-size: 0.8rem;">ПАРОЛЬ ДОСТУПА</label>
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input type="password" id="auth-password" class="form-control" placeholder="••••••••" autocomplete="current-password" required style="font-family: var(--font-mono); font-size: 1.1rem; padding-right: 42px; width: 100%;">
+                            <button type="button" id="btn-toggle-auth-pass" style="position: absolute; right: 8px; background: transparent; border: none; font-size: 1.1rem; cursor: pointer; padding: 4px; border-radius: 4px; z-index: 10;" title="Показать/скрыть пароль">👁️</button>
+                        </div>
+                    </div>
+
+                    <div id="auth-error-msg" class="hidden" style="color: #ef4444; font-family: var(--font-mono); font-size: 0.8rem; text-align: center; font-weight: bold; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px; border-radius: 4px; margin-top: 8px;">
+                    </div>
+                </div>
+                
+                <div class="modal-footer" style="padding: 0 20px 20px 20px;">
+                    <button type="submit" id="btn-submit-login" class="btn btn-primary btn-block aviation-btn" style="width: 100%; padding: 10px;" data-translate="btn-login-submit">[ ВОЙТИ В СИСТЕМУ ]</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно создания / редактирования пользователя -->
+    <div id="modal-user-edit" class="modal-overlay hidden">
+        <div class="modal-content glass aviation-panel" style="max-width: 460px; width: 90%;">
+            <div class="hud-corner top-left"></div>
+            <div class="hud-corner top-right"></div>
+            <div class="hud-corner bottom-left"></div>
+            <div class="hud-corner bottom-right"></div>
+            
+            <div class="modal-header">
+                <span class="warning-blink" style="color: var(--accent-cyan); animation: none;">👤</span>
+                <span id="user-modal-title" class="modal-title-text">[ СОЗДАНИЕ УЧЕТНОЙ ЗАПИСИ ]</span>
+                <button type="button" id="btn-close-user-modal" class="btn-modal-close" style="background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer;">✕</button>
+            </div>
+            
+            <form id="form-user-edit">
+                <input type="hidden" id="edit-user-id" value="">
+                <div class="modal-body" style="padding: 16px 20px;">
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="edit-username" data-translate="label-user-login">Логин (System Login)</label>
+                        <input type="text" id="edit-username" class="form-control text-uppercase" placeholder="Напр. DISP_SVO" required>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="edit-fullname" data-translate="label-user-fullname">ФИО / Позывной</label>
+                        <input type="text" id="edit-fullname" class="form-control" placeholder="Иванов И.И." required>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="edit-user-role" data-translate="label-user-role">Роль в системе</label>
+                        <select id="edit-user-role" class="form-control">
+                            <option value="dispatcher">Диспетчер (Только Прогнозирование и Дашборд)</option>
+                            <option value="admin">Администратор (Полный доступ + Управление пользователями)</option>
+                        </select>
+                    </div>
+
+                    <div id="user-pass-group" class="form-group" style="margin-bottom: 12px;">
+                        <label for="edit-user-pass" data-translate="label-user-password">Пароль доступа</label>
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input type="password" id="edit-user-pass" class="form-control" placeholder="Минимум 4 символа" style="padding-right: 42px; width: 100%;">
+                            <button type="button" id="btn-toggle-edit-pass" style="position: absolute; right: 8px; background: transparent; border: none; font-size: 1.1rem; cursor: pointer; padding: 4px; border-radius: 4px; z-index: 10;" title="Показать/скрыть пароль">👁️</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="user-active-group" style="margin-bottom: 12px;">
+                        <label class="aviation-checkbox-container" style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="edit-user-active" checked>
+                            <span data-translate="label-user-active">Активная учетная запись (Разрешить вход)</span>
+                        </label>
+                    </div>
+
+                    <div id="user-modal-error" class="hidden" style="color: #ef4444; font-family: var(--font-mono); font-size: 0.8rem; margin-top: 8px; text-align: center;"></div>
+                </div>
+                
+                <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 10px 20px 20px 20px;">
+                    <button type="button" id="btn-cancel-user-modal" class="btn btn-secondary">[ ОТМЕНА ]</button>
+                    <button type="submit" id="btn-save-user" class="btn btn-primary">[ СОХРАНИТЬ ]</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно смены пароля пользователя -->
+    <div id="modal-change-user-pass" class="modal-overlay hidden">
+        <div class="modal-content glass aviation-panel" style="max-width: 400px; width: 90%;">
+            <div class="hud-corner top-left"></div>
+            <div class="hud-corner top-right"></div>
+            <div class="hud-corner bottom-left"></div>
+            <div class="hud-corner bottom-right"></div>
+            
+            <div class="modal-header">
+                <span class="warning-blink" style="color: var(--accent-gold); animation: none;">🔑</span>
+                <span class="modal-title-text">[ СМЕНА ПАРОЛЯ ]</span>
+                <button type="button" id="btn-close-pass-modal" class="btn-modal-close" style="background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer;">✕</button>
+            </div>
+            
+            <form id="form-change-password">
+                <input type="hidden" id="pass-user-id" value="">
+                <div class="modal-body" style="padding: 16px 20px;">
+                    <p id="pass-user-label" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px; font-family: var(--font-mono);">
+                        Пользователь: <strong id="pass-user-name" class="highlight-cyan">-</strong>
+                    </p>
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="new-password-input" data-translate="label-new-password">Новый пароль</label>
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input type="password" id="new-password-input" class="form-control" placeholder="Новый пароль..." required minlength="4" style="padding-right: 42px; width: 100%;">
+                            <button type="button" id="btn-toggle-new-pass" style="position: absolute; right: 8px; background: transparent; border: none; font-size: 1.1rem; cursor: pointer; padding: 4px; border-radius: 4px; z-index: 10;" title="Показать/скрыть пароль">👁️</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="confirm-password-input" data-translate="label-confirm-password">Повторите пароль</label>
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input type="password" id="confirm-password-input" class="form-control" placeholder="Повторите пароль..." required minlength="4" style="padding-right: 42px; width: 100%;">
+                            <button type="button" id="btn-toggle-confirm-pass" style="position: absolute; right: 8px; background: transparent; border: none; font-size: 1.1rem; cursor: pointer; padding: 4px; border-radius: 4px; z-index: 10;" title="Показать/скрыть пароль">👁️</button>
+                        </div>
+                    </div>
+
+                    <div id="pass-modal-error" class="hidden" style="color: #ef4444; font-family: var(--font-mono); font-size: 0.8rem; margin-top: 8px; text-align: center;"></div>
+                </div>
+                
+                <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 10px 20px 20px 20px;">
+                    <button type="button" id="btn-cancel-pass-modal" class="btn btn-secondary">[ ОТМЕНА ]</button>
+                    <button type="submit" id="btn-save-new-password" class="btn btn-primary">[ ОБНОВИТЬ ПАРОЛЬ ]</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно просмотра деталей лога / ошибки (HUD) -->
+    <div id="modal-log-details" class="modal-overlay hidden">
+        <div class="modal-content glass aviation-panel" style="max-width: 760px; width: 94%; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="hud-corner top-left"></div>
+            <div class="hud-corner top-right"></div>
+            <div class="hud-corner bottom-left"></div>
+            <div class="hud-corner bottom-right"></div>
+            
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0, 240, 255, 0.2); padding-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="log-modal-icon" style="font-size: 1.2rem;">📋</span>
+                    <span id="log-modal-title" class="modal-title-text" data-translate="modal-log-title">[ LOG EVENT CONTEXT DETAILS ]</span>
+                </div>
+                <button type="button" id="btn-close-log-modal" class="btn-modal-close" style="background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; padding: 2px 8px;" onclick="closeLogDetailsModal()">✕</button>
+            </div>
+            
+            <div class="modal-body" style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+                <div id="log-modal-meta" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 14px; background: rgba(0,0,0,0.25); padding: 10px 14px; border-radius: 6px; font-family: var(--font-mono); font-size: 0.8rem;">
+                    <!-- Метаданные (Время, Уровень, Категория, Пользователь, IP) -->
+                </div>
+                
+                <h4 style="font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent-cyan); margin-bottom: 6px; text-transform: uppercase;">Сообщение:</h4>
+                <div id="log-modal-message" style="background: rgba(10, 20, 40, 0.6); border: 1px solid rgba(0, 240, 255, 0.2); padding: 10px 12px; border-radius: 6px; font-family: var(--font-mono); font-size: 0.85rem; color: #fff; margin-bottom: 14px; word-break: break-word;"></div>
+
+                <h4 style="font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent-gold); margin-bottom: 6px; text-transform: uppercase;">Контекст и стек ошибки (Details / JSON / Stack):</h4>
+                <pre id="log-modal-details-pre" style="background: rgba(0, 5, 15, 0.85); border: 1px solid rgba(255, 183, 0, 0.25); padding: 12px; border-radius: 6px; font-family: var(--font-mono); font-size: 0.78rem; color: #38bdf8; max-height: 280px; overflow: auto; white-space: pre-wrap; word-break: break-all; margin: 0;"></pre>
+            </div>
+            
+            <div class="modal-footer" style="padding: 12px 20px 20px 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary aviation-btn" onclick="closeLogDetailsModal()">[ ЗАКРЫТЬ ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- МОДАЛЬНОЕ ОКНО ДОБАВЛЕНИЯ НАПРАВЛЕНИЯ/ГОРОДА -->
+    <!-- ========================================== -->
+    <div id="modal-add-airport" class="modal-overlay hidden">
+        <div class="modal-content glass aviation-panel" style="max-width: 480px; width: 92%;">
+            <div class="hud-corner top-left"></div>
+            <div class="hud-corner top-right"></div>
+            <div class="hud-corner bottom-left"></div>
+            <div class="hud-corner bottom-right"></div>
+            
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0, 240, 255, 0.2); padding-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.2rem;">✈️</span>
+                    <span id="modal-add-airport-title" class="modal-title-text" data-translate="modal-add-airport-title" style="font-size: 0.95rem; color: var(--accent-cyan);">[ ДОБАВЛЕНИЕ НОВОГО НАПРАВЛЕНИЯ ]</span>
+                </div>
+                <button type="button" class="btn-modal-close" style="background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; padding: 2px 8px;" onclick="closeAddAirportModal()">✕</button>
+            </div>
+            
+            <form id="form-modal-add-airport" onsubmit="handleSaveNewAirport(event)">
+                <div class="modal-body" style="padding: 16px 20px;">
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label class="form-label" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">
+                            <span data-translate="label-airport-city">Название города / аэропорта</span> <span style="color: #ef4444;">*</span>
+                        </label>
+                        <input type="text" id="new-airport-name" class="form-control" placeholder="Например: Куляб, Самара, Дубай" required autocomplete="off" style="font-size: 0.88rem;">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">
+                                <span data-translate="label-airport-iata">Код ИАТА (IATA)</span> <span style="color: #ef4444;">*</span>
+                            </label>
+                            <input type="text" id="new-airport-iata" class="form-control text-uppercase" placeholder="TJU" maxlength="3" required autocomplete="off" style="font-family: var(--font-mono); font-weight: bold; letter-spacing: 1px; font-size: 0.9rem;">
+                            <span style="font-size: 0.7rem; color: var(--text-muted);" data-translate="hint-airport-iata">3 латинские буквы</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">
+                                <span data-translate="label-airport-ru">Российский код (РФ)</span>
+                            </label>
+                            <input type="text" id="new-airport-ru" class="form-control text-uppercase" placeholder="КЛБ" maxlength="3" autocomplete="off" style="font-family: var(--font-mono); font-weight: bold; letter-spacing: 1px; font-size: 0.9rem;">
+                            <span style="font-size: 0.7rem; color: var(--text-muted);" data-translate="hint-airport-ru">Для РФ/СНГ (или как IATA)</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 8px;">
+                        <label class="form-label" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 8px; display: block;" data-translate="label-airport-target">
+                            В какой фильтр добавить:
+                        </label>
+                        <div style="display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                            <label class="aviation-checkbox-container" style="font-size: 0.82rem; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="radio" name="new-airport-target" value="departures" id="target-departures" checked>
+                                <span data-translate="target-departures-label">🛫 Аэропорты вылета (FROM)</span>
+                            </label>
+                            <label class="aviation-checkbox-container" style="font-size: 0.82rem; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="radio" name="new-airport-target" value="arrivals" id="target-arrivals">
+                                <span data-translate="target-arrivals-label">🛬 Аэропорты прилета (TO)</span>
+                            </label>
+                            <label class="aviation-checkbox-container" style="font-size: 0.82rem; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="radio" name="new-airport-target" value="both" id="target-both">
+                                <span data-translate="target-both-label">🔄 В оба списка (Вылет и Прилет)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="new-airport-error" class="hidden" style="color: #ef4444; font-family: var(--font-mono); font-size: 0.8rem; margin-top: 10px; text-align: center;"></div>
+                </div>
+
+                <div class="modal-footer" style="padding: 12px 20px 20px 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn btn-secondary aviation-btn" onclick="closeAddAirportModal()" data-translate="btn-cancel">[ Отмена ]</button>
+                    <button type="submit" class="btn btn-primary aviation-btn" data-translate="btn-save-airport">[ ➕ Сохранить и добавить ]</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <footer class="app-footer" style="text-align: center; padding: 20px; font-size: 0.8rem; color: var(--text-secondary); font-family: var(--font-mono); opacity: 0.7; border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 40px; display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap;">
+<span>AeroBag Predictor <span id="app-version-tag">v12.2.31</span> (<span id="app-build-date">12.11.2026</span>)</span>
+        <span style="opacity: 0.4;">•</span>
+        <span data-translate="footer-developer">Разработчик: Andrey Zubkov</span>
+    </footer>
+
+    <!-- Загрузка локальных библиотек -->
+    <script src="xlsx.full.min.js"></script>
+<script src="app.js?v=v12.2.31"></script>
+    <script src="dcs_sync.js?v=v12.2.31"></script>
+</body>
+</html>
+

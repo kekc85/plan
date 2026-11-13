@@ -1,3 +1,53 @@
+- 2026-11-13: Устранено повторное появление 16 изменений и оптимизирован MySQL:
+  - В `web_app/public/api/index.php` убрано циклическое выполнение 21 `ALTER TABLE` при каждом запросе: добавлена разовая проверка через маркер `.db_schema_v2_ready`, что полностью устранило `SQLSTATE[HY000] [1040] Too many connections` и блокировки таблиц на Beget.
+  - В `web_app/src/App.jsx` в `handleAcknowledgeAll` добавлен вызов `setChangeToast(null)` для немедленного скрытия плашки уведомления, а также реализовано мгновенное сохранение подтверждённых рейсов в БД без 2-секундного ожидания.
+  - В `web_app/src/App.jsx` (`normalizeFlight`) и `web_app/src/utils/deltaSync.js` (`detectFlightChanges`) обеспечено гарантированное извлечение `pax_ch` и `pax_inf` из формата `pax` (`131/9/1`) или `notes` (`9рб 1рм`), что предотвращает ложные расхождения дельты.
+- 2026-11-12: Исправлен вызов `applyAircraftCompartmentConfig` и синхронизирован GitHub:
+  - В `aerobag-test/app.js` вызов `applyAircraftCompartmentConfig` обернут в `typeof === 'function'` с сохранением бейджа борта `[acNum]`.
+  - Ветка `local-standalone` со всеми локальными доработками и журналом `State.md` успешно отправлена в удаленный репозиторий GitHub (`origin/local-standalone`).
+- 2026-11-12: Исправлен перенос DOW, DOI и заправки при переходе AeroPlan -> AeroBag -> LoadSheet:
+  - В `boostandgo.ru/public_html/aerobag-test/app.js` в `checkIncomingFlightParameters` добавлен полный разбор параметров: `dow`, `doi`, `galley`, `crew`, `pax_m/f/ch/inf`, `to_fuel`, `trip_fuel`, `cargo`, `mail`, `ac_config`.
+  - Загружен справочник флота `fleet_wb.json` в `aerobag-test` для автоматического расчета DOW/DOI по бортовому номеру.
+  - В `index.html` поднята версия `?v=v12.2.36_dow_doi_fuel` для сброса кэша.
+- 2026-11-12: Исправлен вызов кнопки Loadsheet в `aerobag-test`:
+  - В `index.html` обновлена версия скриптов на `?v=v12.2.35_loadsheet` для принудительного сброса дискового кэша браузера.
+  - В `app.js` функция `openWbLoadsheet` экспортирована в `window.openWbLoadsheet` и привязана через слушатель `btn-open-loadsheet.addEventListener('click')`.
+- 2026-11-12: Синхронизирована база и восстановлен Loadsheet в `aerobag-test`:
+  - В `boostandgo.ru/public_html/aerobag-test/db_config.php` переключено подключение на единую боевую БД `kekc8584_aerobag` (пользователь `kekc8584_aerobag`). Восстановлены все 8 981 рейс и все 6 учетных записей пользователей/диспетчеров.
+  - В `index.html` и `app.js` восстановлена кнопка `btn-open-loadsheet` и обработчик `openWbLoadsheet` под таблицей отсеков BULK.
+- 2026-11-12: Исправлена ошибка `selectTo is not defined` и восстановлена вкладка Администрирование в `aerobag-test`:
+  - В `boostandgo.ru/public_html/aerobag-test/app.js` объявлена переменная `selectTo = document.getElementById('select-to')` в `populateAirportDropdowns`, исключен сбой JS при старте.
+  - Входные параметры рейса (`flight`, `from`, `to`, `pax`, `date`) теперь корректно переносятся из AeroPlan в форму прогноза.
+  - В `aerobag-test` открыта вкладка «Администрирование» в HUD-навигации; клик по статусу `ДИСПЕТЧЕР ОНЛАЙН` или по вкладке вызывает окно ввода пароля администратора при необходимости.
+- 2026-11-12: Контур `plan_2` полностью поднят и развернут на Beget:
+  - Папка `plan_2` подготовлена на хостинге, ветка `plan_2` сбилжена и выгружена через GitHub Actions.
+  - Проверено: `https://boostandgo.ru/plan_2/` отдаёт 200 OK, `https://boostandgo.ru/plan_2/api/health` возвращает `{"status":"ok","database":"connected"}`.
+- 2026-11-12: Проверено и подтверждено восстановление автодеплоя GitHub Actions на Beget:
+  - Секреты `BEGET_FTP_USERNAME` и `BEGET_FTP_PASSWORD` обновлены на новый аккаунт `kekc8584_deploy`.
+  - Тестовый пайплайн (ветка `dev` -> контур `plan_test`) успешно прошёл все шаги: сборка, `Sync Built Files to Beget` (success) и `Sync Loadsheet to Beget` (success). Автодеплой полностью восстановлен.
+- 2026-11-12: Проверено FTP-подключение Beget:
+  - Создан независимый FTP-аккаунт `kekc8584_deploy` с сервером `kekc8584.beget.tech`. Доступ к корню и `boostandgo.ru/public_html` проверен, работает на 100%.
+  - В `public_html` обнаружено отсутствие директории `plan_2` (присутствуют `plan`, `plan_test`, `aerobag`).
+- 2026-11-11: Решена проблема ошибки входа в MySQL [1045 Access denied for user 'kekc8584_plan'@'localhost']:
+  - В панели Beget в разделе MySQL актуализирован пароль пользователя `kekc8584_plan` в соответствии с конфигурацией приложения. Связь с базой данных на хостинге полностью восстановлена.
+- 2026-11-11: Выполнено полное слияние бэкапов AeroBag без дубликатов:
+  - Исходные файлы: `aerobag_backup_2026_11_11.json` (8 853 рейса) и `aerobag_backup_2026_11_11_new.json` (8 722 рейса).
+  - Алгоритм дедупликации: канонический ключ `_norm_f_key(flight, date, from, to)` согласно `api_server.py`.
+  - Приоритет данных: пересекающиеся рейсы (8 598) обновлены из актуального `_new.json` (стандарт PAX без RM, поля `flight`, `isSystem`); 254 уникальных рейса из первого бэкапа (Lydia DCS, manual) сохранены и приведены к единому формату; 124 уникальных рейса из `_new.json` добавлены.
+  - Объединены сопутствующие метаданные: справочник `custom_airports` (NQZ + TJU), полные фильтры `airport_filters` (32 вылета, 79 прилетов), сохраненные расчеты `predictions_history` (2 расчета центровки/багажа).
+  - Итоговый файл: `aerobag_backup_2026_11_11_merged.json` (ровно 8 976 уникальных рейсов, проверено на 100% отсутствие дубликатов).
+- 2026-11-11: Исправлено сохранение рейсов из Lydia DCS и отчетов Astra DCS в AeroBag:
+  - Устранена рассинхронизация ссылок `window.userFlights` и перезапись базы: в `dcs_sync.js` убран деструктивный вызов `saveUserFlights()`, затиравший только что сохраненные рейсы; после сохранения вызывается `loadUserFlights()` для моментальной подгрузки свежих данных с сервера.
+  - В `app.js` `window.userFlights` переведен на динамический `Object.defineProperty` getter/setter, гарантирующий актуальность массива.
+  - В `api_server.py` (`save_to_database`) нормализованы ключи дедупликации (очистка цифр рейса, даты, маршрута), поля `flight`/`flight_no`, расчет пассажиров `vz`/`pax` и атомарная запись во временный файл.
+  - Для Astra DCS: в `processRegistrationData` отключена жесткая фильтрация по 24 аэропортам вылета (теперь фильтрует только при включенном `strict_departures`), расширен справочник аэропортов (включая SVO, LED, KZN, UFA и др.), исправлен сдвиг дефолтных колонок РМ/Р-кладь/Багаж. Все файлы Astra DCS корректно читаются и сохраняются в базу.
+  - Пересобран автономный архив `AeroPlan_2.0_Standalone.zip` на Рабочем столе (180 файлов, 35.67 МБ).
+- 2026-11-11: Устранена проблема незапуска приложения локально:
+  - В `api_server.py` удалено занижение приоритета процесса/потока (IDLE_PRIORITY_CLASS / THREAD_PRIORITY_IDLE), приводившее к зависанию асинхронного event loop uvicorn и блокировке входящих HTTP-соединений в Windows.
+  - В `launcher.py` переработан алгоритм запуска: убран `BELOW_NORMAL_PRIORITY_CLASS`, добавлено авто-обнаружение pythonw/python, логирование жизненного цикла в `launcher.log` и надежный опрос healthcheck с авто-открытием браузера.
+  - В `Start_AeroPlan.bat` и `AeroPlan_Launch.vbs` реализован бесшовный запуск через единый `launcher.py` без моджибейка и без блокировок MSXML.
+  - В `api_server.py` расширен период выборки AviaBit назад на 24 часа (`fetch_start = start_dt - timedelta(hours=24)`), благодаря чему движок оборота бортов безошибочно находит входящие рейсы и корректно отображает плашки движения ВС (`Сел в ...`, `В пути к ...`, `⏳ Из ...`).
+  - Пересобран автономный переносной архив `AeroPlan_2.0_Standalone.zip` на Рабочем столе (180 файлов, 35.66 МБ).
 - 2026-08-24: Исследована структура API сайтов Nordwind (aviabit.nordwindairlines.ru) и Икар (aviabit.ikar.aero).
 - Реализована мульти-серверная архитектура с объединением расписаний Nordwind + Икар в один суточный план.
 - Добавлена поддержка 2FA-кодов подтверждения из почты:
@@ -508,3 +558,28 @@
 - 2026-11-01: Руководство пользователя AeroPlan 2.0 (Инструкция в шапке и Word docx): убраны упоминания plan_2, заменены все скриншоты на актуальные чистые снимки без артефактов/модалок, скриншоты переведены на Vite hashed assets для гарантированного сброса кэша браузеров.
 - 2026-11-01: Устранены фантомные изменения дельта-синхронизации (pax_ch/pax_inf 0 vs пустая строка, ac_num, time). Добавлена визуализация изменений детей/младенцев в ячейке PAX и детальный tooltip в кнопке подтверждения.
 - 2026-11-01: Полная переработка иллюстраций руководства пользователя: сняты чистые Retina-скриншоты реальных модулей (3-колоночный AeroBag со списком рейсов смены и калькулятором отсеков, официальный бланк W&B Loadsheet с расчетом лимитов и балансировкой). Устранены черные заглушки и модалки. Пересобраны docx и веб-приложение с версионированием ассетов.
+- 2026-11-10 (Ветка local-standalone): Создан автономный офлайн-контур AeroPlan 2.0 для рабочего ПК без прав администратора:
+  * Единый FastAPI бэкенд api_server.py на порту 8000 раздает все 3 приложения: /plan/ (AeroPlan 2.0), /aerobag/ (AeroBag Predictor), /loadsheet/ (W&B Loadsheet);
+  * В api_server.py интегрированы шлюзы Lydia DCS (/api/dcs_sync) и рейс-менеджер /aerobag/flights для полной независимости от PHP и Beget;
+  * В FlightRow.jsx и Header.jsx динамически маршрутизируются кнопки AeroBag и Loadsheet на локальный хост 127.0.0.1;
+  * В AeroBag добавлена кнопка возврата [↩ В AeroPlan] и прием входящих URL-параметров рейса;
+  * Созданы скрипты Запуск_AeroPlan_2.0.bat, AeroPlan_Launch.vbs, Остановить_AeroPlan_2.0.bat и Создать_Ярлык_на_Рабочем_Столе.bat (zero-admin). База SQLite plan.db в режиме WAL;
+  * Исправлена ошибка очистки базы при импорте в AeroBag: в api_server.py (/aerobag/api.php) реализовано сохранение (save_flights), удаление (delete_flight), очистка (clear_db), управление бэкапами (list/create/restore/download/delete_backup) и персистентные настройки аэропортов/фильтров;
+  * База dcs_saved_flights.json предзаполнена актуальным бэкапом (8719 рейсов), кнопка «Импорт базы» в AeroBag адаптирована под файлы .json, .xls и .xlsx;
+  * Устранена ошибка загрузки расписания AviaBit (области видимости DEFAULT_USERNAME и user_avb);
+  * Восстановлена индикация движения бортов (plane_status, inbound_flight/dep): в api_server.py снят фильтр template_id при запросе к AviaBit, чтобы парсер видел полную ротацию судов флота;
+  * AeroBag синхронизирован с актуальной 3-колоночной версией v12.2.30 (ветка add_test_address_config из AVERAGO BAGGEGE WEIGH): история расчетов и рейсы смены расположены в левой панели, форма в центре, раскладка BULK и переход в Loadsheet справа;
+  * Скрипт создания ярлыка переведен на автономный Windows VBScript create_shortcut.vbs с поддержкой OneDrive Desktop и защитой от запуска прямо из Temp ZIP архива;
+  * Исправлена ошибка Windows при запуске ярлыка (кодировка имени): создан Start_AeroPlan.bat со 100% ASCII-именем;
+  * В AeroBag (handleBulkInput) обеспечен автоматический сброс фиксации веса (locked) при изменении мест на позиции отсека;
+  * В AeroBag кнопка «Сформировать W&B LoadSheet» переведена на локальный роутинг /loadsheet/ вместо boostandgo.ru;
+  * Пересобран дистрибутив на Рабочем столе AeroPlan_2.0_Standalone.zip со всеми исправлениями.
+  * Синхронизация и исправление сохранения рейсов Lydia DCS и отчетов Astra DCS:
+    - Скопирована полная база рейсов aerobag_db.json (8976 рейсов) в репозиторий aerobag/;
+    - В api_server.py и dcs_server.py реализовано единое безопасное атомное сохранение через .tmp с поддержкой конвертов {"flights": [...]};
+    - В dcs_sync.js удален деструктивный вызов saveUserFlights() после save_to_database, заменен на автоматический loadUserFlights() и обновление UI;
+    - Централизован getDcsEndpoint(action) с относительными путями (api/dcs_sync?action= и lydia_dcs_sync.php?action=) для исключения CORS-блокировок в Chrome;
+    - Исправлен парсинг Astra DCS (strict_departures: false, корректные индексы столбцов FastReport);
+    - Обновлена портативная версия AeroBag на Рабочем столе (C:\Users\kekc85\Desktop\AeroBag_Portable RAB), перезапущен сервер на 8080;
+    - Версии бандлов подняты до v12.2.31 для сброса кэша браузера;
+    - Дистрибутив AeroPlan_2.0_Standalone.zip на Рабочем столе полностью пересобран и готов к переносу на рабочий ПК.

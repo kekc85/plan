@@ -536,14 +536,18 @@ export default function Header({
             <button
               type="button"
               onClick={() => {
+                const isLocal = typeof window !== 'undefined' && 
+                               (window.location.hostname === 'localhost' || 
+                                window.location.hostname === '127.0.0.1');
                 const isPlan2 = window.location.href.includes('plan_2');
-                const isTest = !isPlan2 && (window.location.href.includes('plan_test') || 
-                               window.location.hostname === 'localhost' || 
-                               window.location.hostname === '127.0.0.1');
-                // Для plan_2 и тестовых сборок открываем версию со списком рейсов слева (aerobag-test)
-                const targetAeroBagUrl = (isPlan2 || isTest)
+                const isTest = !isPlan2 && (window.location.href.includes('plan_test') || isLocal);
+                
+                let targetAeroBagUrl = (isPlan2 || isTest)
                   ? 'https://boostandgo.ru/aerobag-test/' 
                   : 'https://boostandgo.ru/aerobag/';
+                if (isLocal) {
+                  targetAeroBagUrl = `${window.location.origin}/aerobag/`;
+                }
                 const params = new URLSearchParams();
                 params.set('return_url', window.location.href);
                 window.location.href = `${targetAeroBagUrl}?${params.toString()}`;
@@ -559,13 +563,17 @@ export default function Header({
             <button
               type="button"
               onClick={() => {
+                const isLocal = typeof window !== 'undefined' && 
+                               (window.location.hostname === 'localhost' || 
+                                window.location.hostname === '127.0.0.1');
                 const isPlan2 = window.location.href.includes('plan_2');
-                const isTest = !isPlan2 && (window.location.href.includes('plan_test') || 
-                               window.location.hostname === 'localhost' || 
-                               window.location.hostname === '127.0.0.1');
-                const targetLoadsheetUrl = isTest 
+                const isTest = !isPlan2 && (window.location.href.includes('plan_test') || isLocal);
+                let targetLoadsheetUrl = isTest 
                   ? 'https://boostandgo.ru/loadsheet_test/' 
                   : 'https://boostandgo.ru/loadsheet/';
+                if (isLocal) {
+                  targetLoadsheetUrl = `${window.location.origin}/loadsheet/`;
+                }
                 const params = new URLSearchParams();
                 params.set('return_url', window.location.href);
                 window.location.href = `${targetLoadsheetUrl}?${params.toString()}`;

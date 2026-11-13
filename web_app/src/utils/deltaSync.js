@@ -306,8 +306,28 @@ export function detectFlightChanges(oldFlight, incomingFlight) {
       return;
     }
 
-    const rawOld = oldFlight[field];
+    let rawOld = oldFlight[field];
     const rawNew = incomingFlight[field];
+
+    // Авто-извлечение детей и младенцев из pax (131/9/1) или примечаний, если в старом рейсе они не были разнесены
+    if (field === 'pax_ch' && (rawOld === undefined || rawOld === null || rawOld === '')) {
+      if (oldFlight.pax && typeof oldFlight.pax === 'string' && oldFlight.pax.includes('/')) {
+        const parts = oldFlight.pax.split('/');
+        if (parts[1]) rawOld = parts[1].trim();
+      } else if (oldFlight.notes && typeof oldFlight.notes === 'string') {
+        const m = oldFlight.notes.match(/(\d+)\s*(?:рб|дети|дет|chd)/i);
+        if (m) rawOld = m[1];
+      }
+    }
+    if (field === 'pax_inf' && (rawOld === undefined || rawOld === null || rawOld === '')) {
+      if (oldFlight.pax && typeof oldFlight.pax === 'string' && oldFlight.pax.includes('/')) {
+        const parts = oldFlight.pax.split('/');
+        if (parts[2]) rawOld = parts[2].trim();
+      } else if (oldFlight.notes && typeof oldFlight.notes === 'string') {
+        const m = oldFlight.notes.match(/(\d+)\s*(?:рм|млад|inf)/i);
+        if (m) rawOld = m[1];
+      }
+    }
 
     const oldVal = normalizeVal(rawOld);
     const newVal = normalizeVal(rawNew);

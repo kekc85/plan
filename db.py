@@ -36,10 +36,11 @@ def is_mysql_configured() -> bool:
 
 class DatabaseConnection:
     """Менеджер соединения с базой данных (MySQL на Beget или SQLite локально)"""
+    _mysql_available = None
 
     @staticmethod
     def get_connection():
-        if is_mysql_configured():
+        if DatabaseConnection._mysql_available is not False and is_mysql_configured():
             try:
                 conn = pymysql.connect(
                     host=DB_HOST,
@@ -49,13 +50,16 @@ class DatabaseConnection:
                     database=DB_NAME,
                     charset=DB_CHARSET,
                     cursorclass=pymysql.cursors.DictCursor,
-                    autocommit=True
+                    autocommit=True,
+                    connect_timeout=1
                 )
+                DatabaseConnection._mysql_available = True
                 return conn, "mysql"
             except Exception as e:
-                print(f"[DB Warning] Не удалось подключиться к MySQL ({e}). Переключение на локальный SQLite.")
+                DatabaseConnection._mysql_available = False
+                print(f"[DB Warning] Не удалось подключиться к MySQL ({e}). Автоматический переход на локальный SQLite.")
 
-        # Fallback на SQLite для локального тестирования
+        # Быстрый прямой контур SQLite для локального режима
         sqlite_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plan.db")
         conn = sqlite3.connect(sqlite_file)
         conn.execute("PRAGMA journal_mode=WAL;")

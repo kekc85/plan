@@ -21,7 +21,7 @@ from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, HTTPException, Depends, Body, Header, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, RedirectResponse
+from fastapi.responses import StreamingResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
@@ -60,6 +60,8 @@ from parser import (
     AviaBitClient,
     BASE_URL_NORDWIND,
     BASE_URL_IKAR,
+    DEFAULT_USERNAME,
+    DEFAULT_PASSWORD,
     ALLOWED_DEPARTURES,
     IATA_CITIES,
     parse_date_arg,
@@ -69,37 +71,6 @@ from parser import (
     normalize_plane_type,
     detect_plane_type
 )
-
-def _set_process_idle_priority():
-    """
-    Устанавливает минимальный приоритет для Python-процесса и его потоков в Windows.
-    IDLE_PRIORITY_CLASS (0x40): Windows отдаёт CPU этому процессу только когда
-    все остальные процессы простаивают — Excel, браузер и т.д. никогда не тормозят.
-    """
-    if sys.platform != "win32":
-        return
-    try:
-        import ctypes
-        import os as _os
-        kernel32 = ctypes.windll.kernel32
-        pid = _os.getpid()
-
-        # Открываем реальный handle процесса (GetCurrentProcess возвращает псевдо-handle)
-        PROCESS_ALL_ACCESS = 0x1F0FFF
-        proc_handle = kernel32.OpenProcess(PROCESS_ALL_ACCESS, False, pid)
-        if proc_handle:
-            # IDLE_PRIORITY_CLASS = 0x00000040 — самый низкий приоритет CPU
-            kernel32.SetPriorityClass(proc_handle, 0x00000040)
-            kernel32.CloseHandle(proc_handle)
-
-        # Понижаем приоритет текущего потока (главный поток uvicorn)
-        # THREAD_PRIORITY_IDLE = -15
-        thread_handle = kernel32.GetCurrentThread()
-        kernel32.SetThreadPriority(thread_handle, -15)
-    except Exception:
-        pass
-
-_set_process_idle_priority()
 
 # Инициализируем таблицы БД при запуске
 init_db()
@@ -910,7 +881,7 @@ def test_telegram_connection(req: TelegramTestRequest, user: dict = Depends(requ
 # --- AVIABIT SETTINGS & FLEET W&B ---
 
 @app.get("/api/admin/aviabit/settings")
-def get_aviabit_settings(user: dict = Depends(require_moderator_or_admin)):
+def get_aviabit_settings(user: dict = Depends(require_admin_or_moderator)):
     """Получение настроек подключения к шлюзу AviaBit"""
     import os
     has_nw = os.path.exists(".session.json")
@@ -953,7 +924,7 @@ def update_aviabit_settings(req: AviabitSettingsRequest, admin: dict = Depends(r
     return {"success": True, "message": "Учетные данные AviaBit успешно сохранены"}
 
 @app.post("/api/admin/aviabit/test")
-def test_aviabit_connection(req: AviabitSettingsRequest, user: dict = Depends(require_moderator_or_admin)):
+def test_aviabit_connection(req: AviabitSettingsRequest, user: dict = Depends(require_admin_or_moderator)):
     """Проверка аутентификации в AviaBit"""
     test_user = req.username or get_setting("aviabit_username", "a.zubkov")
     test_pass = req.password or get_setting("aviabit_password", "SoLnCeVo1985")
@@ -991,7 +962,7 @@ def test_aviabit_connection(req: AviabitSettingsRequest, user: dict = Depends(re
     }
 
 @app.post("/api/admin/aviabit/reset_session")
-def reset_aviabit_session(user: dict = Depends(require_moderator_or_admin)):
+def reset_aviabit_session(user: dict = Depends(require_admin_or_moderator)):
     """Сброс кэшированных файлов сессий"""
     import os
     for sf in [".session.json", ".session_ikar.json", ".session_test_nw.json", ".session_test_ik.json"]:
@@ -1002,7 +973,7 @@ def reset_aviabit_session(user: dict = Depends(require_moderator_or_admin)):
     return {"success": True, "message": "Сессии AviaBit сброшены"}
 
 @app.get("/api/admin/fleet_wb")
-def get_fleet_wb_api(user: dict = Depends(require_moderator_or_admin)):
+def get_fleet_wb_api(user: dict = Depends(require_admin_or_moderator)):
     """Получение базы флота W&B"""
     import json, os
     fp = os.path.join(os.path.dirname(__file__), "web_app", "src", "data", "fleet_wb.json")
@@ -1851,16 +1822,21 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
     all_raw_flights = []
     errors = []
 
+    user_avb = get_setting("aviabit_username", DEFAULT_USERNAME or "a.zubkov")
+    pass_avb = get_setting("aviabit_password", DEFAULT_PASSWORD or "SoLnCeVo1985")
+
+    # Расширяем диапазон выборки на 24 часа назад для точного определения входящих плеч и статуса ВС
+    fetch_start = start_dt - timedelta(hours=24)
+
     # Nordwind
     if req.airline in ("both", "nordwind"):
         try:
-            user_avb = get_setting("aviabit_username", DEFAULT_USERNAME or "a.zubkov")
-            pass_avb = get_setting("aviabit_password", DEFAULT_PASSWORD or "SoLnCeVo1985")
             url_nw = get_setting("aviabit_url_nordwind", BASE_URL_NORDWIND)
             client_nw = AviaBitClient(username=user_avb, password=pass_avb, base_url=url_nw, session_filename=".session.json", name="Nordwind")
             client_nw.login()
-            t_id = client_nw.get_template_id(req.filter_name)
-            flights_nw = client_nw.fetch_schedule(start_dt, end_dt, template_id=t_id)
+            # Запрашиваем полный флот без шаблона на стороне AviaBit с запасом 24 часа назад,
+            # чтобы движок отслеживания воздушных судов видел входящие плечи борта из любых городов
+            flights_nw = client_nw.fetch_schedule(fetch_start, end_dt)
             for fl in flights_nw:
                 fl["_client"] = client_nw
                 all_raw_flights.append(fl)
@@ -1873,8 +1849,7 @@ def fetch_schedule(req: FetchScheduleRequest, current_user: dict = Depends(get_c
             url_ik = get_setting("aviabit_url_ikar", BASE_URL_IKAR)
             client_ik = AviaBitClient(username=user_avb, password=pass_avb, base_url=url_ik, session_filename=".session_ikar.json", name="Икар")
             client_ik.login()
-            t_id = client_ik.get_template_id(req.filter_name)
-            flights_ik = client_ik.fetch_schedule(start_dt, end_dt, template_id=t_id)
+            flights_ik = client_ik.fetch_schedule(fetch_start, end_dt)
             for fl in flights_ik:
                 fl["_client"] = client_ik
                 all_raw_flights.append(fl)
@@ -2154,15 +2129,486 @@ def save_shift_legacy(data: dict = Body(...), current_user: dict = Depends(get_c
     return save_shift_state(req, current_user)
 
 
+# --- 8.1. СИНХРОНИЗАЦИЯ LYDIA DCS (AEROBAG PREDICTOR) ---
+from dcs_sync_server import (
+    load_dcs_config,
+    save_dcs_credentials,
+    load_dcs_stations,
+    save_dcs_stations,
+    DcsScraper,
+)
+
+def get_aerobag_db_path():
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag")
+    p1 = os.path.join(base, "aerobag_db.json")
+    p2 = os.path.join(base, "dcs_saved_flights.json")
+    if os.path.exists(p1):
+        return p1
+    if os.path.exists(p2):
+        return p2
+    return p1
+
+def load_aerobag_flights_data():
+    path = get_aerobag_db_path()
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict) and "flights" in data:
+                return data["flights"]
+            elif isinstance(data, list):
+                return data
+    except Exception as e:
+        print(f"Error loading {path}: {e}")
+    return []
+
+def save_aerobag_flights_data(flights_list):
+    path = get_aerobag_db_path()
+    envelope = None
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict) and "flights" in data:
+                    envelope = data
+        except Exception:
+            pass
+    if envelope is not None:
+        envelope["flights"] = flights_list
+        save_obj = envelope
+    else:
+        save_obj = flights_list
+
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(save_obj, f, ensure_ascii=False)
+    os.replace(tmp_path, path)
+    return len(flights_list)
+
+@app.get("/api/dcs_sync")
+@app.get("/aerobag/api/dcs_sync")
+@app.get("/lydia_dcs_sync.php")
+@app.get("/aerobag/lydia_dcs_sync.php")
+def dcs_sync_get(action: str = ""):
+    if action == "get_dcs_stations":
+        stations = load_dcs_stations()
+        return {"success": True, "stations": stations}
+    elif action == "get_dcs_credentials":
+        cfg = load_dcs_config()
+        return {
+            "success": True,
+            "username": cfg.get("username", ""),
+            "password": cfg.get("password", ""),
+            "airline": cfg.get("airline", "N4"),
+        }
+    return {"success": False, "error": f"Неизвестное действие: {action}"}
+
+
+@app.post("/api/dcs_sync")
+@app.post("/lydia_dcs_sync.php")
+@app.post("/aerobag/lydia_dcs_sync.php")
+async def dcs_sync_post(request: Request):
+    action = request.query_params.get("action", "")
+    try:
+        body = await request.json()
+    except Exception:
+        form = await request.form()
+        body = dict(form)
+    if not action:
+        action = body.get("action", "")
+
+    config = load_dcs_config()
+    scraper = DcsScraper(config)
+
+    if action == "test_connection":
+        u = body.get("username") or config.get("username")
+        p = body.get("password") or config.get("password")
+        air = body.get("airline") or config.get("airline", "N4")
+        scraper.config["airline"] = air
+        return scraper.login(u, p)
+
+    elif action == "save_dcs_credentials":
+        u = body.get("username", "")
+        p = body.get("password", "")
+        air = body.get("airline", "N4")
+        ok = save_dcs_credentials(u, p, air)
+        return {"success": ok}
+
+    elif action == "save_dcs_stations":
+        stations = body.get("stations", [])
+        ok = save_dcs_stations(stations)
+        return {"success": ok}
+
+    elif action == "scan_flights":
+        if body.get("username"): config["username"] = body["username"]
+        if body.get("password"): config["password"] = body["password"]
+        if body.get("airline"): config["airline"] = body["airline"]
+        s_date = body.get("start_date", "")
+        e_date = body.get("end_date", "")
+        locs = body.get("locations") or config.get("default_locations")
+        if isinstance(locs, str):
+            locs = [l.strip() for l in locs.split(",") if l.strip()]
+        only_fin = body.get("only_finalized", True)
+        if isinstance(only_fin, str):
+            only_fin = (only_fin.lower() in ["true", "1", "yes"])
+        client_keys = body.get("client_flight_keys", [])
+        return scraper.scan_flights(s_date, e_date, locs, only_fin, client_keys)
+
+    elif action == "save_to_database":
+        flights = body.get("flights", [])
+        cur_db = load_aerobag_flights_data()
+
+        def _norm_f_key(fn, dt, fr, to):
+            fn_clean = re.sub(r'\D', '', str(fn or ''))
+            dt_clean = str(dt or '').strip()[:10]
+            fr_clean = str(fr or '').strip().upper()
+            to_clean = str(to or '').strip().upper()
+            return f"{fn_clean}_{dt_clean}_{fr_clean}_{to_clean}"
+
+        db_map = {}
+        for i, it in enumerate(cur_db):
+            k = _norm_f_key(
+                it.get('flight_no') or it.get('flight'),
+                it.get('date') or it.get('flight_date'),
+                it.get('from') or it.get('departure_code'),
+                it.get('to') or it.get('dest_code')
+            )
+            db_map[k] = i
+
+        for f in flights:
+            flt_no = str(f.get("flight_no") or f.get("flight") or "").strip()
+            flt_digits = re.sub(r'\D', '', flt_no) or flt_no
+            flt_date = str(f.get("flight_date") or f.get("date") or "").strip()
+            dep_code = str(f.get("departure_code") or f.get("from") or "").strip().upper()
+            arr_code = str(f.get("dest_code") or f.get("to") or "").strip().upper()
+
+            vz_val = int(f.get("vz") or 0)
+            men_val = int(f.get("men") or 0)
+            women_val = int(f.get("women") or 0)
+            if vz_val == 0 and (men_val > 0 or women_val > 0):
+                vz_val = men_val + women_val
+
+            rb_val = int(f.get("rb") or 0)
+            rm_val = int(f.get("rm") or 0)
+            pax_val = int(f.get("pax") or 0)
+            if pax_val == 0:
+                pax_val = vz_val + rb_val
+
+            bag_pcs_val = int(float(f.get("bag_pcs") or 0))
+            bag_wt_val = float(f.get("bag_weight") or 0.0)
+            hb_wt_val = float(f.get("hb_weight") or 0.0)
+
+            clean_item = {
+                "id": f.get("id") or f"dcs_{flt_digits}_{flt_date}_{dep_code}_{arr_code}",
+                "airline": f.get("airline") or (flt_no[:2] if len(flt_no) >= 2 and not flt_no[:2].isdigit() else "N4"),
+                "flight_no": flt_no,
+                "flight": flt_digits,
+                "date": flt_date,
+                "from": dep_code,
+                "to": arr_code,
+                "men": vz_val,
+                "women": 0,
+                "rb": rb_val,
+                "rm": rm_val,
+                "pax": pax_val,
+                "bag_pcs": bag_pcs_val,
+                "bag_weight": bag_wt_val,
+                "hb_weight": hb_wt_val,
+                "source": "Lydia DCS",
+                "active": True
+            }
+            k = _norm_f_key(flt_no, flt_date, dep_code, arr_code)
+            if k in db_map:
+                cur_db[db_map[k]].update(clean_item)
+            else:
+                cur_db.append(clean_item)
+                db_map[k] = len(cur_db) - 1
+
+        try:
+            total_saved = save_aerobag_flights_data(cur_db)
+            return {"success": True, "saved_count": len(flights), "total_count": total_saved, "message": f"Успешно сохранено {len(flights)} рейсов в общую базу"}
+        except Exception as e:
+            return {"success": False, "error": f"Ошибка сохранения в базу данных: {str(e)}"}
+
+    return {"success": False, "error": f"Неизвестное действие: {action}"}
+
+
+# --- 8.2. ШЛЮЗ ДЛЯ ОБЩЕЙ БАЗЫ РЕЙСОВ И НАСТРОЕК AEROBAG ---
+
+@app.get("/aerobag/flights")
+@app.get("/api/aerobag/flights")
+def get_aerobag_shift_flights():
+    """Возвращает текущие рейсы смены для бокового списка AeroBag"""
+    shift_res = get_current_shift()
+    flights = shift_res.get("flights", [])
+    converted = []
+    for f in flights:
+        converted.append({
+            "id": f.get("id"),
+            "flight_no": f.get("flight") or f.get("flight_no") or f.get("flight_number"),
+            "date": f.get("flight_date") or f.get("date"),
+            "from": f.get("airport_from") or f.get("from"),
+            "to": f.get("airport_to") or f.get("to"),
+            "pax": f.get("pax", 0),
+            "dep_time": f.get("time_dep") or f.get("dep_time"),
+            "ac_num": f.get("ac_num") or f.get("aircraft_reg"),
+            "ac_type": f.get("ac_type") or f.get("aircraft_type"),
+            "ac_config": f.get("ac_config") or f.get("layout"),
+            "pax_m": f.get("pax_m"),
+            "pax_f": f.get("pax_f"),
+            "pax_ch": f.get("pax_ch"),
+            "pax_inf": f.get("pax_inf"),
+            "bag_pcs": f.get("bag_pcs"),
+            "bag_wt": f.get("bag_wt"),
+            "cargo_wt": f.get("cargo_wt"),
+            "mail_wt": f.get("mail_wt"),
+            "dow": f.get("dow"),
+            "doi": f.get("doi"),
+            "galley": f.get("galley"),
+        })
+    return {"success": True, "flights": converted}
+
+
+@app.get("/api.php")
+@app.get("/aerobag/api.php")
+@app.post("/api.php")
+@app.post("/aerobag/api.php")
+@app.get("/aerobag/api.php")
+@app.post("/api.php")
+@app.get("/api.php")
+async def aerobag_api_php_compat(request: Request):
+    """Эмуляция API AeroBag для полноценной работы и персистентности в локальном режиме"""
+    action = request.query_params.get("action", "")
+    body = {}
+    if request.method == "POST":
+        try:
+            body = await request.json()
+        except Exception:
+            try:
+                form = await request.form()
+                body = dict(form)
+            except Exception:
+                body = {}
+    if not action and isinstance(body, dict):
+        action = body.get("action", "")
+
+    if action == "login":
+        u = (body.get("username") or "").strip() if isinstance(body, dict) else ""
+        p = (body.get("password") or "").strip() if isinstance(body, dict) else ""
+        u_up = u.upper()
+        is_adm = (u_up in ("ADMIN", "АДМИНИСТРАТОР")) and (p in ("NW2026", "AeroBag#2026!Master", "admin", "admin123", ""))
+        user_obj = {
+            "id": "usr_local_admin" if is_adm else f"usr_local_{u.lower() or 'disp'}",
+            "username": "ADMIN" if is_adm else (u or "DISPATCHER"),
+            "full_name": "Главный Администратор (Local)" if is_adm else f"Диспетчер ({u or 'Смена'})",
+            "role": "admin" if is_adm else "dispatcher",
+            "theme": "dark"
+        }
+        return {"success": True, "user": user_obj, "token": "local_aerobag_token"}
+
+    elif action == "check_auth":
+        user_obj = {
+            "id": "usr_local_admin",
+            "username": "ADMIN",
+            "full_name": "Главный Администратор (Local)",
+            "role": "admin",
+            "theme": "dark"
+        }
+        return {"success": True, "authenticated": True, "user": user_obj}
+
+    elif action == "logout":
+        return {"success": True}
+
+    elif action == "get_flights":
+        flts = load_aerobag_flights_data()
+        return {"success": True, "flights": flts}
+
+    elif action == "save_flights":
+        flts = body if isinstance(body, list) else (body.get("flights") if isinstance(body, dict) else [])
+        if not isinstance(flts, list):
+            flts = []
+        try:
+            total = save_aerobag_flights_data(flts)
+            return {"success": True, "count": total, "message": f"Успешно сохранено {total} рейсов"}
+        except Exception as e:
+            return {"success": False, "error": f"Ошибка сохранения рейсов: {str(e)}"}
+
+    elif action == "delete_flight":
+        target_id = request.query_params.get("id") or (body.get("id") if isinstance(body, dict) else "")
+        if target_id:
+            try:
+                flts = load_aerobag_flights_data()
+                flts = [fl for fl in flts if str(fl.get("id")) != str(target_id)]
+                save_aerobag_flights_data(flts)
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+        return {"success": True, "message": "Рейс удален"}
+
+    elif action == "clear_db":
+        try:
+            save_aerobag_flights_data([])
+            return {"success": True, "message": "База рейсов очищена"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif action == "update_theme":
+        return {"success": True}
+
+    elif action == "save_settings":
+        k = ""
+        v = None
+        if isinstance(body, dict):
+            k = (body.get("setting_key") or body.get("key") or "").strip()
+            v = body.get("setting_value") if "setting_value" in body else body.get("value")
+        if k:
+            val_str = json.dumps(v, ensure_ascii=False) if v is not None else ""
+            set_setting(f"aerobag_{k}", val_str)
+            return {"success": True, "message": f"Настройка {k} сохранена"}
+        return {"success": False, "error": "Не указан ключ настройки"}
+
+    elif action == "get_settings":
+        key = request.query_params.get("key", "").strip()
+        if key:
+            raw_v = get_setting(f"aerobag_{key}") or ""
+            val = None
+            if raw_v:
+                try:
+                    val = json.loads(raw_v)
+                except Exception:
+                    val = raw_v
+            return {"success": True, "key": key, "value": val}
+        return {"success": True, "settings": {}}
+
+    elif action == "list_backups":
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        backups = []
+        for fn in sorted(os.listdir(backup_dir), reverse=True):
+            if fn.endswith(".json"):
+                fp = os.path.join(backup_dir, fn)
+                st = os.stat(fp)
+                fl_cnt = 0
+                try:
+                    with open(fp, "r", encoding="utf-8") as f:
+                        b_data = json.load(f)
+                        fl_cnt = len(b_data.get("flights", [])) if isinstance(b_data, dict) else len(b_data)
+                except Exception:
+                    pass
+                backups.append({
+                    "filename": fn,
+                    "date": datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                    "size": f"{st.st_size / 1024:.1f} KB",
+                    "flights_count": fl_cnt
+                })
+        return {"success": True, "backups": backups}
+
+    elif action == "create_backup":
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
+        flts = []
+        if os.path.exists(db_path):
+            try:
+                with open(db_path, "r", encoding="utf-8") as f:
+                    flts = json.load(f)
+            except Exception:
+                flts = []
+        now_ts = datetime.now().strftime("%Y_%m_%d_%H%M%S")
+        backup_fn = f"aerobag_backup_{now_ts}.json"
+        backup_fp = os.path.join(backup_dir, backup_fn)
+        raw_filters = get_setting("aerobag_airport_filters")
+        filters = json.loads(raw_filters) if raw_filters else {}
+        raw_ports = get_setting("aerobag_custom_airports")
+        ports = json.loads(raw_ports) if raw_ports else []
+        
+        backup_data = {
+            "backup_version": "2.0",
+            "exported_at": datetime.now().isoformat(),
+            "flights_count": len(flts),
+            "flights": flts,
+            "custom_airports": ports,
+            "airport_filters": filters
+        }
+        with open(backup_fp, "w", encoding="utf-8") as f:
+            json.dump(backup_data, f, ensure_ascii=False, indent=2)
+        return {"success": True, "filename": backup_fn, "message": f"Бэкап создан: {backup_fn}"}
+
+    elif action == "restore_backup":
+        fn = (body.get("filename") or body.get("file") or "").strip() if isinstance(body, dict) else ""
+        if not fn:
+            return {"success": False, "error": "Не указано имя файла бэкапа"}
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "backups")
+        backup_fp = os.path.join(backup_dir, fn)
+        if not os.path.exists(backup_fp):
+            return {"success": False, "error": f"Файл бэкапа {fn} не найден"}
+        try:
+            with open(backup_fp, "r", encoding="utf-8") as f:
+                b_data = json.load(f)
+            restored_flights = b_data if isinstance(b_data, list) else b_data.get("flights", [])
+            db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "dcs_saved_flights.json")
+            tmp_path = db_path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(restored_flights, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, db_path)
+            
+            if isinstance(b_data, dict):
+                if "airport_filters" in b_data:
+                    set_setting("aerobag_airport_filters", json.dumps(b_data["airport_filters"], ensure_ascii=False))
+                if "custom_airports" in b_data:
+                    set_setting("aerobag_custom_airports", json.dumps(b_data["custom_airports"], ensure_ascii=False))
+            return {"success": True, "flights_restored": len(restored_flights), "message": f"База успешно восстановлена: {len(restored_flights)} рейсов"}
+        except Exception as e:
+            return {"success": False, "error": f"Ошибка восстановления бэкапа: {str(e)}"}
+
+    elif action == "download_backup":
+        fn = request.query_params.get("file", "").strip()
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "backups")
+        backup_fp = os.path.join(backup_dir, fn)
+        if os.path.exists(backup_fp):
+            return FileResponse(backup_fp, filename=fn, media_type="application/json")
+        return {"success": False, "error": "Файл не найден"}
+
+    elif action == "delete_backup":
+        fn = (body.get("filename") or body.get("file") or "").strip() if isinstance(body, dict) else ""
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag", "backups")
+        backup_fp = os.path.join(backup_dir, fn)
+        if os.path.exists(backup_fp):
+            os.remove(backup_fp)
+            return {"success": True, "message": "Бэкап удален"}
+        return {"success": False, "error": "Файл не найден"}
+
+    elif action == "health":
+        return {"success": True, "status": "ok", "mode": "local_standalone"}
+
+    elif action == "get_users":
+        return {
+            "success": True,
+            "users": [
+                {"id": "usr_local_admin", "username": "ADMIN", "full_name": "Главный Администратор", "role": "admin"}
+            ]
+        }
+
+    return {"success": True}
+
+
 # --- 9. РАЗДАЧА СТАТИКИ ВЕБ-ПРИЛОЖЕНИЯ (PRODUCTION UI) ---
 
 dist_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_app", "dist")
 if os.path.exists(dist_dir):
     app.mount("/plan", StaticFiles(directory=dist_dir, html=True), name="plan")
 
-    @app.get("/")
-    def redirect_to_plan():
-        return RedirectResponse(url="/plan/")
+loadsheet_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "loadsheet")
+if os.path.exists(loadsheet_dir):
+    app.mount("/loadsheet", StaticFiles(directory=loadsheet_dir, html=True), name="loadsheet")
+
+aerobag_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aerobag")
+if os.path.exists(aerobag_dir):
+    app.mount("/aerobag", StaticFiles(directory=aerobag_dir, html=True), name="aerobag")
+
+@app.get("/")
+def redirect_to_plan():
+    return RedirectResponse(url="/plan/")
 
 
 if __name__ == "__main__":
