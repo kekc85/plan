@@ -6,7 +6,7 @@
  * для визуальной подсветки до явного подтверждения диспетчером.
  */
 
-import { lookupFleetWb, getAircraftMtow } from './fleetWbLookup';
+import { lookupFleetWb, getAircraftMtow } from './fleetWbLookup.js';
 
 // Поля, которые контролируются и обновляются из AviaBit
 export const TRACKED_AVIABIT_FIELDS = [
