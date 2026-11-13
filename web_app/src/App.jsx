@@ -108,6 +108,13 @@ function normalizeFlight(f) {
   // Интеллектуальное определение типа ВС (332, 333, 321, 772, 739, 738, 190)
   const ac_type = f.ac_type ? normalizePlaneType(f.ac_type) : detectPlaneType(f);
 
+  let pax_ch = (f.pax_ch !== undefined && f.pax_ch !== null && f.pax_ch !== '')
+    ? String(f.pax_ch)
+    : (f.pax && typeof f.pax === 'string' && f.pax.includes('/') ? f.pax.split('/')[1]?.trim() : (f.notes?.match(/(\d+)\s*(?:рб|дети|дет|chd)/i)?.[1] || ''));
+  let pax_inf = (f.pax_inf !== undefined && f.pax_inf !== null && f.pax_inf !== '')
+    ? String(f.pax_inf)
+    : (f.pax && typeof f.pax === 'string' && f.pax.includes('/') && f.pax.split('/').length > 2 ? f.pax.split('/')[2]?.trim() : (f.notes?.match(/(\d+)\s*(?:рм|млад|inf)/i)?.[1] || ''));
+
   const unread_changes = getSafeUnreadChanges(f);
   const hasUnread = Object.keys(unread_changes).length > 0;
 
@@ -125,6 +132,8 @@ function normalizeFlight(f) {
     astra_times_sent, 
     crew_manual,
     ac_type,
+    pax_ch: pax_ch || f.pax_ch || '',
+    pax_inf: pax_inf || f.pax_inf || '',
     unread_changes: hasUnread ? unread_changes : undefined,
     is_new_flight: hasUnread ? !!f.is_new_flight : false
   };
@@ -805,20 +814,45 @@ export default function App() {
   // Подтверждение ознакомления с отдельным измененным параметром (мемоизировано)
   const handleAcknowledgeField = useCallback((flightId, fieldName) => {
     hasUserModifiedRef.current = true;
-    setFlights(prev => prev.map(f => String(f.id) === String(flightId) ? acknowledgeFieldChange(f, fieldName) : f));
+    setFlights(prev => {
+      const updated = prev.map(f => String(f.id) === String(flightId) ? acknowledgeFieldChange(f, fieldName) : f);
+      if (countUnreadChanges(updated) === 0) {
+        setChangeToast(null);
+      }
+      return updated;
+    });
   }, []);
 
   // Подтверждение ознакомления со всеми изменениями конкретного рейса (мемоизировано)
   const handleAcknowledgeFlight = useCallback((flightId) => {
     hasUserModifiedRef.current = true;
-    setFlights(prev => prev.map(f => String(f.id) === String(flightId) ? acknowledgeFlightChanges(f) : f));
+    setFlights(prev => {
+      const updated = prev.map(f => String(f.id) === String(flightId) ? acknowledgeFlightChanges(f) : f);
+      if (countUnreadChanges(updated) === 0) {
+        setChangeToast(null);
+      }
+      return updated;
+    });
   }, []);
 
   // Подтверждение ознакомления со всеми изменениями суточного плана
   const handleAcknowledgeAll = useCallback(() => {
     hasUserModifiedRef.current = true;
-    setFlights(prev => acknowledgeAllChanges(prev));
-  }, []);
+    setChangeToast(null);
+    setFlights(prev => {
+      const ackFlights = acknowledgeAllChanges(prev);
+      try {
+        localStorage.setItem(`${STORAGE_KEY}_flights`, JSON.stringify(ackFlights));
+      } catch (e) {}
+      // Немедленное сохранение подтверждения на сервер без ожидания дебаунса
+      saveShift(shiftInfo, ackFlights).catch(err => console.warn('Instant ack save error:', err));
+      lastServerDataHashRef.current = JSON.stringify({
+        s: shiftInfo || null,
+        f: ackFlights.map(f => ({ id: f.id, status: f.status, time: f.time, fuel: f.fuel_block, notes: f.notes, ac: f.ac_num, pax: f.pax, unread: f.unread_changes }))
+      });
+      return ackFlights;
+    });
+  }, [shiftInfo]);
 
   // Переключение тумблера авто-подкачки
   const handleToggleAutoSync = () => {

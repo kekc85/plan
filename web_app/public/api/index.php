@@ -122,6 +122,50 @@ function getFleetMtow($tail, $operator = '') {
     return '';
 }
 
+function runDatabaseMigrationsOnce($pdo) {
+    $markerFile = __DIR__ . '/.db_schema_v2_ready';
+    if (file_exists($markerFile)) {
+        return;
+    }
+    // Разовая автоматическая безопасная миграция колонок в MySQL (если они отсутствуют)
+    $migrations = [
+        "ALTER TABLE plan_flights ADD COLUMN ac_type VARCHAR(16) NULL AFTER ac_num",
+        "ALTER TABLE plan_flights ADD COLUMN unread_changes TEXT NULL",
+        "ALTER TABLE plan_flights ADD COLUMN astra_times_sent TINYINT(1) DEFAULT 0",
+        "ALTER TABLE plan_flights ADD COLUMN inbound_flight VARCHAR(32) NULL",
+        "ALTER TABLE plan_flights ADD COLUMN inbound_dep VARCHAR(16) NULL",
+        "ALTER TABLE plan_flights ADD COLUMN inbound_takeoff_time VARCHAR(16) NULL",
+        "ALTER TABLE plan_flights ADD COLUMN inbound_landing_calc VARCHAR(16) NULL",
+        "ALTER TABLE plan_flights ADD COLUMN inbound_landing_time VARCHAR(16) NULL",
+        "ALTER TABLE plan_flights ADD COLUMN outbound_takeoff_time VARCHAR(16) NULL",
+        "ALTER TABLE plan_flights ADD COLUMN plane_status VARCHAR(32) NULL",
+        "ALTER TABLE plan_flights ADD COLUMN crew_manual TINYINT(1) DEFAULT 0",
+        "ALTER TABLE plan_flights ADD COLUMN fuel_confirmed TINYINT(1) DEFAULT 0",
+        "ALTER TABLE plan_flights ADD COLUMN mtow_manual TINYINT(1) DEFAULT 0",
+        "ALTER TABLE plan_flights ADD COLUMN pax_m VARCHAR(16) NULL",
+        "ALTER TABLE plan_flights ADD COLUMN pax_f VARCHAR(16) NULL",
+        "ALTER TABLE plan_flights ADD COLUMN pax_ch VARCHAR(16) NULL",
+        "ALTER TABLE plan_flights ADD COLUMN pax_inf VARCHAR(16) NULL",
+        "ALTER TABLE plan_shifts ADD COLUMN deleted_flights TEXT NULL",
+        "ALTER TABLE plan_handover_logs ADD COLUMN is_read TINYINT(1) DEFAULT 0",
+        "ALTER TABLE plan_handover_logs ADD COLUMN read_at VARCHAR(64) NULL",
+        "ALTER TABLE plan_handover_logs ADD COLUMN read_by VARCHAR(128) NULL"
+    ];
+    foreach ($migrations as $mSql) {
+        try {
+            $pdo->exec($mSql);
+        } catch (Exception $ign) {}
+    }
+
+    // Автоматическое обновление имени диспетчера по умолчанию на реальное имя и удаление старых резервных рейсов
+    try {
+        $pdo->exec("UPDATE plan_users SET full_name = 'Иван Иванов' WHERE username = 'dispatcher' AND full_name = 'Диспетчер по центровке'");
+        $pdo->exec("DELETE FROM plan_flights WHERE flight_number LIKE '~%' OR flight_number LIKE '%РЕЗ%' OR flight_number LIKE '%REZ%' OR flight_number LIKE 'РЕ%'");
+    } catch (Exception $ign) {}
+
+    @file_put_contents($markerFile, date('Y-m-d H:i:s'));
+}
+
 function getDb() {
     static $pdo = null;
     if ($pdo === null) {
@@ -132,41 +176,7 @@ function getDb() {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false
             ]);
-            // Автоматическая безопасная миграция колонок в MySQL (если они отсутствуют)
-            $migrations = [
-                "ALTER TABLE plan_flights ADD COLUMN ac_type VARCHAR(16) NULL AFTER ac_num",
-                "ALTER TABLE plan_flights ADD COLUMN unread_changes TEXT NULL",
-                "ALTER TABLE plan_flights ADD COLUMN astra_times_sent TINYINT(1) DEFAULT 0",
-                "ALTER TABLE plan_flights ADD COLUMN inbound_flight VARCHAR(32) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN inbound_dep VARCHAR(16) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN inbound_takeoff_time VARCHAR(16) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN inbound_landing_calc VARCHAR(16) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN inbound_landing_time VARCHAR(16) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN outbound_takeoff_time VARCHAR(16) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN plane_status VARCHAR(32) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN crew_manual TINYINT(1) DEFAULT 0",
-                "ALTER TABLE plan_flights ADD COLUMN fuel_confirmed TINYINT(1) DEFAULT 0",
-                "ALTER TABLE plan_flights ADD COLUMN mtow_manual TINYINT(1) DEFAULT 0",
-                "ALTER TABLE plan_flights ADD COLUMN pax_m VARCHAR(16) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN pax_f VARCHAR(16) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN pax_ch VARCHAR(16) NULL",
-                "ALTER TABLE plan_flights ADD COLUMN pax_inf VARCHAR(16) NULL",
-                "ALTER TABLE plan_shifts ADD COLUMN deleted_flights TEXT NULL",
-                "ALTER TABLE plan_handover_logs ADD COLUMN is_read TINYINT(1) DEFAULT 0",
-                "ALTER TABLE plan_handover_logs ADD COLUMN read_at VARCHAR(64) NULL",
-                "ALTER TABLE plan_handover_logs ADD COLUMN read_by VARCHAR(128) NULL"
-            ];
-            foreach ($migrations as $mSql) {
-                try {
-                    $pdo->exec($mSql);
-                } catch (Exception $ign) {}
-            }
-
-            // Автоматическое обновление имени диспетчера по умолчанию на реальное имя и удаление старых резервных рейсов
-            try {
-                $pdo->exec("UPDATE plan_users SET full_name = 'Иван Иванов' WHERE username = 'dispatcher' AND full_name = 'Диспетчер по центровке'");
-                $pdo->exec("DELETE FROM plan_flights WHERE flight_number LIKE '~%' OR flight_number LIKE '%РЕЗ%' OR flight_number LIKE '%REZ%' OR flight_number LIKE 'РЕ%'");
-            } catch (Exception $ign) {}
+            runDatabaseMigrationsOnce($pdo);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['detail' => 'Ошибка подключения к MySQL: ' . $e->getMessage()]);

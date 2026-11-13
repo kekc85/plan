@@ -1,3 +1,7 @@
+- 2026-11-13: Устранено повторное появление 16 изменений и оптимизирован MySQL:
+  - В `web_app/public/api/index.php` убрано циклическое выполнение 21 `ALTER TABLE` при каждом запросе: добавлена разовая проверка через маркер `.db_schema_v2_ready`, что полностью устранило `SQLSTATE[HY000] [1040] Too many connections` и блокировки таблиц на Beget.
+  - В `web_app/src/App.jsx` в `handleAcknowledgeAll` добавлен вызов `setChangeToast(null)` для немедленного скрытия плашки уведомления, а также реализовано мгновенное сохранение подтверждённых рейсов в БД без 2-секундного ожидания.
+  - В `web_app/src/App.jsx` (`normalizeFlight`) и `web_app/src/utils/deltaSync.js` (`detectFlightChanges`) обеспечено гарантированное извлечение `pax_ch` и `pax_inf` из формата `pax` (`131/9/1`) или `notes` (`9рб 1рм`), что предотвращает ложные расхождения дельты.
 - 2026-11-12: Исправлен вызов `applyAircraftCompartmentConfig` и синхронизирован GitHub:
   - В `aerobag-test/app.js` вызов `applyAircraftCompartmentConfig` обернут в `typeof === 'function'` с сохранением бейджа борта `[acNum]`.
   - Ветка `local-standalone` со всеми локальными доработками и журналом `State.md` успешно отправлена в удаленный репозиторий GitHub (`origin/local-standalone`).
