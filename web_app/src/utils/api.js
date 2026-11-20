@@ -408,6 +408,13 @@ export async function adminResetAviabitSession() {
     method: 'POST'
   });
 }
+
+export async function adminConfirmAviabit2FA(payload) {
+  return request('/admin/aviabit/confirm_2fa', {
+    method: 'POST',
+    body: JSON.stringify(payload || {})
+  });
+}
 // --- Эндпоинты для работы с общей базой рейсов AeroBag ---
 export async function fetchAeroBagFlights(params = {}) {
   const query = new URLSearchParams();

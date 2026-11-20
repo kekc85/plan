@@ -1913,9 +1913,9 @@ function saveAviaBitCookie($name, $cookieVal) {
     setSystemSetting("aviabit_cookie_{$name}", $cookieVal);
 }
 
-function testAviaBitAuth($baseUrl, $username, $password) {
+function testAviaBitAuth($baseUrl, $username, $password, $confirmationCode = null) {
     $origin = rtrim($baseUrl, '/');
-    $authPayload = json_encode([
+    $payloadData = [
         'rememberMe' => true,
         'version' => [
             'date' => '2026-08-06T08:00:00.000Z',
@@ -1925,14 +1925,21 @@ function testAviaBitAuth($baseUrl, $username, $password) {
         'eng' => false,
         'username' => $username,
         'password' => $password
-    ]);
+    ];
+
+    if (!empty($confirmationCode)) {
+        $payloadData['confirmationCode'] = strval(trim($confirmationCode));
+        $payloadData['confirmationType'] = 2;
+    }
+
+    $authPayload = json_encode($payloadData);
 
     $ch = curl_init("$origin/api/auth");
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $authPayload);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HEADER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "Origin: $origin",
@@ -1943,6 +1950,7 @@ function testAviaBitAuth($baseUrl, $username, $password) {
     ]);
     $res = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
     $curlErr = curl_error($ch);
     curl_close($ch);
 
@@ -1950,14 +1958,31 @@ function testAviaBitAuth($baseUrl, $username, $password) {
         return ['ok' => false, 'code' => $httpCode, 'message' => "Ошибка сети/cURL: $curlErr"];
     }
 
+    $headerStr = substr($res, 0, $headerSize);
+    $bodyStr = substr($res, $headerSize);
+    $bodyJson = @json_decode($bodyStr, true);
+
     if ($httpCode === 200) {
-        if (preg_match('/connect\.sid=([^;]+)/', $res, $m)) {
+        if (preg_match('/connect\.sid=([^;]+)/', $headerStr, $m)) {
             $cookieName = (strpos($origin, 'ikar') !== false) ? 'ikar' : 'nordwind';
             saveAviaBitCookie($cookieName, $m[1]);
         }
         return ['ok' => true, 'code' => $httpCode, 'message' => 'Авторизация успешна (сессия получена)'];
     } elseif ($httpCode === 401 || $httpCode === 403) {
-        return ['ok' => false, 'code' => $httpCode, 'message' => 'Неверный логин или пароль'];
+        if (is_array($bodyJson) && ($bodyJson['code'] ?? '') === 'CHECK_AUTH_FAILED') {
+            $sendingInfo = $bodyJson['info']['sendingInfo'] ?? 'почту';
+            return [
+                'ok' => false,
+                'need_2fa' => true,
+                'code' => 401,
+                'sending_info' => $sendingInfo,
+                'message' => (!empty($confirmationCode)
+                    ? "Неверный код 2FA. Введите свежий код из письма ($sendingInfo)"
+                    : "Требуется код подтверждения (отправлен на $sendingInfo)")
+            ];
+        }
+        $errDetail = $bodyJson['message'] ?? $bodyJson['error'] ?? 'Неверный логин или пароль';
+        return ['ok' => false, 'code' => $httpCode, 'message' => $errDetail];
     } else {
         return ['ok' => false, 'code' => $httpCode, 'message' => "HTTP код $httpCode"];
     }
@@ -2163,22 +2188,28 @@ if ($route === '/fetch_schedule') {
         }
     } catch (Exception $e) {}
 
-    $avbUser = getSystemSetting('aviabit_username', 'a.zubkov');
-    $avbPass = getSystemSetting('aviabit_password', 'SoLnCeVo1985');
+    $defaultUser = getSystemSetting('aviabit_username', 'a.zubkov');
+    $defaultPass = getSystemSetting('aviabit_password', 'SoLnCeVo1985');
+
+    $avbNwUser = getSystemSetting('aviabit_nw_username', $defaultUser);
+    $avbNwPass = getSystemSetting('aviabit_nw_password', $defaultPass);
     $urlNordwind = getSystemSetting('aviabit_url_nordwind', 'https://aviabit.nordwindairlines.ru');
+
+    $avbIkUser = getSystemSetting('aviabit_ik_username', $defaultUser);
+    $avbIkPass = getSystemSetting('aviabit_ik_password', $defaultPass);
     $urlIkar = getSystemSetting('aviabit_url_ikar', 'https://aviabit.ikar.aero');
 
     $rawFlights = [];
     $diag = [];
     if ($airline === 'both' || $airline === 'nordwind') {
-        $nw = fetchAviaBitSchedule($urlNordwind, $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'nordwind', $diag);
+        $nw = fetchAviaBitSchedule($urlNordwind, $avbNwUser, $avbNwPass, $tsStartMs, $tsEndMs, 'nordwind', $diag);
         if (!empty($nw)) {
             foreach ($nw as &$f) { $f['_airline'] = 'nordwind'; }
             $rawFlights = array_merge($rawFlights, $nw);
         }
     }
     if ($airline === 'both' || $airline === 'ikar') {
-        $ik = fetchAviaBitSchedule($urlIkar, $avbUser, $avbPass, $tsStartMs, $tsEndMs, 'ikar', $diag);
+        $ik = fetchAviaBitSchedule($urlIkar, $avbIkUser, $avbIkPass, $tsStartMs, $tsEndMs, 'ikar', $diag);
         if (!empty($ik)) {
             foreach ($ik as &$f) { $f['_airline'] = 'ikar'; }
             $rawFlights = array_merge($rawFlights, $ik);
@@ -3226,20 +3257,31 @@ if (strpos($route, '/admin/aviabit') === 0) {
 
     if ($route === '/admin/aviabit/settings' || $route === '/admin/aviabit_settings') {
         if ($method === 'GET') {
-            $user = getSystemSetting('aviabit_username', 'a.zubkov');
-            $pass = getSystemSetting('aviabit_password', 'SoLnCeVo1985');
+            $defaultUser = getSystemSetting('aviabit_username', 'a.zubkov');
+            $defaultPass = getSystemSetting('aviabit_password', 'SoLnCeVo1985');
+
+            $userNw = getSystemSetting('aviabit_nw_username', $defaultUser);
+            $passNw = getSystemSetting('aviabit_nw_password', $defaultPass);
             $urlNw = getSystemSetting('aviabit_url_nordwind', 'https://aviabit.nordwindairlines.ru');
+
+            $userIk = getSystemSetting('aviabit_ik_username', $defaultUser);
+            $passIk = getSystemSetting('aviabit_ik_password', $defaultPass);
             $urlIk = getSystemSetting('aviabit_url_ikar', 'https://aviabit.ikar.aero');
+
             $hasNwCookie = file_exists(__DIR__ . '/.session_nordwind.json') || !empty(getSystemSetting('aviabit_cookie_nordwind', ''));
             $hasIkCookie = file_exists(__DIR__ . '/.session_ikar.json') || !empty(getSystemSetting('aviabit_cookie_ikar', ''));
 
             echo json_encode([
-                'username' => $user,
-                'password' => $pass,
+                'username_nw' => $userNw,
+                'password_nw' => $passNw,
                 'url_nordwind' => $urlNw,
-                'url_ikar' => $urlIk,
                 'has_nordwind_session' => $hasNwCookie,
-                'has_ikar_session' => $hasIkCookie
+                'username_ik' => $userIk,
+                'password_ik' => $passIk,
+                'url_ikar' => $urlIk,
+                'has_ikar_session' => $hasIkCookie,
+                'username' => $userNw,
+                'password' => $passNw
             ]);
             exit;
         }
@@ -3251,15 +3293,36 @@ if (strpos($route, '/admin/aviabit') === 0) {
                 exit;
             }
             $input = getJsonInput();
-            if (isset($input['username'])) setSystemSetting('aviabit_username', trim($input['username']));
-            if (isset($input['password'])) setSystemSetting('aviabit_password', (string)$input['password']);
+            if (isset($input['username_nw'])) {
+                setSystemSetting('aviabit_nw_username', trim($input['username_nw']));
+                setSystemSetting('aviabit_username', trim($input['username_nw']));
+            } elseif (isset($input['username'])) {
+                setSystemSetting('aviabit_nw_username', trim($input['username']));
+                setSystemSetting('aviabit_username', trim($input['username']));
+            }
+
+            if (isset($input['password_nw'])) {
+                setSystemSetting('aviabit_nw_password', (string)$input['password_nw']);
+                setSystemSetting('aviabit_password', (string)$input['password_nw']);
+            } elseif (isset($input['password'])) {
+                setSystemSetting('aviabit_nw_password', (string)$input['password']);
+                setSystemSetting('aviabit_password', (string)$input['password']);
+            }
+
+            if (isset($input['username_ik'])) {
+                setSystemSetting('aviabit_ik_username', trim($input['username_ik']));
+            }
+            if (isset($input['password_ik'])) {
+                setSystemSetting('aviabit_ik_password', (string)$input['password_ik']);
+            }
+
             if (isset($input['url_nordwind'])) setSystemSetting('aviabit_url_nordwind', trim($input['url_nordwind']));
             if (isset($input['url_ikar'])) setSystemSetting('aviabit_url_ikar', trim($input['url_ikar']));
 
-            // Если пароль или логин изменились - очищаем старые сессии
+            // Если сменились учетные данные - очищаем старые сессии
             resetAviaBitSessions();
 
-            logSystemEvent('INFO', 'system', "Администратор '{$authUser['username']}' обновил учетную запись AviaBit ({$input['username']})", null, $authUser['id'], $authUser['username'], getClientIp());
+            logSystemEvent('INFO', 'system', "Администратор '{$authUser['username']}' обновил раздельные учетные записи AviaBit (Nordwind/Ikar)", null, $authUser['id'], $authUser['username'], getClientIp());
 
             echo json_encode(['success' => true, 'message' => 'Учетные данные AviaBit успешно сохранены. Кэш сессий обновлен.']);
             exit;
@@ -3268,21 +3331,80 @@ if (strpos($route, '/admin/aviabit') === 0) {
 
     if (($route === '/admin/aviabit/test' || $route === '/admin/aviabit_test') && $method === 'POST') {
         $input = getJsonInput();
-        $testUser = trim($input['username'] ?? getSystemSetting('aviabit_username', 'a.zubkov'));
-        $testPass = (string)($input['password'] ?? getSystemSetting('aviabit_password', 'SoLnCeVo1985'));
+        $target = $input['target'] ?? $input['airline'] ?? 'both';
+
+        $defaultUser = getSystemSetting('aviabit_username', 'a.zubkov');
+        $defaultPass = getSystemSetting('aviabit_password', 'SoLnCeVo1985');
+
+        $testUserNw = trim($input['username_nw'] ?? $input['username'] ?? getSystemSetting('aviabit_nw_username', $defaultUser));
+        $testPassNw = (string)($input['password_nw'] ?? $input['password'] ?? getSystemSetting('aviabit_nw_password', $defaultPass));
         $testUrlNw = trim($input['url_nordwind'] ?? getSystemSetting('aviabit_url_nordwind', 'https://aviabit.nordwindairlines.ru'));
+
+        $testUserIk = trim($input['username_ik'] ?? $input['username'] ?? getSystemSetting('aviabit_ik_username', $defaultUser));
+        $testPassIk = (string)($input['password_ik'] ?? $input['password'] ?? getSystemSetting('aviabit_ik_password', $defaultPass));
         $testUrlIk = trim($input['url_ikar'] ?? getSystemSetting('aviabit_url_ikar', 'https://aviabit.ikar.aero'));
 
-        $nwResult = testAviaBitAuth($testUrlNw, $testUser, $testPass);
-        $ikResult = testAviaBitAuth($testUrlIk, $testUser, $testPass);
+        $nwResult = null;
+        $ikResult = null;
 
-        logSystemEvent('INFO', 'system', "Тестирование подключения AviaBit: Nordwind=" . ($nwResult['ok'] ? 'OK' : 'ERR') . ", Ikar=" . ($ikResult['ok'] ? 'OK' : 'ERR'), null, $authUser['id'], $authUser['username'], getClientIp());
+        if ($target === 'both' || $target === 'nordwind') {
+            $nwResult = testAviaBitAuth($testUrlNw, $testUserNw, $testPassNw);
+        }
+        if ($target === 'both' || $target === 'ikar') {
+            $ikResult = testAviaBitAuth($testUrlIk, $testUserIk, $testPassIk);
+        }
+
+        $isSuccess = false;
+        if ($target === 'both') {
+            $isSuccess = (!empty($nwResult['ok']) || !empty($ikResult['ok']));
+        } elseif ($target === 'nordwind') {
+            $isSuccess = !empty($nwResult['ok']);
+        } elseif ($target === 'ikar') {
+            $isSuccess = !empty($ikResult['ok']);
+        }
+
+        logSystemEvent('INFO', 'system', "Тестирование подключения AviaBit ($target): Nordwind=" . (($nwResult['ok'] ?? false) ? 'OK' : 'ERR') . ", Ikar=" . (($ikResult['ok'] ?? false) ? 'OK' : 'ERR'), null, $authUser['id'], $authUser['username'], getClientIp());
 
         echo json_encode([
-            'success' => $nwResult['ok'] || $ikResult['ok'],
+            'success' => $isSuccess,
             'nordwind' => $nwResult,
             'ikar' => $ikResult
         ]);
+        exit;
+    }
+
+    if (($route === '/admin/aviabit/confirm_2fa' || $route === '/admin/aviabit_confirm_2fa') && $method === 'POST') {
+        $input = getJsonInput();
+        $airline = strtolower($input['airline'] ?? 'ikar');
+        $code = trim($input['code'] ?? $input['confirmationCode'] ?? '');
+
+        if (empty($code)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'message' => 'Введите код подтверждения из письма']);
+            exit;
+        }
+
+        $defaultUser = getSystemSetting('aviabit_username', 'a.zubkov');
+        $defaultPass = getSystemSetting('aviabit_password', 'SoLnCeVo1985');
+
+        if ($airline === 'ikar') {
+            $u = trim($input['username_ik'] ?? $input['username'] ?? getSystemSetting('aviabit_ik_username', $defaultUser));
+            $p = (string)($input['password_ik'] ?? $input['password'] ?? getSystemSetting('aviabit_ik_password', $defaultPass));
+            $url = trim($input['url_ikar'] ?? getSystemSetting('aviabit_url_ikar', 'https://aviabit.ikar.aero'));
+        } else {
+            $u = trim($input['username_nw'] ?? $input['username'] ?? getSystemSetting('aviabit_nw_username', $defaultUser));
+            $p = (string)($input['password_nw'] ?? $input['password'] ?? getSystemSetting('aviabit_nw_password', $defaultPass));
+            $url = trim($input['url_nordwind'] ?? getSystemSetting('aviabit_url_nordwind', 'https://aviabit.nordwindairlines.ru'));
+        }
+
+        $res = testAviaBitAuth($url, $u, $p, $code);
+        if (!empty($res['ok'])) {
+            logSystemEvent('INFO', 'system', "Успешное 2FA-подтверждение сессии AviaBit ($airline) администратором '{$authUser['username']}'", null, $authUser['id'], $authUser['username'], getClientIp());
+        } else {
+            logSystemEvent('WARN', 'system', "Ошибка 2FA-подтверждения AviaBit ($airline): {$res['message']}", null, $authUser['id'], $authUser['username'], getClientIp());
+        }
+
+        echo json_encode($res);
         exit;
     }
 

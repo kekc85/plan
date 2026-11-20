@@ -237,9 +237,24 @@ class TelegramSettingsRequest(BaseModel):
 
 
 class AviabitSettingsRequest(BaseModel):
+    username_nw: Optional[str] = None
+    password_nw: Optional[str] = None
+    url_nordwind: Optional[str] = None
+    username_ik: Optional[str] = None
+    password_ik: Optional[str] = None
+    url_ikar: Optional[str] = None
+    airline: Optional[str] = None
     username: Optional[str] = None
     password: Optional[str] = None
+
+class AviabitConfirm2FARequest(BaseModel):
+    airline: str = "ikar"
+    code: str
+    username_nw: Optional[str] = None
+    password_nw: Optional[str] = None
     url_nordwind: Optional[str] = None
+    username_ik: Optional[str] = None
+    password_ik: Optional[str] = None
     url_ikar: Optional[str] = None
 
 class TelegramTestRequest(BaseModel):
@@ -884,69 +899,125 @@ def test_telegram_connection(req: TelegramTestRequest, user: dict = Depends(requ
 def get_aviabit_settings(user: dict = Depends(require_admin_or_moderator)):
     """Получение настроек подключения к шлюзу AviaBit"""
     import os
-    has_nw = os.path.exists(".session.json")
+    has_nw = os.path.exists(".session.json") or os.path.exists(".session_nordwind.json")
     has_ik = os.path.exists(".session_ikar.json")
+    def_user = get_setting("aviabit_username", "a.zubkov")
+    def_pass = get_setting("aviabit_password", "SoLnCeVo1985")
     return {
-        "username": get_setting("aviabit_username", "a.zubkov"),
-        "password": get_setting("aviabit_password", "SoLnCeVo1985"),
+        "username_nw": get_setting("aviabit_nw_username", def_user),
+        "password_nw": get_setting("aviabit_nw_password", def_pass),
         "url_nordwind": get_setting("aviabit_url_nordwind", "https://aviabit.nordwindairlines.ru"),
-        "url_ikar": get_setting("aviabit_url_ikar", "https://aviabit.ikar.aero"),
         "has_nordwind_session": has_nw,
-        "has_ikar_session": has_ik
+        "username_ik": get_setting("aviabit_ik_username", def_user),
+        "password_ik": get_setting("aviabit_ik_password", def_pass),
+        "url_ikar": get_setting("aviabit_url_ikar", "https://aviabit.ikar.aero"),
+        "has_ikar_session": has_ik,
+        "username": def_user,
+        "password": def_pass
     }
 
 @app.post("/api/admin/aviabit/settings")
 def update_aviabit_settings(req: AviabitSettingsRequest, admin: dict = Depends(require_admin)):
-    """Обновление учетных данных AviaBit"""
+    """Обновление учетных данных AviaBit (раздельные Nordwind и Ikar)"""
     import os
-    if req.username is not None:
+    if req.username_nw is not None:
+        set_setting("aviabit_nw_username", req.username_nw.strip())
+        set_setting("aviabit_username", req.username_nw.strip())
+    elif req.username is not None:
+        set_setting("aviabit_nw_username", req.username.strip())
         set_setting("aviabit_username", req.username.strip())
-    if req.password is not None:
+
+    if req.password_nw is not None:
+        set_setting("aviabit_nw_password", req.password_nw)
+        set_setting("aviabit_password", req.password_nw)
+    elif req.password is not None:
+        set_setting("aviabit_nw_password", req.password)
         set_setting("aviabit_password", req.password)
+
+    if req.username_ik is not None:
+        set_setting("aviabit_ik_username", req.username_ik.strip())
+    if req.password_ik is not None:
+        set_setting("aviabit_ik_password", req.password_ik)
+
     if req.url_nordwind is not None:
         set_setting("aviabit_url_nordwind", req.url_nordwind.strip())
     if req.url_ikar is not None:
         set_setting("aviabit_url_ikar", req.url_ikar.strip())
     
     # Сброс старых сессий
-    for sf in [".session.json", ".session_ikar.json"]:
+    for sf in [".session.json", ".session_nordwind.json", ".session_ikar.json"]:
         if os.path.exists(sf):
-            try:
-                os.remove(sf)
-            except Exception:
-                pass
+            try: os.remove(sf)
+            except Exception: pass
     
     log_system_event(
         "INFO", "system",
-        f"Администратор '{admin['username']}' обновил учетную запись AviaBit ({req.username or ''})",
+        f"Администратор '{admin['username']}' обновил раздельные учетные записи AviaBit",
         user_id=admin["id"], username=admin["username"]
     )
     return {"success": True, "message": "Учетные данные AviaBit успешно сохранены"}
 
 @app.post("/api/admin/aviabit/test")
 def test_aviabit_connection(req: AviabitSettingsRequest, user: dict = Depends(require_admin_or_moderator)):
-    """Проверка аутентификации в AviaBit"""
-    test_user = req.username or get_setting("aviabit_username", "a.zubkov")
-    test_pass = req.password or get_setting("aviabit_password", "SoLnCeVo1985")
+    """Проверка аутентификации в AviaBit с поддержкой 2FA"""
+    target = req.airline or "both"
+    def_user = get_setting("aviabit_username", "a.zubkov")
+    def_pass = get_setting("aviabit_password", "SoLnCeVo1985")
+
+    user_nw = req.username_nw or req.username or get_setting("aviabit_nw_username", def_user)
+    pass_nw = req.password_nw or req.password or get_setting("aviabit_nw_password", def_pass)
     url_nw = req.url_nordwind or get_setting("aviabit_url_nordwind", "https://aviabit.nordwindairlines.ru")
+
+    user_ik = req.username_ik or req.username or get_setting("aviabit_ik_username", def_user)
+    pass_ik = req.password_ik or req.password or get_setting("aviabit_ik_password", def_pass)
     url_ik = req.url_ikar or get_setting("aviabit_url_ikar", "https://aviabit.ikar.aero")
 
-    nw_res = {"ok": False, "message": ""}
-    ik_res = {"ok": False, "message": ""}
+    nw_res = None
+    ik_res = None
 
-    try:
-        c_nw = AviaBitClient(username=test_user, password=test_pass, base_url=url_nw, session_filename=".session_test_nw.json", name="Nordwind")
-        ok_nw = c_nw.login()
-        nw_res = {"ok": ok_nw, "code": 200 if ok_nw else 401, "message": "Авторизация успешна" if ok_nw else "Неверный логин/пароль"}
-    except Exception as e:
-        nw_res = {"ok": False, "code": 500, "message": str(e)}
+    if target in ("both", "nordwind"):
+        try:
+            c_nw = AviaBitClient(username=user_nw, password=pass_nw, base_url=url_nw, session_filename=".session_test_nw.json", name="Nordwind")
+            ok_nw = c_nw.login()
+            nw_res = {"ok": ok_nw, "code": 200 if ok_nw else 401, "message": "Авторизация успешна" if ok_nw else "Неверный логин/пароль"}
+        except Exception as e:
+            nw_res = {"ok": False, "code": 500, "message": str(e)}
 
-    try:
-        c_ik = AviaBitClient(username=test_user, password=test_pass, base_url=url_ik, session_filename=".session_test_ik.json", name="Ikar")
-        ok_ik = c_ik.login()
-        ik_res = {"ok": ok_ik, "code": 200 if ok_ik else 401, "message": "Авторизация успешна" if ok_ik else "Неверный логин/пароль"}
-    except Exception as e:
-        ik_res = {"ok": False, "code": 500, "message": str(e)}
+    if target in ("both", "ikar"):
+        try:
+            # Прямой запрос к /api/auth для выявления 2FA
+            import requests
+            auth_payload = {
+                "rememberMe": True,
+                "version": {"date": "2026-08-06T08:00:00.000Z", "company": 'ООО "АвиаБит"', "number": "9.8.1"},
+                "eng": False,
+                "username": user_ik,
+                "password": pass_ik
+            }
+            resp = requests.post(f"{url_ik.rstrip('/')}/api/auth", json=auth_payload, timeout=15)
+            if resp.status_code == 200:
+                cookie_val = resp.cookies.get("connect.sid")
+                if cookie_val:
+                    with open(".session_ikar.json", "w", encoding="utf-8") as f:
+                        json.dump({"connect.sid": cookie_val}, f)
+                ik_res = {"ok": True, "code": 200, "message": "Авторизация успешна (сессия получена)"}
+            elif resp.status_code == 401:
+                err_data = resp.json() if resp.text else {}
+                if err_data.get("code") == "CHECK_AUTH_FAILED":
+                    sending_info = err_data.get("info", {}).get("sendingInfo", "почту")
+                    ik_res = {
+                        "ok": False,
+                        "need_2fa": True,
+                        "code": 401,
+                        "sending_info": sending_info,
+                        "message": f"Требуется код подтверждения (отправлен на {sending_info})"
+                    }
+                else:
+                    ik_res = {"ok": False, "code": 401, "message": err_data.get("message", "Неверный логин или пароль")}
+            else:
+                ik_res = {"ok": False, "code": resp.status_code, "message": f"HTTP код {resp.status_code}"}
+        except Exception as e:
+            ik_res = {"ok": False, "code": 500, "message": str(e)}
 
     # Удаляем тестовые сессии
     import os
@@ -955,9 +1026,62 @@ def test_aviabit_connection(req: AviabitSettingsRequest, user: dict = Depends(re
             try: os.remove(tf)
             except Exception: pass
 
+    is_success = bool((nw_res and nw_res.get("ok")) or (ik_res and ik_res.get("ok")))
     return {
-        "success": nw_res["ok"] or ik_res["ok"],
+        "success": is_success,
         "nordwind": nw_res,
+        "ikar": ik_res
+    }
+
+@app.post("/api/admin/aviabit/confirm_2fa")
+def confirm_aviabit_2fa(req: AviabitConfirm2FARequest, user: dict = Depends(require_admin_or_moderator)):
+    """Подтверждение 2FA кода из почты для AviaBit"""
+    import requests, os
+    airline = req.airline.lower()
+    code = req.code.strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="Код подтверждения не может быть пустым")
+
+    def_user = get_setting("aviabit_username", "a.zubkov")
+    def_pass = get_setting("aviabit_password", "SoLnCeVo1985")
+
+    if airline == "ikar":
+        u = req.username_ik or get_setting("aviabit_ik_username", def_user)
+        p = req.password_ik or get_setting("aviabit_ik_password", def_pass)
+        url = (req.url_ikar or get_setting("aviabit_url_ikar", "https://aviabit.ikar.aero")).rstrip("/")
+        session_file = ".session_ikar.json"
+    else:
+        u = req.username_nw or get_setting("aviabit_nw_username", def_user)
+        p = req.password_nw or get_setting("aviabit_nw_password", def_pass)
+        url = (req.url_nordwind or get_setting("aviabit_url_nordwind", "https://aviabit.nordwindairlines.ru")).rstrip("/")
+        session_file = ".session_nordwind.json"
+
+    auth_payload = {
+        "rememberMe": True,
+        "version": {"date": "2026-08-06T08:00:00.000Z", "company": 'ООО "АвиаБит"', "number": "9.8.1"},
+        "eng": False,
+        "username": u,
+        "password": p,
+        "confirmationCode": str(code),
+        "confirmationType": 2
+    }
+
+    try:
+        resp = requests.post(f"{url}/api/auth", json=auth_payload, timeout=20)
+        if resp.status_code == 200:
+            cookie_val = resp.cookies.get("connect.sid")
+            if cookie_val:
+                with open(session_file, "w", encoding="utf-8") as f:
+                    json.dump({"connect.sid": cookie_val}, f)
+            log_system_event("INFO", "system", f"Успешная 2FA-авторизация AviaBit ({airline}) пользователем '{user['username']}'", user_id=user["id"], username=user["username"])
+            return {"ok": True, "code": 200, "message": "2FA авторизация успешна! Сессия сохранена."}
+        else:
+            err_data = resp.json() if resp.text else {}
+            msg = err_data.get("message", f"Ошибка проверки 2FA кода (HTTP {resp.status_code})")
+            log_system_event("WARN", "system", f"Неудачная 2FA-авторизация AviaBit ({airline}): {msg}", user_id=user["id"], username=user["username"])
+            return {"ok": False, "code": resp.status_code, "message": msg}
+    except Exception as e:
+        return {"ok": False, "code": 500, "message": f"Ошибка сети при отправке 2FA: {str(e)}"}
         "ikar": ik_res
     }
 

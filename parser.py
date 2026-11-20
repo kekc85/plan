@@ -135,6 +135,10 @@ _load_env_file()
 
 DEFAULT_USERNAME = os.getenv("AVIABIT_USERNAME", "")
 DEFAULT_PASSWORD = os.getenv("AVIABIT_PASSWORD", "")
+DEFAULT_NW_USERNAME = os.getenv("AVIABIT_NW_USERNAME", DEFAULT_USERNAME)
+DEFAULT_NW_PASSWORD = os.getenv("AVIABIT_NW_PASSWORD", DEFAULT_PASSWORD)
+DEFAULT_IK_USERNAME = os.getenv("AVIABIT_IK_USERNAME", DEFAULT_USERNAME)
+DEFAULT_IK_PASSWORD = os.getenv("AVIABIT_IK_PASSWORD", DEFAULT_PASSWORD)
 BASE_URL_NORDWIND = os.getenv("AVIABIT_BASE_URL_NORDWIND", "https://aviabit.nordwindairlines.ru")
 BASE_URL_IKAR = os.getenv("AVIABIT_BASE_URL_IKAR", "https://aviabit.ikar.aero")
 
@@ -1501,8 +1505,8 @@ def run_parse(
             e_t = f"{e_h:02d}-{e_m:02d}"
             output_path = f"План_{start_str}_{s_t}_{end_str}_{e_t}.xlsx"
 
-    client_nws = AviaBitClient(base_url=BASE_URL_NORDWIND, session_filename=".session.json", name="Nordwind")
-    client_ikar = AviaBitClient(base_url=BASE_URL_IKAR, session_filename=".session_ikar.json", name="Икар")
+    client_nws = AviaBitClient(username=DEFAULT_NW_USERNAME, password=DEFAULT_NW_PASSWORD, base_url=BASE_URL_NORDWIND, session_filename=".session.json", name="Nordwind")
+    client_ikar = AviaBitClient(username=DEFAULT_IK_USERNAME, password=DEFAULT_IK_PASSWORD, base_url=BASE_URL_IKAR, session_filename=".session_ikar.json", name="Икар")
 
     ok_nws = client_nws.login(prompt_code_callback=prompt_code_callback)
     ok_ikar = client_ikar.login(prompt_code_callback=prompt_code_callback)
