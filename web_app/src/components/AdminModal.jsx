@@ -94,6 +94,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
   const [avbNwTestResult, setAvbNwTestResult] = useState(null);
   const [avbNw2FaCode, setAvbNw2FaCode] = useState('');
   const [avbNw2FaConfirming, setAvbNw2FaConfirming] = useState(false);
+  const [showManualNw2Fa, setShowManualNw2Fa] = useState(false);
 
   // Состояние: Шлюз AviaBit - Ikar Airlines
   const [avbIkUsername, setAvbIkUsername] = useState('a.zubkov');
@@ -105,6 +106,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
   const [avbIkTestResult, setAvbIkTestResult] = useState(null);
   const [avbIk2FaCode, setAvbIk2FaCode] = useState('');
   const [avbIk2FaConfirming, setAvbIk2FaConfirming] = useState(false);
+  const [showManualIk2Fa, setShowManualIk2Fa] = useState(false);
 
   const [avbLoading, setAvbLoading] = useState(false);
   const [avbSaving, setAvbSaving] = useState(false);
@@ -239,10 +241,18 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
 
   // --- МЕТОДЫ УПРАВЛЕНИЯ УЧЕТНЫМИ ЗАПИСЯМИ AVIABIT ---
 
+  const refreshSessionBadgesOnly = async () => {
+    try {
+      const res = await adminGetAviabitSettings();
+      if (res) {
+        setAvbHasNwSession(Boolean(res.has_nordwind_session));
+        setAvbHasIkSession(Boolean(res.has_ikar_session));
+      }
+    } catch (_) {}
+  };
+
   const loadAviabitSettings = async () => {
     setAvbLoading(true);
-    setAvbNwTestResult(null);
-    setAvbIkTestResult(null);
     try {
       const res = await adminGetAviabitSettings();
       if (res) {
@@ -278,7 +288,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
         url_ikar: avbUrlIkar.trim()
       });
       setSuccessMsg('Учётные записи AviaBit успешно сохранены. Кэш сессий обновлен.');
-      await loadAviabitSettings();
+      await refreshSessionBadgesOnly();
     } catch (err) {
       setErrorMsg(err.message || 'Ошибка сохранения настроек AviaBit');
     } finally {
@@ -292,7 +302,6 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
       return;
     }
     setAvbNwTesting(true);
-    setAvbNwTestResult(null);
     setErrorMsg('');
     setSuccessMsg('');
     try {
@@ -307,12 +316,14 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
       if (nw?.ok) {
         setSuccessMsg('Nordwind Airlines: авторизация успешна, сессия получена!');
         setAvbHasNwSession(true);
+        setShowManualNw2Fa(false);
+        await refreshSessionBadgesOnly();
       } else if (nw?.need_2fa) {
+        setShowManualNw2Fa(true);
         setErrorMsg(nw.message || 'Требуется код подтверждения из письма');
       } else {
         setErrorMsg(nw?.message || 'Ошибка авторизации Nordwind');
       }
-      await loadAviabitSettings();
     } catch (err) {
       setErrorMsg(err.message || 'Ошибка тестирования Nordwind');
     } finally {
@@ -326,7 +337,6 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
       return;
     }
     setAvbIkTesting(true);
-    setAvbIkTestResult(null);
     setErrorMsg('');
     setSuccessMsg('');
     try {
@@ -341,12 +351,14 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
       if (ik?.ok) {
         setSuccessMsg('Ikar Airlines: авторизация успешна, сессия получена!');
         setAvbHasIkSession(true);
+        setShowManualIk2Fa(false);
+        await refreshSessionBadgesOnly();
       } else if (ik?.need_2fa) {
+        setShowManualIk2Fa(true);
         setErrorMsg(ik.message || 'Требуется код подтверждения из письма');
       } else {
         setErrorMsg(ik?.message || 'Ошибка авторизации Ikar');
       }
-      await loadAviabitSettings();
     } catch (err) {
       setErrorMsg(err.message || 'Ошибка тестирования Ikar');
     } finally {
@@ -1989,19 +2001,41 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                       <Activity className={`w-3.5 h-3.5 ${avbNwTesting ? 'animate-spin' : ''}`} />
                       <span>{avbNwTesting ? 'Проверка связи...' : 'Проверить Nordwind'}</span>
                     </button>
+
+                    {!(avbNwTestResult?.need_2fa || showManualNw2Fa) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowManualNw2Fa(true)}
+                        className="text-[11px] font-medium text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1"
+                      >
+                        <KeyRound className="w-3 h-3" />
+                        <span>Ввести 2FA код из почты</span>
+                      </button>
+                    )}
                   </div>
 
-                  {/* Блок 2FA для Nordwind (если запрошен) */}
-                  {avbNwTestResult?.need_2fa && (
+                  {/* Блок 2FA для Nordwind */}
+                  {(avbNwTestResult?.need_2fa || showManualNw2Fa) && (
                     <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-xl space-y-2">
-                      <div className="flex items-start gap-2">
-                        <KeyRound className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                        <div className="text-[11px] text-amber-900 dark:text-amber-200">
-                          <span className="font-bold">Требуется подтверждение 2FA:</span>
-                          <p className="text-[10px] text-amber-800/80 dark:text-amber-300/80">
-                            Код отправлен на почту {avbNwTestResult.sending_info || ''}. Введите его ниже:
-                          </p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
+                          <KeyRound className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div className="text-[11px] text-amber-900 dark:text-amber-200">
+                            <span className="font-bold">Подтверждение 2FA (Nordwind):</span>
+                            <p className="text-[10px] text-amber-800/80 dark:text-amber-300/80">
+                              {avbNwTestResult?.sending_info
+                                ? `Код отправлен на почту ${avbNwTestResult.sending_info}. Введите его:`
+                                : 'Введите 6-значный одноразовый пароль/код из почты:'}
+                            </p>
+                          </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowManualNw2Fa(false)}
+                          className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-1.5 py-0.5 rounded hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                        >
+                          ✕
+                        </button>
                       </div>
                       <div className="flex items-center gap-2">
                         <input
@@ -2123,19 +2157,41 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                       <Activity className={`w-3.5 h-3.5 ${avbIkTesting ? 'animate-spin' : ''}`} />
                       <span>{avbIkTesting ? 'Проверка связи...' : 'Проверить Ikar'}</span>
                     </button>
+
+                    {!(avbIkTestResult?.need_2fa || showManualIk2Fa) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowManualIk2Fa(true)}
+                        className="text-[11px] font-medium text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1"
+                      >
+                        <KeyRound className="w-3 h-3" />
+                        <span>Ввести 2FA код из почты</span>
+                      </button>
+                    )}
                   </div>
 
-                  {/* Блок 2FA для Ikar (если запрошен) */}
-                  {avbIkTestResult?.need_2fa && (
+                  {/* Блок 2FA для Ikar */}
+                  {(avbIkTestResult?.need_2fa || showManualIk2Fa) && (
                     <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-xl space-y-2">
-                      <div className="flex items-start gap-2">
-                        <KeyRound className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                        <div className="text-[11px] text-amber-900 dark:text-amber-200">
-                          <span className="font-bold">Требуется подтверждение 2FA:</span>
-                          <p className="text-[10px] text-amber-800/80 dark:text-amber-300/80">
-                            Код отправлен на почту {avbIkTestResult.sending_info || ''}. Введите его ниже:
-                          </p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
+                          <KeyRound className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div className="text-[11px] text-amber-900 dark:text-amber-200">
+                            <span className="font-bold">Подтверждение 2FA (Ikar):</span>
+                            <p className="text-[10px] text-amber-800/80 dark:text-amber-300/80">
+                              {avbIkTestResult?.sending_info
+                                ? `Код отправлен на почту ${avbIkTestResult.sending_info}. Введите его:`
+                                : 'Введите 6-значный одноразовый пароль/код из почты:'}
+                            </p>
+                          </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowManualIk2Fa(false)}
+                          className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-1.5 py-0.5 rounded hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                        >
+                          ✕
+                        </button>
                       </div>
                       <div className="flex items-center gap-2">
                         <input

@@ -606,8 +606,7 @@ function setSystemSetting($key, $value) {
         $db = getDb();
         initLogsTable($db);
         $now = date('Y-m-d H:i:s');
-        $stmt = $db->prepare("INSERT INTO plan_settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)
-            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = VALUES(updated_at)");
+        $stmt = $db->prepare("REPLACE INTO plan_settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)");
         $stmt->execute([$key, (string)$value, $now]);
     } catch (Exception $e) {}
 }
@@ -1939,6 +1938,7 @@ function testAviaBitAuth($baseUrl, $username, $password, $confirmationCode = nul
     curl_setopt($ch, CURLOPT_POSTFIELDS, $authPayload);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HEADER, true);
+    curl_setopt($ch, CURLOPT_ENCODING, '');
     curl_setopt($ch, CURLOPT_TIMEOUT, 20);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -1962,30 +1962,52 @@ function testAviaBitAuth($baseUrl, $username, $password, $confirmationCode = nul
     $bodyStr = substr($res, $headerSize);
     $bodyJson = @json_decode($bodyStr, true);
 
-    if ($httpCode === 200) {
-        if (preg_match('/connect\.sid=([^;]+)/', $headerStr, $m)) {
-            $cookieName = (strpos($origin, 'ikar') !== false) ? 'ikar' : 'nordwind';
-            saveAviaBitCookie($cookieName, $m[1]);
-        }
-        return ['ok' => true, 'code' => $httpCode, 'message' => 'Авторизация успешна (сессия получена)'];
-    } elseif ($httpCode === 401 || $httpCode === 403) {
-        if (is_array($bodyJson) && ($bodyJson['code'] ?? '') === 'CHECK_AUTH_FAILED') {
-            $sendingInfo = $bodyJson['info']['sendingInfo'] ?? 'почту';
-            return [
-                'ok' => false,
-                'need_2fa' => true,
-                'code' => 401,
-                'sending_info' => $sendingInfo,
-                'message' => (!empty($confirmationCode)
-                    ? "Неверный код 2FA. Введите свежий код из письма ($sendingInfo)"
-                    : "Требуется код подтверждения (отправлен на $sendingInfo)")
-            ];
-        }
-        $errDetail = $bodyJson['message'] ?? $bodyJson['error'] ?? 'Неверный логин или пароль';
-        return ['ok' => false, 'code' => $httpCode, 'message' => $errDetail];
-    } else {
-        return ['ok' => false, 'code' => $httpCode, 'message' => "HTTP код $httpCode"];
+    // 1. Проверяем требование 2FA (может приходить и при 401, и при 200 с кодом CHECK_AUTH_FAILED)
+    if (is_array($bodyJson) && (($bodyJson['code'] ?? '') === 'CHECK_AUTH_FAILED')) {
+        $sendingInfo = $bodyJson['info']['sendingInfo'] ?? 'почту';
+        return [
+            'ok' => false,
+            'need_2fa' => true,
+            'code' => $httpCode,
+            'sending_info' => $sendingInfo,
+            'message' => (!empty($confirmationCode)
+                ? "Неверный код 2FA. Введите свежий код из письма ($sendingInfo)"
+                : "Требуется код подтверждения (отправлен на $sendingInfo)")
+        ];
     }
+
+    // 2. Извлекаем куку connect.sid
+    $cookieVal = null;
+    if (preg_match('/connect\.sid=([^;]+)/i', $headerStr, $m)) {
+        $cookieVal = trim($m[1]);
+    }
+
+    // 3. Успех ТОЛЬКО если HTTP 200 И получена кука connect.sid
+    if ($httpCode === 200 && !empty($cookieVal)) {
+        $cookieName = (strpos($origin, 'ikar') !== false) ? 'ikar' : 'nordwind';
+        saveAviaBitCookie($cookieName, $cookieVal);
+        return [
+            'ok' => true,
+            'code' => 200,
+            'cookie' => $cookieVal,
+            'message' => 'Авторизация успешна (сессия получена и сохранена)'
+        ];
+    }
+
+    // 4. Ошибки авторизации
+    $errDetail = '';
+    if (is_array($bodyJson)) {
+        $errDetail = $bodyJson['message'] ?? $bodyJson['error'] ?? '';
+    }
+    if (empty($errDetail)) {
+        if ($httpCode === 200 && empty($cookieVal)) {
+            $errDetail = 'Ответ 200 OK получен, но сессионный маркер connect.sid не найден';
+        } else {
+            $errDetail = "Неверный логин или пароль (HTTP $httpCode)";
+        }
+    }
+
+    return ['ok' => false, 'code' => $httpCode, 'message' => $errDetail];
 }
 
 function resetAviaBitSessions() {
