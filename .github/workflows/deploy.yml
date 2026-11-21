@@ -124,3 +124,15 @@ jobs:
           server-dir: ${{ env.LOADSHEET_CLEAN_DIR }}
           protocol: ftp
           log-level: verbose
+
+      - name: Sync Loadsheet Test to Beget (Plan2)
+        if: env.ENV_NAME == 'Plan2'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.CLEAN_SERVER }}
+          username: ${{ secrets.BEGET_FTP_USERNAME }}
+          password: ${{ secrets.BEGET_FTP_PASSWORD }}
+          local-dir: ./loadsheet/
+          server-dir: boostandgo.ru/public_html/loadsheet_test/
+          protocol: ftp
+          log-level: verbose

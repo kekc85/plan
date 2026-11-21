@@ -2681,6 +2681,218 @@
       }
     }
 
+    const MODEL_TO_LAYOUT_MAP = {
+      'A321-NEO': 'Y218',
+      'A321NEO': 'Y218',
+      'A321-253N': 'Y218',
+      'A321NX': 'Y218',
+      'B737-900ER': 'Y215',
+      'B737-900': 'Y215',
+      '737-900': 'Y215',
+      'B739': 'Y215',
+      '739': 'Y215',
+      'B737-800': 'Y189',
+      '737-800': 'Y189',
+      'B738': 'Y189',
+      '738': 'Y189',
+      'A321-200': 'Y220',
+      'A321-231': 'Y220',
+      'A321-232': 'Y220',
+      'A321-211': 'Y220',
+      'A321': 'Y220',
+      '321': 'Y220',
+      'ERJ190-100LR': 'Y110',
+      'ERJ190': 'Y110',
+      'ERJ-190': 'Y110',
+      'E190': 'Y110',
+      '190': 'Y110',
+      'A330-200': 'Y365',
+      'A332': 'Y365',
+      '332': 'Y365',
+      'A330-300': 'Y379',
+      'A333': 'Y379',
+      '333': 'Y379',
+      'B777-200ER': 'Y440',
+      'B777-200': 'Y440',
+      '777-200ER': 'Y440',
+      '777-200': 'Y440',
+      'B772': 'Y440',
+      '772': 'Y440',
+      'B777-300ER': 'Y486',
+      'B777-300': 'Y486',
+      '777-300ER': 'Y486',
+      '777-300': 'Y486',
+      'B773': 'Y486',
+      '773': 'Y486'
+    };
+
+    function resolveLayoutVersionFromModel(rawVersion) {
+      const str = String(rawVersion || '').trim();
+      if (!str) return '';
+      const normV = str.toUpperCase().replace(/\s+/g, '');
+      for (const [k, v] of Object.entries(MODEL_TO_LAYOUT_MAP)) {
+        const normK = k.toUpperCase().replace(/\s+/g, '');
+        if (normV === normK || normV.includes(normK)) {
+          return v;
+        }
+      }
+      return str;
+    }
+
+    function resolveDefaultCrewForLoadsheet(cfg, rawCrew) {
+      if (!cfg || !cfg.matrix) return { crewCode: '', isDefault: false };
+      const matrixKeys = Object.keys(cfg.matrix);
+      if (matrixKeys.length === 0) return { crewCode: '', isDefault: false };
+
+      const cParts = String(rawCrew || '').split(/[\/\-\s]+/).filter(Boolean);
+      let normCrew = '';
+      if (cParts.length >= 2 && !isNaN(parseInt(cParts[0], 10)) && !isNaN(parseInt(cParts[1], 10))) {
+        normCrew = `${parseInt(cParts[0], 10)}/${parseInt(cParts[1], 10)}`;
+      } else if (cParts.length === 1 && !isNaN(parseInt(cParts[0], 10))) {
+        normCrew = `${parseInt(cParts[0], 10)}/0`;
+      }
+
+      if (normCrew && cfg.matrix[normCrew]) {
+        return { crewCode: normCrew, isDefault: false };
+      }
+
+      const modelUpper = String(cfg.model || '').toUpperCase();
+      let preferred = [];
+      if (modelUpper.includes('321') || modelUpper.includes('737-900') || modelUpper.includes('739')) {
+        preferred = ['2/5', '2/4'];
+      } else if (modelUpper.includes('737-800') || modelUpper.includes('738')) {
+        preferred = ['2/4', '2/5'];
+      } else if (modelUpper.includes('190') || modelUpper.includes('ERJ')) {
+        preferred = ['2/3', '2/2'];
+      } else if (modelUpper.includes('330')) {
+        preferred = ['2/8', '2/9', '2/10'];
+      } else if (modelUpper.includes('777')) {
+        preferred = ['2/10', '2/9', '2/8', '2/11'];
+      }
+
+      for (const p of preferred) {
+        if (cfg.matrix[p]) return { crewCode: p, isDefault: true };
+      }
+      const nonZero = matrixKeys.find(k => k !== '0/0');
+      return { crewCode: nonZero || matrixKeys[0], isDefault: true };
+    }
+
+    window._fleetWbDataCache = null;
+
+    function getFleetWbDataCached() {
+      if (window._fleetWbDataCache) {
+        return Promise.resolve(window._fleetWbDataCache);
+      }
+      return fetch('fleet_wb.json')
+        .then(r => r.json())
+        .then(wbData => {
+          window._fleetWbDataCache = wbData;
+          return wbData;
+        });
+    }
+
+    function lookupAndApplyAircraftWb(forceOverwrite = false) {
+      const curTailRaw = document.getElementById('f_acreg')?.value || '';
+      const curTail = String(curTailRaw).toUpperCase().replace(/^(RA|РА)[-\s]?/i, '').replace(/\D/g, '').trim();
+      if (!curTail) return;
+
+      const curFlightStr = String(document.getElementById('f_flight')?.value || '').toUpperCase().trim();
+      let curOp = '';
+      if (/^(EO|KAR|ИК|ЕО)/i.test(curFlightStr)) curOp = 'EO';
+      else if (/^(N4|NWS|СВ|Н4)/i.test(curFlightStr)) curOp = 'N4';
+
+      const crewInpEl = document.getElementById('f_crew');
+      const rawCrewVal = crewInpEl?.value || '';
+      const curGalley = String(window._activeLoadsheetGalley || 'D').toUpperCase().trim() || 'D';
+
+      getFleetWbDataCached()
+        .then(wbData => {
+          if (!wbData) return;
+          let configKey = null;
+          if (curOp && wbData[curTail + '_' + curOp]) {
+            configKey = curTail + '_' + curOp;
+          } else if (curOp && wbData[curTail + '_' + curOp + '_FAK_2AKE']) {
+            configKey = curTail + '_' + curOp + '_FAK_2AKE';
+          } else {
+            const candidates = Object.keys(wbData).filter(k => k.startsWith(curTail + '_'));
+            if (candidates.length === 1) configKey = candidates[0];
+            else if (candidates.length > 1) {
+              if (curOp) configKey = candidates.find(k => k.includes('_' + curOp)) || candidates[0];
+              else configKey = candidates.find(k => k.includes('_N4')) || candidates[0];
+            }
+          }
+
+          if (!configKey || !wbData[configKey]) return;
+          const cfg = wbData[configKey];
+          let needRecalc = false;
+
+          const setFieldIfNeeded = (id, val) => {
+            if (val === undefined || val === null || val === '') return;
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (forceOverwrite || !el.value) {
+              if (String(el.value) !== String(val)) {
+                el.value = val;
+                needRecalc = true;
+              }
+            }
+          };
+
+          // 1. Официальные предельные веса (MZFW, MTOW, MLAW) — зависят от борта
+          if (cfg.max_weights) {
+            setFieldIfNeeded('inp_max_zfw', cfg.max_weights.mzfw);
+            setFieldIfNeeded('inp_max_tow', cfg.max_weights.mtow);
+            setFieldIfNeeded('inp_max_law', cfg.max_weights.mlaw);
+          }
+
+          // 2. Компоновка салона (Version), если не задана или при смене борта
+          if (cfg.model) {
+            const layoutVer = resolveLayoutVersionFromModel(cfg.model);
+            if (layoutVer) {
+              setFieldIfNeeded('f_version', layoutVer);
+            }
+          }
+
+          // 3. DOW и DOI (при пустом экипаже или отсутствии в матрице подбирается стандартный для типа ВС)
+          const { crewCode, isDefault } = resolveDefaultCrewForLoadsheet(cfg, rawCrewVal);
+          if (crewCode && crewInpEl && (!crewInpEl.value || isDefault)) {
+            crewInpEl.value = crewCode;
+          }
+
+          let targetDow = '';
+          let targetDoi = '';
+          if (cfg.matrix && crewCode && cfg.matrix[crewCode]) {
+            const row = cfg.matrix[crewCode];
+            const cell = row[curGalley] || row['D'] || (cfg.pantry_codes && row[cfg.pantry_codes[0]]);
+            if (cell) {
+              targetDow = cell.dow;
+              targetDoi = cell.doi;
+            }
+          }
+          if (!targetDow && cfg.basic_weight) targetDow = cfg.basic_weight;
+          if (!targetDoi && cfg.basic_index) targetDoi = cfg.basic_index;
+
+          if (targetDow) {
+            setFieldIfNeeded('inp_dow', targetDow);
+          }
+          if (targetDoi) {
+            const freeformEl = document.getElementById('inp_balance_freeform');
+            if (freeformEl) {
+              if (forceOverwrite && /^DOI:.*$/m.test(freeformEl.value)) {
+                freeformEl.value = freeformEl.value.replace(/^DOI:.*$/m, 'DOI: ' + targetDoi);
+              } else if (!freeformEl.value.includes('DOI:')) {
+                freeformEl.value = freeformEl.value ? (freeformEl.value + '\nDOI: ' + targetDoi) : ('DOI: ' + targetDoi);
+              }
+            }
+          }
+
+          if (needRecalc) {
+            calculate();
+          }
+        })
+        .catch(e => console.warn('[Loadsheet] Error fetching fleet_wb.json:', e));
+    }
+
     function checkIncomingLoadsheetData() {
       let data = {};
 
@@ -2725,6 +2937,58 @@
         return;
       }
 
+      // 3.1. Дозаполнение отсутствующих реквизитов рейса из активной смены AeroPlan (если открыт по номеру рейса)
+      try {
+        const incomingFlt = String(data.flight || data.f_flight || data.flight_no || data.flight_number || '').replace(/\D/g, '');
+        const cleanIncomingFlt = incomingFlt ? String(parseInt(incomingFlt, 10)) : '';
+        if (cleanIncomingFlt && (!data.acreg && !data.ac_num || !data.crew || !data.dow || !data.to_fuel && !data.fuel_block)) {
+          const rawShift = localStorage.getItem('aeroplan_shift_journal_active_flights');
+          if (rawShift) {
+            const shiftFlights = JSON.parse(rawShift);
+            if (Array.isArray(shiftFlights)) {
+              const normDate = (d) => {
+                if (!d) return '';
+                const s = String(d).trim().split('T')[0];
+                if (s.includes('-')) {
+                  const p = s.split('-');
+                  if (p.length === 3 && p[0].length === 4) return `${p[2].padStart(2, '0')}.${p[1].padStart(2, '0')}`;
+                }
+                if (s.includes('.')) {
+                  const p = s.split('.');
+                  if (p.length >= 2) return `${p[0].padStart(2, '0')}.${p[1].padStart(2, '0')}`;
+                }
+                return s;
+              };
+              const targetDateNorm = normDate(data.date || data.f_date || data.flight_date);
+              const matched = shiftFlights.find(f => {
+                const fn = String(f.flight || f.flight_no || '').replace(/\D/g, '');
+                if (!fn || String(parseInt(fn, 10)) !== cleanIncomingFlt) return false;
+                const fd = normDate(f.flight_date);
+                if (targetDateNorm && fd && targetDateNorm !== fd) return false;
+                return true;
+              });
+              if (matched) {
+                if (!data.acreg && !data.ac_num && matched.ac_num) data.acreg = matched.ac_num;
+                if (!data.version && !data.ac_config && matched.ac_config) data.version = matched.ac_config;
+                if (!data.crew && matched.crew) data.crew = matched.crew;
+                if (!data.galley && matched.galley) data.galley = matched.galley;
+                if (!data.dow && matched.dow) data.dow = matched.dow;
+                if (!data.doi && matched.doi) data.doi = matched.doi;
+                if (!data.max_tow && !data.mtow && matched.mtow) data.max_tow = matched.mtow;
+                if (!data.to_fuel && !data.fuel_block && matched.fuel_block) data.to_fuel = matched.fuel_block;
+                if (!data.trip_fuel && !data.fuel_trip && matched.fuel_trip) data.trip_fuel = matched.fuel_trip;
+                if (!data.cargo && matched.cargo) data.cargo = matched.cargo;
+                if (!data.mail && matched.mail) data.mail = matched.mail;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Loadsheet] Ошибка сверки с aeroplan_shift_journal_active_flights:', err);
+      }
+
+      window._activeLoadsheetGalley = String(data.galley || 'D').toUpperCase().trim() || 'D';
+
       // Helper для безопасной установки значений
       const setInp = (id, val) => {
         if (val === undefined || val === null || val === '') return;
@@ -2738,49 +3002,7 @@
       setInp('f_flight', data.flight || data.f_flight || data.flight_no || data.flight_number);
       setInp('f_originator', data.originator || data.f_originator || 'DISPATCH');
       setInp('f_acreg', data.acreg || data.ac_num || data.f_acreg || data.tail);
-      let versionVal = String(data.version || data.f_version || data.ac_config || data.layout || '').trim();
-      const modelToLayout = {
-        'B737-900': 'Y215',
-        'B737-900ER': 'Y215',
-        '737-900': 'Y215',
-        'B739': 'Y215',
-        '739': 'Y215',
-        'B737-800': 'Y189',
-        '737-800': 'Y189',
-        'B738': 'Y189',
-        '738': 'Y189',
-        'A321': 'Y220',
-        'A321-200': 'Y220',
-        'A321-231': 'Y220',
-        'A321-NEO': 'Y218',
-        '321': 'Y220',
-        'E190': 'Y110',
-        'ERJ 190': 'Y110',
-        'ERJ-190': 'Y110',
-        '190': 'Y110',
-        'A330-200': 'Y365',
-        'A332': 'Y365',
-        '332': 'Y365',
-        'A330-300': 'Y379',
-        'A333': 'Y379',
-        '333': 'Y379',
-        'B777-200': 'Y440',
-        'B777-200ER': 'Y440',
-        'B772': 'Y440',
-        '772': 'Y440',
-        'B777-300': 'Y486',
-        'B777-300ER': 'Y486',
-        'B773': 'Y486',
-        '773': 'Y486'
-      };
-      const normV = versionVal.toUpperCase().replace(/\s+/g, '');
-      for (const [k, v] of Object.entries(modelToLayout)) {
-        const normK = k.toUpperCase().replace(/\s+/g, '');
-        if (normV === normK || normV.includes(normK)) {
-          versionVal = v;
-          break;
-        }
-      }
+      let versionVal = resolveLayoutVersionFromModel(data.version || data.f_version || data.ac_config || data.layout || '');
       setInp('f_version', versionVal);
       setInp('f_captain', data.captain || data.f_captain);
       let crewRaw = String(data.crew || data.f_crew || '').trim();
@@ -2821,9 +3043,9 @@
 
       // 6. Заполнение весов (DOW, DOI, лимиты)
       setInp('inp_dow', data.dow || data.inp_dow);
-      setInp('inp_max_zfw', data.max_zfw || data.inp_max_zfw);
+      setInp('inp_max_zfw', data.max_zfw || data.inp_max_zfw || data.mzfw);
       setInp('inp_max_tow', data.max_tow || data.inp_max_tow || data.mtow);
-      setInp('inp_max_law', data.max_law || data.inp_max_law);
+      setInp('inp_max_law', data.max_law || data.inp_max_law || data.mlaw);
 
       if (data.doi || data.inp_doi) {
         const cleanDoi = String(data.doi || data.inp_doi).trim();
@@ -2833,82 +3055,15 @@
         }
       }
 
-      // Автономный расчет DOW, DOI и предельных весов из базы центровок флота
+      // Автономный расчет DOW, DOI, предельных весов и экипажа из базы центровок флота (при любом известном борте!)
       const curDow = document.getElementById('inp_dow')?.value;
+      const curMaxZfw = document.getElementById('inp_max_zfw')?.value;
       const curMaxTow = document.getElementById('inp_max_tow')?.value;
-      if (!curDow || !data.doi || !curMaxTow) {
-        const curTail = String(data.acreg || data.ac_num || data.f_acreg || data.tail || '').toUpperCase().replace(/^(RA|РА)[-\s]?/i, '').replace(/\D/g, '').trim();
-        const curFlightStr = String(data.flight || data.f_flight || '').toUpperCase().trim();
-        let curOp = '';
-        if (/^(EO|KAR|ИК|ЕО)/i.test(curFlightStr)) curOp = 'EO';
-        else if (/^(N4|NWS|СВ|Н4)/i.test(curFlightStr)) curOp = 'N4';
-
-        let cParts = String(data.crew || data.f_crew || '').split(/[\/\-\s]+/).filter(Boolean);
-        let curCrew = cParts.length >= 2 ? (parseInt(cParts[0], 10) + '/' + parseInt(cParts[1], 10)) : (cParts.length === 1 ? (parseInt(cParts[0], 10) + '/0') : '');
-        let curGalley = String(data.galley || 'D').toUpperCase().trim() || 'D';
-
-        if (curTail && curCrew) {
-          fetch('fleet_wb.json')
-            .then(r => r.json())
-            .then(wbData => {
-              let configKey = null;
-              if (curOp && wbData[curTail + '_' + curOp]) {
-                configKey = curTail + '_' + curOp;
-              } else if (curOp && wbData[curTail + '_' + curOp + '_FAK_2AKE']) {
-                configKey = curTail + '_' + curOp + '_FAK_2AKE';
-              } else {
-                const candidates = Object.keys(wbData).filter(k => k.startsWith(curTail + '_'));
-                if (candidates.length === 1) configKey = candidates[0];
-                else if (candidates.length > 1) {
-                  if (curOp) configKey = candidates.find(k => k.includes('_' + curOp)) || candidates[0];
-                  else configKey = candidates.find(k => k.includes('_N4')) || candidates[0];
-                }
-              }
-
-              if (configKey && wbData[configKey]) {
-                const cfg = wbData[configKey];
-                let needRecalc = false;
-
-                // Авто-подстановка официальных предельных весов (MZFW, MTOW, MLAW)
-                if (cfg.max_weights) {
-                  if (!document.getElementById('inp_max_zfw').value && cfg.max_weights.mzfw) {
-                    setInp('inp_max_zfw', cfg.max_weights.mzfw);
-                    needRecalc = true;
-                  }
-                  if (!document.getElementById('inp_max_tow').value && cfg.max_weights.mtow) {
-                    setInp('inp_max_tow', cfg.max_weights.mtow);
-                    needRecalc = true;
-                  }
-                  if (!document.getElementById('inp_max_law').value && cfg.max_weights.mlaw) {
-                    setInp('inp_max_law', cfg.max_weights.mlaw);
-                    needRecalc = true;
-                  }
-                }
-
-                if (cfg.matrix && curCrew) {
-                  const row = cfg.matrix[curCrew];
-                  if (row) {
-                    const cell = row[curGalley] || (cfg.pantry_codes && row[cfg.pantry_codes[0]]);
-                    if (cell) {
-                      if (!document.getElementById('inp_dow').value) {
-                        setInp('inp_dow', cell.dow);
-                        needRecalc = true;
-                      }
-                      const freeformEl = document.getElementById('inp_balance_freeform');
-                      if (freeformEl && !freeformEl.value.includes('DOI:')) {
-                        freeformEl.value = freeformEl.value ? (freeformEl.value + '\nDOI: ' + cell.doi) : ('DOI: ' + cell.doi);
-                      }
-                    }
-                  }
-                }
-
-                if (needRecalc) {
-                  calculate();
-                }
-              }
-            })
-            .catch(e => console.warn('[Loadsheet] Error fetching fleet_wb.json:', e));
-        }
+      const curMaxLaw = document.getElementById('inp_max_law')?.value;
+      const curCrewVal = document.getElementById('f_crew')?.value;
+      const curVersionVal = document.getElementById('f_version')?.value;
+      if (!curDow || !data.doi || !curMaxZfw || !curMaxTow || !curMaxLaw || !curCrewVal || !curVersionVal) {
+        lookupAndApplyAircraftWb(false);
       }
 
       // 7. Коммерческая загрузка Destination 1
@@ -3012,6 +3167,15 @@
       initTrafficTable();
       checkIncomingLoadsheetData();
       calculate();
+
+      const acregEl = document.getElementById('f_acreg');
+      if (acregEl) {
+        acregEl.addEventListener('change', () => lookupAndApplyAircraftWb(true));
+      }
+      const crewEl = document.getElementById('f_crew');
+      if (crewEl) {
+        crewEl.addEventListener('change', () => lookupAndApplyAircraftWb(true));
+      }
     });
   </script>
 </body>

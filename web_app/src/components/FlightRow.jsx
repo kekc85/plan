@@ -312,6 +312,24 @@ function FlightRow({
     return match ? CITY_TO_IATA_MAP[match] : clean;
   };
 
+  // Получение актуальных параметров W&B (DOW, DOI, кухня, MTOW) из рейса или базы флота
+  const getResolvedWbParams = () => {
+    const acNum = (flight.ac_num || '').trim();
+    let dow = flight.dow || '';
+    let doi = flight.doi || '';
+    let galley = flight.galley || '';
+    if ((!dow || !doi) && acNum) {
+      const wb = lookupFleetWb(flight);
+      if (wb && wb.success) {
+        if (!dow) dow = String(wb.dow);
+        if (!doi) doi = String(wb.doi);
+        if (!galley && wb.galley) galley = String(wb.galley);
+      }
+    }
+    const mtow = flight.mtow || (acNum ? getAircraftMtow(acNum) : '');
+    return { dow, doi, galley, mtow };
+  };
+
   // Переход в калькулятор веса коммерческой загрузки AeroBag Predictor
   const handleOpenAeroBag = () => {
     const rawFlight = (flight.flight || flight.flight_no || flight.flight_number || '').trim();
@@ -423,9 +441,11 @@ function FlightRow({
     if (abInf) params.set('pax_inf', abInf);
     if (flight.cargo) params.set('cargo', flight.cargo);
     if (flight.mail) params.set('mail', flight.mail);
-    if (flight.dow) params.set('dow', flight.dow);
-    if (flight.doi) params.set('doi', flight.doi);
-    if (flight.galley) params.set('galley', flight.galley);
+    const wbParams = getResolvedWbParams();
+    if (wbParams.dow) params.set('dow', wbParams.dow);
+    if (wbParams.doi) params.set('doi', wbParams.doi);
+    if (wbParams.galley) params.set('galley', wbParams.galley);
+    if (wbParams.mtow) params.set('mtow', wbParams.mtow);
     params.set('return_url', window.location.href);
 
     // Прямой переход в этой же вкладке: 100% надежность без блокировок Chrome
@@ -545,9 +565,11 @@ function FlightRow({
     if (flight.notes) params.set('notes', flight.notes);
     if (flight.cargo) params.set('cargo', flight.cargo);
     if (flight.mail) params.set('mail', flight.mail);
-    if (flight.dow) params.set('dow', flight.dow);
-    if (flight.doi) params.set('doi', flight.doi);
-    if (flight.galley) params.set('galley', flight.galley);
+    const wbParams = getResolvedWbParams();
+    if (wbParams.dow) params.set('dow', wbParams.dow);
+    if (wbParams.doi) params.set('doi', wbParams.doi);
+    if (wbParams.galley) params.set('galley', wbParams.galley);
+    if (wbParams.mtow) params.set('mtow', wbParams.mtow);
 
     params.set('return_url', window.location.href);
 
