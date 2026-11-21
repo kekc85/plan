@@ -1894,31 +1894,57 @@ if ($route === '/shift/handover') {
 // ----------------------------------------------------
 // ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ЗАПРОСА К AVIABIT С АВТОРИЗАЦИЕЙ
 // ----------------------------------------------------
+function getAviaBitSessionDirs() {
+    $dirs = [__DIR__];
+    $plan2Dir = dirname(__DIR__, 2) . '/plan_2/api';
+    $planDir = dirname(__DIR__, 2) . '/plan/api';
+    if (is_dir($plan2Dir) && !in_array($plan2Dir, $dirs, true)) $dirs[] = $plan2Dir;
+    if (is_dir($planDir) && !in_array($planDir, $dirs, true)) $dirs[] = $planDir;
+    return $dirs;
+}
+
 function getAviaBitCookie($name, $defaultCookie) {
-    $sessionPaths = [
-        __DIR__ . "/.session_{$name}.json",
-        dirname(__DIR__, 2) . "/plan_2/api/.session_{$name}.json",
-        dirname(__DIR__, 2) . "/plan/api/.session_{$name}.json"
-    ];
-    foreach ($sessionPaths as $sessionFile) {
+    $bestCookie = '';
+    $bestTs = -1;
+
+    foreach (getAviaBitSessionDirs() as $dir) {
+        $sessionFile = "{$dir}/.session_{$name}.json";
         if (file_exists($sessionFile)) {
             $raw = @file_get_contents($sessionFile);
             $data = json_decode($raw, true);
             if (!empty($data['connect.sid'])) {
-                return $data['connect.sid'];
+                $ts = isset($data['updated_ts']) ? (int)$data['updated_ts'] : (int)@filemtime($sessionFile);
+                if ($ts >= $bestTs) {
+                    $bestTs = $ts;
+                    $bestCookie = $data['connect.sid'];
+                }
             }
         }
     }
-    $dbCookie = getSystemSetting("aviabit_cookie_{$name}", '');
-    if (!empty($dbCookie)) {
-        return $dbCookie;
-    }
-    return $defaultCookie;
+
+    try {
+        $db = getDb();
+        initLogsTable($db);
+        $stmt = $db->prepare("SELECT setting_value, updated_at FROM plan_settings WHERE setting_key = ? LIMIT 1");
+        $stmt->execute(["aviabit_cookie_{$name}"]);
+        $row = $stmt->fetch();
+        if ($row && !empty($row['setting_value'])) {
+            $dbTs = !empty($row['updated_at']) ? (int)strtotime($row['updated_at']) : 0;
+            if ($dbTs >= $bestTs) {
+                $bestTs = $dbTs;
+                $bestCookie = $row['setting_value'];
+            }
+        }
+    } catch (Exception $e) {}
+
+    return $bestCookie !== '' ? $bestCookie : $defaultCookie;
 }
 
 function saveAviaBitCookie($name, $cookieVal) {
-    $sessionFile = __DIR__ . "/.session_{$name}.json";
-    @file_put_contents($sessionFile, json_encode(['connect.sid' => $cookieVal], JSON_PRETTY_PRINT));
+    $payload = json_encode(['connect.sid' => $cookieVal, 'updated_ts' => time()], JSON_PRETTY_PRINT);
+    foreach (getAviaBitSessionDirs() as $dir) {
+        @file_put_contents("{$dir}/.session_{$name}.json", $payload);
+    }
     setSystemSetting("aviabit_cookie_{$name}", $cookieVal);
 }
 
@@ -2026,9 +2052,11 @@ function resetAviaBitSessions() {
         $db->exec("DELETE FROM plan_settings WHERE setting_key LIKE 'aviabit_cookie_%'");
     } catch (Exception $e) {}
     foreach (['nordwind', 'ikar'] as $name) {
-        $sf = __DIR__ . "/.session_{$name}.json";
-        if (file_exists($sf)) {
-            @unlink($sf);
+        foreach (getAviaBitSessionDirs() as $dir) {
+            $sf = "{$dir}/.session_{$name}.json";
+            if (file_exists($sf)) {
+                @unlink($sf);
+            }
         }
     }
 }
@@ -3420,8 +3448,8 @@ if (strpos($route, '/admin/aviabit') === 0) {
             $passIk = getSystemSetting('aviabit_ik_password', $defaultPass);
             $urlIk = getSystemSetting('aviabit_url_ikar', 'https://aviabit.ikar.aero');
 
-            $hasNwCookie = file_exists(__DIR__ . '/.session_nordwind.json') || !empty(getSystemSetting('aviabit_cookie_nordwind', ''));
-            $hasIkCookie = file_exists(__DIR__ . '/.session_ikar.json') || !empty(getSystemSetting('aviabit_cookie_ikar', ''));
+            $hasNwCookie = !empty(getAviaBitCookie('nordwind', ''));
+            $hasIkCookie = !empty(getAviaBitCookie('ikar', ''));
 
             echo json_encode([
                 'username_nw' => $userNw,
