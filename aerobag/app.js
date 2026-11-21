@@ -2834,6 +2834,7 @@ function renderCompartmentsTable() {
             inputPcs.value = String(row.pcs || 0);
             inputPcs.tabIndex = 11 + (globalRowIdx * 3) + 1;
             inputPcs.oninput = (e) => handleBulkInput(compIdx, rowIdx, 'pcs', e.target.value);
+            inputPcs.onchange = (e) => handleBulkInput(compIdx, rowIdx, 'pcs', e.target.value);
             inputPcs.onfocus = (e) => e.target.select();
             tdPcs.appendChild(inputPcs);
             tr.appendChild(tdPcs);
@@ -2854,6 +2855,7 @@ function renderCompartmentsTable() {
                 inputWeight.classList.add('weight-locked');
             }
             inputWeight.oninput = (e) => handleBulkInput(compIdx, rowIdx, 'weight', e.target.value);
+            inputWeight.onchange = (e) => handleBulkInput(compIdx, rowIdx, 'weight', e.target.value);
             inputWeight.onfocus = (e) => e.target.select();
             tdWeight.appendChild(inputWeight);
             tr.appendChild(tdWeight);
@@ -2977,11 +2979,21 @@ function handleBulkInput(compIdx, rowIdx, field, rawValue) {
     } else if (field === 'weight') {
         const weightVal = parseFloat(rawValue);
         row.weight = isNaN(weightVal) || weightVal < 0 ? 0 : weightVal;
-        row.locked = true;
         const weightInput = document.getElementById(`bulk-weight-${compIdx}-${rowIdx}`);
-        if (weightInput) {
-            weightInput.setAttribute('data-locked', 'true');
-            weightInput.classList.add('weight-locked');
+
+        // Фиксация веса активируется только при вводе положительного веса
+        if (rawValue.trim() !== '' && row.weight > 0) {
+            row.locked = true;
+            if (weightInput) {
+                weightInput.setAttribute('data-locked', 'true');
+                weightInput.classList.add('weight-locked');
+            }
+        } else {
+            row.locked = false;
+            if (weightInput) {
+                weightInput.removeAttribute('data-locked');
+                weightInput.classList.remove('weight-locked');
+            }
         }
     }
 
@@ -3713,12 +3725,71 @@ function recalculateLoadPlanning() {
         prelimAvgPax.textContent = avgP.toFixed(2).replace('.', ',');
     }
 
+    // 1-й проход: Подсчет зафиксированных весов/мест и сбор незафиксированных строк
+    let lockedWeightSum = 0;
+    let lockedPcsSum = 0;
+    const unlockedRows = [];
+
+    currentCompartmentsState.forEach((comp, compIdx) => {
+        comp.rows.forEach((row, rowIdx) => {
+            const pcs = parseInt(row.pcs, 10) || 0;
+            const weightInput = document.getElementById(`bulk-weight-${compIdx}-${rowIdx}`);
+            const isEditingWeight = (weightInput === activeEl);
+            const isLocked = row.locked || (isEditingWeight && weightInput?.value.trim() !== '');
+
+            if (isLocked) {
+                const w = parseFloat(weightInput && isEditingWeight ? weightInput.value : row.weight) || 0;
+                lockedWeightSum += w;
+                lockedPcsSum += pcs;
+            } else {
+                if (pcs > 0) {
+                    unlockedRows.push({ compIdx, rowIdx, row, pcs, weightInput });
+                } else {
+                    if (!isEditingWeight) {
+                        row.weight = 0;
+                        if (weightInput && weightInput.value !== '0') weightInput.value = '0';
+                    }
+                }
+            }
+        });
+    });
+
+    // Расчет удельного веса 1 места на оставшийся свободный вес от общего плана
+    const remainingWeight = Math.max(0, targetWeight - lockedWeightSum);
+    const remainingPcs = Math.max(1, targetPcs - lockedPcsSum);
+    const dynamicAvgW = (targetPcs > 0 && remainingPcs > 0) ? (remainingWeight / remainingPcs) : avgW;
+
+    // Суммарное количество мест, введенных в незафиксированные отсеки
+    const totalUnlockedEnteredPcs = unlockedRows.reduce((acc, r) => acc + r.pcs, 0);
+    const isAllPcsDistributed = (targetPcs > 0) && (totalUnlockedEnteredPcs === (targetPcs - lockedPcsSum));
+
+    // 2-й проход: Распределение веса по незафиксированным отсекам
+    let allocatedUnlockedWeight = 0;
+
+    unlockedRows.forEach((item, idx) => {
+        const isLastRow = (idx === unlockedRows.length - 1);
+        let w = 0;
+
+        if (isAllPcsDistributed && isLastRow) {
+            // Последний отсек, закрывающий абсолютно все оставшиеся места, забирает точный математический остаток веса!
+            w = Math.max(0, Math.round(remainingWeight - allocatedUnlockedWeight));
+        } else {
+            w = Math.round(item.pcs * dynamicAvgW);
+            allocatedUnlockedWeight += w;
+        }
+
+        item.row.weight = w;
+        if (item.weightInput && item.weightInput !== activeEl) {
+            const wStr = String(w);
+            if (item.weightInput.value !== wStr) {
+                item.weightInput.value = wStr;
+            }
+        }
+    });
+
+    // 3-й проход: Подсчет промежуточных итогов по каждому отсеку и общей суммы
     let totalPcs = 0;
     let totalWeight = 0;
-
-    if (!currentCompartmentsState || currentCompartmentsState.length === 0) {
-        initDefaultCompartmentsState();
-    }
 
     currentCompartmentsState.forEach((comp, compIdx) => {
         let compPcs = 0;
@@ -3728,24 +3799,10 @@ function recalculateLoadPlanning() {
             const pcs = parseInt(row.pcs, 10) || 0;
             let weight = parseFloat(row.weight) || 0;
 
-            const pcsInput = document.getElementById(`bulk-pcs-${compIdx}-${rowIdx}`);
             const weightInput = document.getElementById(`bulk-weight-${compIdx}-${rowIdx}`);
-
             const isEditingWeight = (weightInput === activeEl);
-            const isLocked = row.locked || (isEditingWeight && weightInput?.value.trim() !== '');
-
-            if (!isLocked) {
-                if (pcs > 0 && avgW > 0) {
-                    weight = Math.round(pcs * avgW);
-                    row.weight = weight;
-                    if (weightInput && !isEditingWeight) {
-                        weightInput.value = String(weight);
-                    }
-                } else if (pcs === 0 && !isEditingWeight) {
-                    weight = 0;
-                    row.weight = 0;
-                    if (weightInput) weightInput.value = '0';
-                }
+            if (isEditingWeight && weightInput) {
+                weight = parseFloat(weightInput.value) || 0;
             }
 
             compPcs += pcs;
