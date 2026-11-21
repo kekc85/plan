@@ -42,6 +42,15 @@ export default function FleetWbManager() {
   const [showFullMatrixModal, setShowFullMatrixModal] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Режим ручного редактирования полной матрицы WBR (DOW / DOI)
+  const [isEditingMatrix, setIsEditingMatrix] = useState(false);
+  const [editMatrix, setEditMatrix] = useState({});
+  const [editRevision, setEditRevision] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editBasicWeight, setEditBasicWeight] = useState('');
+  const [editBasicIndex, setEditBasicIndex] = useState('');
+  const [isSavingMatrix, setIsSavingMatrix] = useState(false);
+
   // Загрузка актуального реестра с сервера
   const loadFleetRegistry = async () => {
     setIsLoading(true);
@@ -253,6 +262,93 @@ export default function FleetWbManager() {
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+  };
+
+  // --- РУЧНОЕ РЕДАКТИРОВАНИЕ ЦЕНТРОВОЧНОЙ МАТРИЦЫ WBR ---
+  const handleStartEditMatrix = () => {
+    if (!currentAircraft) return;
+    setEditMatrix(JSON.parse(JSON.stringify(currentAircraft.matrix || {})));
+    setEditRevision(currentAircraft.revision || '');
+    setEditDate(currentAircraft.date || '');
+    setEditBasicWeight(currentAircraft.basic_weight ? String(currentAircraft.basic_weight) : '');
+    setEditBasicIndex(currentAircraft.basic_index !== undefined && currentAircraft.basic_index !== null ? String(currentAircraft.basic_index) : '');
+    setIsEditingMatrix(true);
+  };
+
+  const handleCancelEditMatrix = () => {
+    setIsEditingMatrix(false);
+    setEditMatrix({});
+  };
+
+  const handleMatrixCellChange = (crewCode, pCode, field, value) => {
+    setEditMatrix(prev => {
+      const copy = { ...prev };
+      if (!copy[crewCode]) copy[crewCode] = {};
+      if (!copy[crewCode][pCode]) copy[crewCode][pCode] = { dow: 0, doi: 0 };
+
+      copy[crewCode][pCode] = {
+        ...copy[crewCode][pCode],
+        [field]: value
+      };
+      return copy;
+    });
+  };
+
+  const handleSaveMatrix = async () => {
+    if (!currentAircraft) return;
+    setIsSavingMatrix(true);
+    setStatusMsg({ type: '', text: '' });
+
+    try {
+      // Очищаем и форматируем числовые значения DOW и DOI
+      const cleanMatrix = {};
+      for (const [crewCode, pantries] of Object.entries(editMatrix)) {
+        cleanMatrix[crewCode] = {};
+        for (const [pCode, cell] of Object.entries(pantries)) {
+          if (!cell) continue;
+          let dowVal = cell.dow;
+          let doiVal = cell.doi;
+
+          if (typeof dowVal === 'string') {
+            dowVal = parseInt(dowVal.replace(/\s+/g, ''), 10);
+            if (isNaN(dowVal)) dowVal = 0;
+          }
+          if (typeof doiVal === 'string') {
+            doiVal = parseFloat(doiVal.replace(',', '.').replace(/\s+/g, ''));
+            if (isNaN(doiVal)) doiVal = 0;
+          }
+
+          cleanMatrix[crewCode][pCode] = {
+            dow: dowVal,
+            doi: doiVal
+          };
+        }
+      }
+
+      const updatedAircraft = {
+        ...currentAircraft,
+        revision: editRevision.trim() || currentAircraft.revision,
+        date: editDate.trim() || currentAircraft.date,
+        basic_weight: editBasicWeight ? parseInt(editBasicWeight.replace(/\D/g, ''), 10) : currentAircraft.basic_weight,
+        basic_index: editBasicIndex ? parseFloat(editBasicIndex.replace(',', '.')) : currentAircraft.basic_index,
+        matrix: cleanMatrix
+      };
+
+      const updatedFleet = { ...fleet, [selectedKey]: updatedAircraft };
+      setFleet(updatedFleet);
+
+      await adminUpdateFleetWb(selectedKey, updatedAircraft);
+
+      setStatusMsg({ 
+        type: 'success', 
+        text: `Центровочный график RA-${currentAircraft.tail} (${updatedAircraft.revision}) успешно сохранен в реестр флота!` 
+      });
+      setIsEditingMatrix(false);
+    } catch (err) {
+      setStatusMsg({ type: 'error', text: `Ошибка сохранения графика: ${err.message}` });
+    } finally {
+      setIsSavingMatrix(false);
+    }
   };
 
   return (
@@ -780,19 +876,19 @@ export default function FleetWbManager() {
       </div>
 
 
-      {/* 5. ПОЛНОЭКРАННОЕ МОДАЛЬНОЕ ОКНО ПРОСМОТРА ВСЕЙ ТАБЛИЦЫ WBR ЦЕЛИКОМ */}
+      {/* 5. ПОЛНОЭКРАННОЕ МОДАЛЬНОЕ ОКНО ПРОСМОТРА И РЕДАКТИРОВАНИЯ ВСЕЙ ТАБЛИЦЫ WBR ЦЕЛИКОМ */}
       {showFullMatrixModal && currentAircraft && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
             
             {/* Шапка модалки */}
-            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/90 dark:bg-slate-850/90">
+            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/90 dark:bg-slate-850/90 flex-wrap gap-2">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-sky-600/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold">
                   <FileSpreadsheet className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-mono font-black text-lg text-slate-900 dark:text-slate-100">
                       RA-{currentAircraft.tail}
                     </h3>
@@ -806,26 +902,74 @@ export default function FleetWbManager() {
                     <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                       {currentAircraft.model}
                     </span>
+                    {isEditingMatrix && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 animate-pulse">
+                        Режим ручного редактирования WBR
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {currentAircraft.file || 'WBR'} • Ревизия: <strong>{currentAircraft.revision || '1.0'}</strong> • Дата: <strong>{currentAircraft.date || '—'}</strong>
+                    {currentAircraft.file || 'WBR'} • Ревизия: <strong>{isEditingMatrix ? editRevision : (currentAircraft.revision || '1.0')}</strong> • Дата: <strong>{isEditingMatrix ? editDate : (currentAircraft.date || '—')}</strong>
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
+                {!isEditingMatrix ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleStartEditMatrix}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg shadow-sm transition-all"
+                      title="Внести ручные изменения в веса DOW и индексы DOI"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Редактировать таблицу</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition-colors"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Печать</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSaveMatrix}
+                      disabled={isSavingMatrix}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition-all disabled:opacity-50"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{isSavingMatrix ? 'Сохранение...' : 'Сохранить изменения'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelEditMatrix}
+                      disabled={isSavingMatrix}
+                      className="px-3 py-1.5 text-xs font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors"
+                    >
+                      Отмена
+                    </button>
+                  </>
+                )}
+
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition-colors"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Печать</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowFullMatrixModal(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  onClick={() => {
+                    if (isEditingMatrix) {
+                      if (window.confirm('Выйти из режима редактирования без сохранения?')) {
+                        handleCancelEditMatrix();
+                        setShowFullMatrixModal(false);
+                      }
+                    } else {
+                      setShowFullMatrixModal(false);
+                    }
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors ml-1"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -835,13 +979,56 @@ export default function FleetWbManager() {
             {/* Базовые веса и пределы ВС */}
             <div className="px-5 py-2.5 bg-slate-100/70 dark:bg-slate-850/50 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
               <div className="flex items-center gap-5 flex-wrap">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Basic Weight / Index:</span>
-                  <span className="font-extrabold text-sm text-sky-600 dark:text-sky-400">
-                    {currentAircraft.basic_weight ? `${currentAircraft.basic_weight.toLocaleString()} кг` : 'В строках матрицы W&B'}
-                    {currentAircraft.basic_index !== undefined && currentAircraft.basic_index !== null && ` / ${currentAircraft.basic_index}`}
-                  </span>
-                </div>
+                {isEditingMatrix ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">Ревизия:</span>
+                      <input
+                        type="text"
+                        value={editRevision}
+                        onChange={(e) => setEditRevision(e.target.value)}
+                        placeholder="Rev 06"
+                        className="w-24 px-2 py-1 text-xs font-mono font-bold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">Дата:</span>
+                      <input
+                        type="text"
+                        value={editDate}
+                        onChange={(e) => setEditDate(e.target.value)}
+                        placeholder="08NOV26"
+                        className="w-24 px-2 py-1 text-xs font-mono font-bold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">Basic Wt/Idx:</span>
+                      <input
+                        type="text"
+                        value={editBasicWeight}
+                        onChange={(e) => setEditBasicWeight(e.target.value)}
+                        placeholder="кг"
+                        className="w-20 px-2 py-1 text-xs font-mono font-bold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                      />
+                      <input
+                        type="text"
+                        value={editBasicIndex}
+                        onChange={(e) => setEditBasicIndex(e.target.value)}
+                        placeholder="индекс"
+                        className="w-16 px-2 py-1 text-xs font-mono font-bold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Basic Weight / Index:</span>
+                    <span className="font-extrabold text-sm text-sky-600 dark:text-sky-400">
+                      {currentAircraft.basic_weight ? `${currentAircraft.basic_weight.toLocaleString()} кг` : 'В строках матрицы W&B'}
+                      {currentAircraft.basic_index !== undefined && currentAircraft.basic_index !== null && ` / ${currentAircraft.basic_index}`}
+                    </span>
+                  </div>
+                )}
+
                 {currentAircraft.max_weights && (
                   <>
                     <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
@@ -860,13 +1047,19 @@ export default function FleetWbManager() {
                 )}
               </div>
 
-              <div className="text-[11px] text-slate-500 font-sans">
-                Выбрано в симуляторе: <strong className="text-amber-600 dark:text-amber-400 font-mono font-bold">Экипаж {simCrew} / Pantry {simPantry}</strong> 
-                {simResult && <span className="ml-1 text-slate-700 dark:text-slate-300 font-mono font-bold">({simResult.dow ? simResult.dow.toLocaleString() : '—'} кг, DOI {simResult.doi})</span>}
-              </div>
+              {!isEditingMatrix ? (
+                <div className="text-[11px] text-slate-500 font-sans">
+                  Выбрано в симуляторе: <strong className="text-amber-600 dark:text-amber-400 font-mono font-bold">Экипаж {simCrew} / Pantry {simPantry}</strong> 
+                  {simResult && <span className="ml-1 text-slate-700 dark:text-slate-300 font-mono font-bold">({simResult.dow ? simResult.dow.toLocaleString() : '—'} кг, DOI {simResult.doi})</span>}
+                </div>
+              ) : (
+                <div className="text-[11px] text-amber-700 dark:text-amber-300 font-sans font-semibold">
+                  Вносите числовые изменения в ячейки матрицы ниже
+                </div>
+              )}
             </div>
 
-            {/* Просторная полная таблица всей матрицы W&B без сплющивания */}
+            {/* Просторная полная таблица всей матрицы W&B */}
             <div className="p-4 sm:p-5 overflow-auto flex-1">
               <table className="w-full text-left border-collapse font-mono text-xs border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-xs">
                 <thead className="bg-slate-200/90 dark:bg-slate-800 sticky top-0 z-20 text-slate-800 dark:text-slate-200 uppercase font-extrabold text-[11px]">
@@ -875,7 +1068,7 @@ export default function FleetWbManager() {
                       Экипаж (Crew)
                     </th>
                     {(currentAircraft.pantry_codes || ['A', 'B', 'D', 'E', 'F']).map(pCode => (
-                      <th key={pCode} className="px-4 py-3 text-center border-r border-b border-slate-300 dark:border-slate-700 last:border-r-0">
+                      <th key={pCode} className="px-3 py-3 text-center border-r border-b border-slate-300 dark:border-slate-700 last:border-r-0">
                         <div className="text-xs font-black">Pantry {pCode}</div>
                         <div className="text-[9px] text-slate-500 font-normal normal-case">DOW (кг) / DOI</div>
                       </th>
@@ -889,27 +1082,54 @@ export default function FleetWbManager() {
                         {crewCode}
                       </td>
                       {(currentAircraft.pantry_codes || ['A', 'B', 'D', 'E', 'F']).map(pCode => {
-                        const cell = pantries[pCode];
-                        const isHighlighted = simCrew === crewCode && simPantry === pCode;
+                        const cell = isEditingMatrix
+                          ? (editMatrix[crewCode]?.[pCode] || { dow: '', doi: '' })
+                          : pantries[pCode];
+                        const isHighlighted = !isEditingMatrix && simCrew === crewCode && simPantry === pCode;
 
                         return (
                           <td
                             key={pCode}
                             onClick={() => {
-                              if (cell) {
+                              if (!isEditingMatrix && cell) {
                                 setSimCrew(crewCode);
                                 setSimPantry(pCode);
                               }
                             }}
-                            className={`px-3 py-2 text-center border-r border-slate-100 dark:border-slate-800 last:border-r-0 cursor-pointer transition-all ${
+                            className={`px-2.5 py-1.5 text-center border-r border-slate-100 dark:border-slate-800 last:border-r-0 transition-all ${
                               isHighlighted
-                                ? 'bg-amber-100 dark:bg-amber-900/60 font-black ring-2 ring-amber-500 ring-inset shadow-xs'
-                                : cell
-                                ? 'hover:bg-sky-100/50 dark:hover:bg-slate-800'
-                                : 'text-slate-300 dark:text-slate-700'
+                                ? 'bg-amber-100 dark:bg-amber-900/60 font-black ring-2 ring-amber-500 ring-inset shadow-xs cursor-pointer'
+                                : !isEditingMatrix && cell
+                                ? 'hover:bg-sky-100/50 dark:hover:bg-slate-800 cursor-pointer'
+                                : !isEditingMatrix
+                                ? 'text-slate-300 dark:text-slate-700'
+                                : 'bg-slate-50/50 dark:bg-slate-850/30'
                             }`}
                           >
-                            {cell ? (
+                            {isEditingMatrix ? (
+                              <div className="space-y-1 py-0.5 min-w-[84px]">
+                                <div className="flex items-center justify-center gap-1">
+                                  <span className="text-[9px] text-slate-400 font-bold uppercase w-5 text-right">W:</span>
+                                  <input
+                                    type="text"
+                                    value={cell.dow ?? ''}
+                                    onChange={(e) => handleMatrixCellChange(crewCode, pCode, 'dow', e.target.value)}
+                                    placeholder="43000"
+                                    className="w-16 px-1 py-0.5 text-xs font-black font-mono text-center rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                  />
+                                </div>
+                                <div className="flex items-center justify-center gap-1">
+                                  <span className="text-[9px] text-sky-500 font-bold uppercase w-5 text-right">I:</span>
+                                  <input
+                                    type="text"
+                                    value={cell.doi ?? ''}
+                                    onChange={(e) => handleMatrixCellChange(crewCode, pCode, 'doi', e.target.value)}
+                                    placeholder="50.00"
+                                    className="w-16 px-1 py-0.5 text-[11px] font-bold font-mono text-center rounded border border-sky-300 dark:border-sky-700 bg-sky-50/60 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                  />
+                                </div>
+                              </div>
+                            ) : cell ? (
                               <div>
                                 <div className="text-xs font-black text-slate-900 dark:text-slate-100">
                                   {cell.dow ? cell.dow.toLocaleString() : '—'}
@@ -931,15 +1151,41 @@ export default function FleetWbManager() {
             </div>
 
             {/* Подвал модалки */}
-            <div className="px-5 py-3 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-              <span>Кликните по любой ячейке для выбора этой связки экипажа и кухни в расчет W&B</span>
-              <button
-                type="button"
-                onClick={() => setShowFullMatrixModal(false)}
-                className="px-4 py-1.5 font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg transition-colors"
-              >
-                Закрыть
-              </button>
+            <div className="px-5 py-3 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 flex-wrap gap-2">
+              <span>
+                {isEditingMatrix
+                  ? 'Режим редактирования: вносите изменения в ячейки и нажмите «Сохранить изменения» для обновления реестра W&B'
+                  : 'Кликните по любой ячейке для выбора этой связки экипажа и кухни в расчет W&B'}
+              </span>
+              <div className="flex items-center gap-2">
+                {isEditingMatrix && (
+                  <button
+                    type="button"
+                    onClick={handleSaveMatrix}
+                    disabled={isSavingMatrix}
+                    className="px-4 py-1.5 font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm transition-all disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{isSavingMatrix ? 'Сохранение...' : 'Сохранить изменения'}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isEditingMatrix) {
+                      if (window.confirm('Выйти из режима редактирования без сохранения?')) {
+                        handleCancelEditMatrix();
+                        setShowFullMatrixModal(false);
+                      }
+                    } else {
+                      setShowFullMatrixModal(false);
+                    }
+                  }}
+                  className="px-4 py-1.5 font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg transition-colors"
+                >
+                  Закрыть
+                </button>
+              </div>
             </div>
 
           </div>
