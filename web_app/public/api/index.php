@@ -1895,12 +1895,18 @@ if ($route === '/shift/handover') {
 // ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ЗАПРОСА К AVIABIT С АВТОРИЗАЦИЕЙ
 // ----------------------------------------------------
 function getAviaBitCookie($name, $defaultCookie) {
-    $sessionFile = __DIR__ . "/.session_{$name}.json";
-    if (file_exists($sessionFile)) {
-        $raw = @file_get_contents($sessionFile);
-        $data = json_decode($raw, true);
-        if (!empty($data['connect.sid'])) {
-            return $data['connect.sid'];
+    $sessionPaths = [
+        __DIR__ . "/.session_{$name}.json",
+        dirname(__DIR__, 2) . "/plan_2/api/.session_{$name}.json",
+        dirname(__DIR__, 2) . "/plan/api/.session_{$name}.json"
+    ];
+    foreach ($sessionPaths as $sessionFile) {
+        if (file_exists($sessionFile)) {
+            $raw = @file_get_contents($sessionFile);
+            $data = json_decode($raw, true);
+            if (!empty($data['connect.sid'])) {
+                return $data['connect.sid'];
+            }
         }
     }
     $dbCookie = getSystemSetting("aviabit_cookie_{$name}", '');
