@@ -23,7 +23,11 @@ OUTPUT_JSON = os.path.join(PROJECT_DIR, "web_app", "public", "data", "fleet_wb.j
 OUTPUT_JSONS = [
     os.path.join(PROJECT_DIR, "web_app", "src", "data", "fleet_wb.json"),
     os.path.join(PROJECT_DIR, "web_app", "public", "data", "fleet_wb.json"),
+    os.path.join(PROJECT_DIR, "web_app", "dist", "data", "fleet_wb.json"),
+    os.path.join(PROJECT_DIR, "aerobag", "fleet_wb.json"),
     os.path.join(PROJECT_DIR, "loadsheet", "fleet_wb.json"),
+    r"C:\Users\kekc85\.gemini\antigravity\worktrees\AVERAGO BAGGEGE WEIGH\solar_ion_sparks_18h08\fleet_wb.json",
+    r"C:\Users\kekc85\.gemini\antigravity\worktrees\AVERAGO BAGGEGE WEIGH\solar_ion_sparks_18h08\loadsheet\fleet_wb.json",
     r"C:\Users\kekc85\.gemini\antigravity\worktrees\AVERAGO BAGGEGE WEIGH\add_test_address_config\fleet_wb.json",
     r"C:\Users\kekc85\.gemini\antigravity\worktrees\AVERAGO BAGGEGE WEIGH\add_test_address_config\loadsheet\fleet_wb.json"
 ]
@@ -207,6 +211,7 @@ def parse_wbr_file(filepath):
             fly_kit_mode = "FAK_2AKE"
 
         matrix = {}
+        pantry_codes_list = []
 
         # ----------------------------------------------------
         # ПАРСИНГ NORDWIND ТАБЛИЦЫ
@@ -250,72 +255,141 @@ def parse_wbr_file(filepath):
                             "dow": dow_val,
                             "doi": doi_val
                         }
+            pantry_codes_list = [p[1] for p in pantry_codes]
 
         # ----------------------------------------------------
-        # ПАРСИНГ IKAR ТАБЛИЦЫ
+        # ПАРСИНГ IKAR ТАБЛИЦЫ (B739, E190, B772)
         # ----------------------------------------------------
         elif is_ikar and len(tables) >= 2:
-            table = tables[1]
-            header_row_idx = -1
-            header_row = None
+            def parse_cell_num(v):
+                if not v:
+                    return None
+                s = str(v).replace(' ', '').replace(',', '.').strip()
+                lines = [l.strip() for l in s.split('\n') if l.strip()]
+                if not lines:
+                    return None
+                first = lines[0]
+                if any(k in first.lower() for k in ['weight', 'index', 'mac', 'none', '-']):
+                    return None
+                try:
+                    num = float(first)
+                    return int(num) if num.is_integer() else num
+                except:
+                    return None
 
-            for r_idx, row in enumerate(table[:6]):
-                clean = [str(c).strip() for c in row if c]
-                if 'Crew' in clean and any(p in clean for p in ['A', 'B', 'E', 'C', 'D']):
-                    header_row_idx = r_idx
-                    header_row = row
-                    break
+            if "B772" in fname or "777" in model:
+                pantry_codes_list = ['A', 'B', 'C', 'D', 'E']
+                # Для B772 матрицы экипажей разбиты на таблицы: Table 1 (2/x, 3/x) и Table 2 (4/x)
+                for t_idx in range(1, len(tables)):
+                    tbl = tables[t_idx]
+                    if not tbl:
+                        continue
 
-            if header_row:
-                # Список кухонь в первом блоке (Including Fly Kit)
-                p_codes = []
-                for c_idx in range(1, len(header_row)):
-                    p = str(header_row[c_idx]).strip()
-                    if p and p in "ABCDEFGK":
-                        p_codes.append((c_idx, p))
-                    # Для B739/E190 первый блок заканчивается на E
-                    if len(p_codes) >= 3 and p == 'E':
+                    header_row_idx = -1
+                    for r_idx, row in enumerate(tbl[:5]):
+                        clean = [str(c).strip() for c in row if c]
+                        if 'Crew' in clean and 'A' in clean and 'B' in clean:
+                            header_row_idx = r_idx
+                            break
+
+                    if header_row_idx == -1:
+                        continue
+
+                    h_row = tbl[header_row_idx]
+                    col_map = {}
+                    for c_idx in range(1, len(h_row)):
+                        c_val = str(h_row[c_idx]).strip() if h_row[c_idx] else ""
+                        if c_val in ['A', 'B', 'C', 'D', 'E']:
+                            col_map[c_val] = c_idx
+
+                    r_idx = header_row_idx + 1
+                    while r_idx < len(tbl):
+                        row_wt = tbl[r_idx]
+                        row_idx = tbl[r_idx + 1] if r_idx + 1 < len(tbl) else None
+
+                        if not row_wt or not row_wt[0]:
+                            r_idx += 1
+                            continue
+
+                        crew_str = str(row_wt[0]).strip()
+                        if not re.match(r'^\d+/\d+', crew_str):
+                            r_idx += 1
+                            continue
+
+                        if crew_str not in matrix:
+                            matrix[crew_str] = {}
+
+                        for p_code, c_idx in col_map.items():
+                            dow_val = None
+                            doi_val = None
+
+                            cell_wt = row_wt[c_idx] if c_idx < len(row_wt) else None
+                            cell_idx = row_idx[c_idx] if row_idx and c_idx < len(row_idx) else None
+
+                            # В некоторых файлах B772 ячейка веса объединена с индексом через \n (например '141253\n42,7\n26,3')
+                            if cell_wt and '\n' in str(cell_wt):
+                                lines = [l.strip() for l in str(cell_wt).split('\n') if l.strip()]
+                                if len(lines) >= 1:
+                                    dow_val = parse_cell_num(lines[0])
+                                if len(lines) >= 2 and (not cell_idx or parse_cell_num(cell_idx) is None):
+                                    doi_val = parse_cell_num(lines[1])
+                            else:
+                                dow_val = parse_cell_num(cell_wt)
+
+                            if doi_val is None and cell_idx:
+                                doi_val = parse_cell_num(cell_idx)
+
+                            if dow_val is not None:
+                                matrix[crew_str][p_code] = {
+                                    "dow": dow_val,
+                                    "doi": doi_val
+                                }
+
+                        r_idx += 3
+
+            else:
+                # B739 и E190: официальный стандарт - левый блок CREW BAGGAGE INCLUDED -> Including Fly-Away Kit (кухни A, B, E)
+                pantry_codes_list = ['A', 'B', 'E']
+                tbl = tables[1]
+                header_row_idx = -1
+                for r_idx, row in enumerate(tbl[:6]):
+                    clean = [str(c).strip() for c in row if c]
+                    if 'Crew' in clean and 'A' in clean and 'B' in clean:
+                        header_row_idx = r_idx
                         break
 
-                r_idx = header_row_idx + 1
-                while r_idx < len(table):
-                    row_wt = table[r_idx]
-                    row_idx = table[r_idx + 1] if r_idx + 1 < len(table) else None
+                if header_row_idx != -1:
+                    col_map = {'A': 1, 'B': 2, 'E': 3}
 
-                    if not row_wt or not row_wt[0]:
-                        r_idx += 1
-                        continue
+                    r_idx = header_row_idx + 1
+                    while r_idx < len(tbl):
+                        row_wt = tbl[r_idx]
+                        row_idx = tbl[r_idx + 1] if r_idx + 1 < len(tbl) else None
 
-                    crew_str = str(row_wt[0]).strip()
-                    if not re.match(r'^\d+/\d+', crew_str):
-                        r_idx += 1
-                        continue
+                        if not row_wt or not row_wt[0]:
+                            r_idx += 1
+                            continue
 
-                    matrix[crew_str] = {}
-                    for c_idx, p_code in p_codes:
-                        dow_val = None
-                        doi_val = None
-                        if c_idx < len(row_wt) and row_wt[c_idx]:
-                            cell_str = str(row_wt[c_idx]).replace(' ', '').replace(',', '.')
-                            # Если ячейка содержит 'weight' (например, для 2/0 кухни A), пропускаем
-                            if 'weight' not in cell_str.lower():
-                                try: dow_val = int(float(cell_str))
-                                except: pass
+                        crew_str = str(row_wt[0]).strip()
+                        if not re.match(r'^\d+/\d+', crew_str):
+                            r_idx += 1
+                            continue
 
-                        if row_idx and c_idx < len(row_idx) and row_idx[c_idx]:
-                            cell_idx_str = str(row_idx[c_idx]).replace(' ', '').replace(',', '.')
-                            if 'index' not in cell_idx_str.lower():
-                                try: doi_val = float(cell_idx_str)
-                                except: pass
+                        matrix[crew_str] = {}
+                        for p_code, c_idx in col_map.items():
+                            cell_wt = row_wt[c_idx] if c_idx < len(row_wt) else None
+                            cell_idx = row_idx[c_idx] if row_idx and c_idx < len(row_idx) else None
 
-                        if dow_val is not None:
-                            matrix[crew_str][p_code] = {
-                                "dow": dow_val,
-                                "doi": doi_val
-                            }
+                            dow_val = parse_cell_num(cell_wt)
+                            doi_val = parse_cell_num(cell_idx)
 
-                    # Переходим к следующему блоку экипажа (шаг 3 строки: weight, index, MAC)
-                    r_idx += 3
+                            if dow_val is not None:
+                                matrix[crew_str][p_code] = {
+                                    "dow": dow_val,
+                                    "doi": doi_val
+                                }
+
+                        r_idx += 3
 
         mw = MAX_WEIGHTS_MAP.get(tail, {"mtow": None, "mlaw": None, "mzfw": None})
 
@@ -331,7 +405,7 @@ def parse_wbr_file(filepath):
             "max_weights": mw,
             "fly_kit_mode": fly_kit_mode,
             "crew_count": len(matrix),
-            "pantry_codes": list(next(iter(matrix.values())).keys()) if matrix else [],
+            "pantry_codes": pantry_codes_list if pantry_codes_list else (list(next(iter(matrix.values())).keys()) if matrix else []),
             "matrix": matrix
         }
 

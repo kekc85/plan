@@ -3596,11 +3596,11 @@ function parseWbrPdfBinary($pdfBinary, $origName) {
     $totalTok = count($tokens);
     for ($i = 0; $i < $totalTok; $i++) {
         $t = $tokens[$i];
-        if (in_array($t, ['A', 'B', 'D', 'E', 'F', 'G', 'K'])) {
+        if (in_array($t, ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'K'])) {
             $sub = array_slice($tokens, $i, 7);
             $allPantry = true;
             foreach ($sub as $x) {
-                if (!in_array($x, ['A', 'B', 'D', 'E', 'F', 'G', 'K'])) {
+                if (!in_array($x, ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'K'])) {
                     $allPantry = false;
                     break;
                 }
@@ -3612,7 +3612,13 @@ function parseWbrPdfBinary($pdfBinary, $origName) {
         }
     }
     if (empty($pantryCodes)) {
-        $pantryCodes = $isIkar ? ['A', 'B', 'E'] : ['A', 'B', 'D', 'E', 'F', 'G', 'K'];
+        if ($isIkar) {
+            $pantryCodes = (strpos($model, '777') !== false || stripos($fname, '772') !== false)
+                ? ['A', 'B', 'C', 'D', 'E']
+                : ['A', 'B', 'E'];
+        } else {
+            $pantryCodes = ['A', 'B', 'D', 'E', 'F', 'G', 'K'];
+        }
     }
 
     $matrix = [];
