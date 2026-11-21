@@ -1026,7 +1026,8 @@
   <!-- Верхняя панель управления (скрывается при печати) -->
   <div class="top-toolbar">
     <div class="toolbar-left">
-      <button type="button" class="btn btn-secondary" id="btnBackToOrigin" onclick="handleReturnBack()" style="display: none;" title="Вернуться назад в систему расчета">↩ Назад</button>
+      <button type="button" class="btn btn-secondary" id="btnGoToAeroPlan" onclick="handleNavigateToAeroPlan()" title="Перейти в суточный план смены AeroPlan">📋 AeroPlan</button>
+      <button type="button" class="btn btn-secondary" id="btnGoToAeroBag" onclick="handleNavigateToAeroBag()" title="Перейти в расчет загрузки багажа AeroBag">🧳 AeroBag</button>
       <span class="toolbar-title">✈ Nordwind W&amp;B LoadSheet</span>
       <div class="season-selector" title="Выбор сезона для стандартных весов пассажиров">
         <button type="button" class="season-btn active" id="btnSeasonSummer" onclick="setSeason('summer')">Лето (Взр 75 кг)</button>
@@ -2672,13 +2673,159 @@
       }
     });
 
-    function handleReturnBack() {
-      const returnUrl = sessionStorage.getItem('wb_loadsheet_return_url');
-      if (returnUrl) {
-        window.location.href = returnUrl;
-      } else if (window.history.length > 1) {
-        window.history.back();
+    // Определение тестового контура (loadsheet_test / plan_2 / aerobag-test)
+    function isLoadsheetTestContour() {
+      const savedReturnUrl = sessionStorage.getItem('wb_loadsheet_return_url') || '';
+      const curHref = window.location.href || '';
+      const ref = document.referrer || '';
+      return (
+        curHref.includes('loadsheet_test') ||
+        savedReturnUrl.includes('plan_2') ||
+        savedReturnUrl.includes('aerobag-test') ||
+        ref.includes('plan_2') ||
+        ref.includes('aerobag-test')
+      );
+    }
+
+    // Разрешение URL перехода в AeroPlan с учетом сохраненного return_url и контура
+    function resolveAeroPlanTargetUrl() {
+      const savedReturnUrl = sessionStorage.getItem('wb_loadsheet_return_url') || '';
+      const isPlanUrl = (url) =>
+        Boolean(url) &&
+        (url.includes('/plan_2') || url.includes('/plan')) &&
+        !url.includes('aerobag');
+
+      if (savedReturnUrl) {
+        if (isPlanUrl(savedReturnUrl)) {
+          return savedReturnUrl;
+        }
+        try {
+          const parsedUrl = new URL(savedReturnUrl, window.location.origin);
+          const nestedReturnUrl = parsedUrl.searchParams.get('return_url');
+          if (isPlanUrl(nestedReturnUrl)) {
+            return nestedReturnUrl;
+          }
+        } catch (err) {
+          console.warn('[Loadsheet] Ошибка разбора return_url:', err);
+        }
       }
+
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (isLocal) {
+        return `${window.location.origin}/plan/`;
+      }
+      return isLoadsheetTestContour()
+        ? 'https://boostandgo.ru/plan_2/'
+        : 'https://boostandgo.ru/plan/';
+    }
+
+    // Преобразование даты из формата бланка (DD.MM.YYYY / DD.MM) в ISO (YYYY-MM-DD) для AeroBag
+    function formatLoadsheetDateToIso(rawDate) {
+      const str = String(rawDate || '').trim();
+      if (!str) return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+      const parts = str.split('.');
+      if (parts.length === 3 && parts[2].length === 4) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        const year = new Date().getFullYear();
+        return `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+      return str;
+    }
+
+    // Переход в суточный план смены AeroPlan
+    function handleNavigateToAeroPlan() {
+      window.location.href = resolveAeroPlanTargetUrl();
+    }
+
+    // Алиас для обратной совместимости
+    function handleReturnBack() {
+      handleNavigateToAeroPlan();
+    }
+
+    // Переход в расчет загрузки багажа AeroBag с пробросом параметров текущего бланка
+    function handleNavigateToAeroBag() {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const baseAeroBagUrl = isLocal
+        ? `${window.location.origin}/aerobag/`
+        : (isLoadsheetTestContour() ? 'https://boostandgo.ru/aerobag-test/' : 'https://boostandgo.ru/aerobag/');
+
+      const getVal = (id) => String(document.getElementById(id)?.value || '').trim();
+      const rawFlight = getVal('f_flight');
+      const cleanFlight = rawFlight
+        .toUpperCase()
+        .replace(/^(N4|EO|NWS|KAR|NW|WZ|S7|SU|DP|UT|A4|U6|FV|5N|7R|KL|КЛ|Н4|ЕО)[-\s]?/i, '')
+        .replace(/^[A-ZА-Я][A-ZА-Я0-9]{0,2}[-\s]?/i, '');
+      const fltMatch = cleanFlight.match(/\d+/);
+      const flightNum = fltMatch ? fltMatch[0] : cleanFlight.replace(/\D/g, '');
+
+      if (!flightNum) {
+        window.location.href = baseAeroBagUrl;
+        return;
+      }
+
+      const inc = window._incomingLoadsheetData || {};
+      const incFlightRaw = String(inc.flight || inc.f_flight || inc.flight_no || inc.flight_number || '').replace(/\D/g, '');
+      const isSameIncomingFlight = !incFlightRaw || (parseInt(incFlightRaw, 10) === parseInt(flightNum, 10));
+
+      const fromVal = getVal('f_from').toUpperCase();
+      const toVal = (getVal('f_to') || getVal('dest_code_1')).toUpperCase();
+      const isoDateVal = formatLoadsheetDateToIso(getVal('f_date'));
+      const depTimeVal = getVal('f_time') || (isSameIncomingFlight ? String(inc.dep_time || inc.time || inc.f_time || inc.departure_time || '').trim() : '');
+      const acNumVal = getVal('f_acreg').toUpperCase();
+      const acConfigVal = getVal('f_version').toUpperCase();
+      const crewVal = getVal('f_crew');
+
+      const paxM = getVal('pax_m_1');
+      const paxF = getVal('pax_f_1');
+      const paxCh = getVal('pax_ch_1');
+      const paxInf = getVal('pax_inf_1');
+      const numPaxSum = (parseInt(paxM, 10) || 0) + (parseInt(paxF, 10) || 0) + (parseInt(paxCh, 10) || 0);
+      const paxVal = numPaxSum > 0
+        ? String(numPaxSum)
+        : (isSameIncomingFlight && inc.pax ? String(inc.pax).trim() : '');
+
+      const dowVal = getVal('inp_dow');
+      const freeformText = getVal('inp_balance_freeform');
+      const doiMatch = freeformText.match(/DOI:\s*(-?[0-9.,]+)/i);
+      const doiVal = doiMatch
+        ? doiMatch[1].trim()
+        : (isSameIncomingFlight && inc.doi ? String(inc.doi).trim() : '');
+
+      const galleyVal = String(window._activeLoadsheetGalley || (isSameIncomingFlight ? inc.galley : '') || 'D').toUpperCase().trim() || 'D';
+      const maxZfwVal = getVal('inp_max_zfw');
+      const maxTowVal = getVal('inp_max_tow');
+      const maxLawVal = getVal('inp_max_law');
+      const toFuelVal = getVal('inp_takeoff_fuel');
+      const tripFuelVal = getVal('inp_trip_fuel');
+
+      const params = new URLSearchParams();
+      params.set('flight', flightNum);
+      if (fromVal) params.set('from', fromVal);
+      if (toVal) params.set('to', toVal);
+      if (isoDateVal) params.set('date', isoDateVal);
+      if (depTimeVal) params.set('dep_time', depTimeVal);
+      if (acNumVal) params.set('ac_num', acNumVal);
+      if (acConfigVal) params.set('ac_config', acConfigVal);
+      if (crewVal) params.set('crew', crewVal);
+      if (paxM) params.set('pax_m', paxM);
+      if (paxF) params.set('pax_f', paxF);
+      if (paxCh) params.set('pax_ch', paxCh);
+      if (paxInf) params.set('pax_inf', paxInf);
+      if (paxVal) params.set('pax', paxVal);
+      if (dowVal) params.set('dow', dowVal);
+      if (doiVal) params.set('doi', doiVal);
+      if (galleyVal) params.set('galley', galleyVal);
+      if (maxZfwVal) params.set('max_zfw', maxZfwVal);
+      if (maxTowVal) params.set('max_tow', maxTowVal);
+      if (maxLawVal) params.set('max_law', maxLawVal);
+      if (toFuelVal) params.set('to_fuel', toFuelVal);
+      if (tripFuelVal) params.set('trip_fuel', tripFuelVal);
+      params.set('return_url', resolveAeroPlanTargetUrl());
+
+      window.location.href = `${baseAeroBagUrl}?${params.toString()}`;
     }
 
     const MODEL_TO_LAYOUT_MAP = {
@@ -2922,20 +3069,21 @@
         console.warn('[Loadsheet] Ошибка чтения query params:', err);
       }
 
-      // 3. Обработка return_url для кнопки [ ↩ Назад ]
+      // 3. Сохранение return_url для кнопок навигации AeroPlan и AeroBag
       const returnUrl = data.return_url || sessionStorage.getItem('wb_loadsheet_return_url');
-      if (returnUrl) {
+      if (data.return_url) {
+        sessionStorage.setItem('wb_loadsheet_return_url', data.return_url);
+      } else if (returnUrl) {
         sessionStorage.setItem('wb_loadsheet_return_url', returnUrl);
-        const backBtn = document.getElementById('btnBackToOrigin');
-        if (backBtn) {
-          backBtn.style.display = 'inline-flex';
-        }
       }
 
       // Если нет входящих данных, выходим
       if (Object.keys(data).length === 0) {
+        window._incomingLoadsheetData = null;
         return;
       }
+
+      window._incomingLoadsheetData = data;
 
       // 3.1. Дозаполнение отсутствующих реквизитов рейса из активной смены AeroPlan (если открыт по номеру рейса)
       try {
