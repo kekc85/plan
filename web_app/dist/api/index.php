@@ -3439,6 +3439,229 @@ if (strpos($route, '/admin/aviabit') === 0) {
 }
 
 // ----------------------------------------------------
+// ВСПОМОГАТЕЛЬНЫЙ ПАРСЕР PDF ГРАФИКОВ WBR (DOW / DOI)
+// ----------------------------------------------------
+function parseWbrPdfBinary($pdfBinary, $origName) {
+    // 1. Извлечение потоков FlateDecode
+    $tokens = [];
+    if (preg_match_all('/stream[\r\n]+(.*?)[\r\n]+endstream/s', $pdfBinary, $matches)) {
+        foreach ($matches[1] as $stream) {
+            $decomp = @gzuncompress($stream);
+            if (!$decomp) {
+                $decomp = @gzinflate($stream);
+                if (!$decomp && strlen($stream) > 2) {
+                    $decomp = @gzinflate(substr($stream, 2));
+                }
+            }
+            if ($decomp) {
+                if (preg_match_all('/\(((?:[^()\\\\]|\\\\.)*)\)/s', $decomp, $textMatches)) {
+                    foreach ($textMatches[1] as $tok) {
+                        $tok = str_replace(['\\(', '\\)', '\\\\'], ['(', ')', '\\'], $tok);
+                        $tok = trim($tok);
+                        if ($tok !== '') {
+                            $tokens[] = $tok;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    $fullText = implode(' ', $tokens);
+    $fname = basename($origName);
+
+    // 2. Бортовой номер (5 цифр)
+    $tail = 'UNKNOWN';
+    if (preg_match('/(?:Registration:?\s*(?:RA-?)?|RA-?)(\d{5})/i', $fullText, $m)) {
+        $tail = $m[1];
+    } elseif (preg_match('/(?:RA-?)?(\d{5})/i', $fname, $m)) {
+        $tail = $m[1];
+    }
+
+    // 3. Оператор
+    $isIkar = (stripos($fullText, 'ikar') !== false || stripos($fname, 'dnd') !== false || stripos($fname, 'e190') !== false || strpos($tail, '027') === 0);
+    if (stripos($fname, 'wbr_737-900_ra-7334') !== false) {
+        $isIkar = false;
+    } elseif (stripos($fname, 'dow_doi b739 ra7334') !== false) {
+        $isIkar = true;
+    }
+    $operator = $isIkar ? 'EO' : 'N4';
+
+    // 4. Модель ВС
+    $model = 'UNKNOWN';
+    if (stripos($fname, '737-800') !== false || stripos($fname, '738') !== false || stripos($fullText, '737-800') !== false) {
+        $model = 'B737-800';
+    } elseif (stripos($fname, '737-900') !== false || stripos($fname, '739') !== false) {
+        $model = 'B737-900ER';
+    } elseif (stripos($fname, 'A321-NEO') !== false || stripos($fullText, 'A321-253') !== false) {
+        $model = 'A321-NEO';
+    } elseif (stripos($fname, 'A321') !== false) {
+        $model = 'A321-200';
+    } elseif (stripos($fname, 'A332') !== false || stripos($fullText, 'A330-200') !== false) {
+        $model = 'A330-200';
+    } elseif (stripos($fname, 'A333') !== false || stripos($fullText, 'A330-300') !== false) {
+        $model = 'A330-300';
+    } elseif (stripos($fname, 'E190') !== false || stripos($fullText, '190') !== false) {
+        $model = 'ERJ 190-100';
+    } elseif (stripos($fname, '777-200') !== false || stripos($fname, '772') !== false) {
+        $model = 'B777-200ER';
+    } elseif (stripos($fname, '777-300') !== false || stripos($fname, '773') !== false) {
+        $model = 'B777-300ER';
+    }
+
+    // 5. Ревизия и дата
+    $revision = '';
+    if (preg_match('/Revision\s*(?:No\.?)?:?\s*([^\s]+)/i', $fullText, $m)) {
+        $revision = trim($m[1]);
+    } elseif (preg_match('/rev_?(\d+)/i', $fname, $m)) {
+        $revision = 'Rev ' . $m[1];
+    } elseif (preg_match('/№\s*(\d+(?:\.\d+)?)/u', $fullText, $m)) {
+        $revision = '№' . $m[1];
+    }
+
+    $dateVal = '';
+    if (preg_match('/Date:?\s*([0-9]{1,2}-[A-Za-z]{3}-[0-9]{2,4})/i', $fullText, $m)) {
+        $dateVal = $m[1];
+    } elseif (preg_match('/(20\d{6}|\d{2}[A-Za-z]{3}\d{2,4})/i', $fname, $m)) {
+        $dateVal = $m[1];
+    }
+
+    // 6. Базовый вес и базовый индекс
+    $basicWeight = null;
+    $basicIndex = null;
+    if (preg_match('/(?:Basic Weight|Weight)\s*(\d{5,6})/i', $fullText, $m)) {
+        $basicWeight = (int)$m[1];
+    }
+    if (preg_match('/Index\s*([0-9]+[,\.][0-9]{2})/i', $fullText, $m)) {
+        $basicIndex = (float)str_replace(',', '.', $m[1]);
+    }
+
+    // 7. Fly kit
+    $flyKitMode = 'STANDARD';
+    if (stripos($fname, 'nofak') !== false) {
+        $flyKitMode = 'NO_FAK';
+    } elseif (stripos($fname, 'fak2ake') !== false) {
+        $flyKitMode = 'FAK_2AKE';
+    }
+
+    // 8. Предельные веса (MZFW, MTOW, MLAW)
+    $maxWeightsMap = [
+        '72271' => ['mtow' => 89000, 'mlaw' => 75500, 'mzfw' => 71500],
+        '72273' => ['mtow' => 89000, 'mlaw' => 75500, 'mzfw' => 71500],
+        '72324' => ['mtow' => 89000, 'mlaw' => 77800, 'mzfw' => 73800],
+        '72325' => ['mtow' => 89000, 'mlaw' => 77800, 'mzfw' => 73800],
+        '72326' => ['mtow' => 89000, 'mlaw' => 75500, 'mzfw' => 71500],
+        '73271' => ['mtow' => 89000, 'mlaw' => 75500, 'mzfw' => 71500],
+        '73273' => ['mtow' => 89000, 'mlaw' => 75500, 'mzfw' => 71500],
+        '73324' => ['mtow' => 89000, 'mlaw' => 77800, 'mzfw' => 73800],
+        '73325' => ['mtow' => 89000, 'mlaw' => 77800, 'mzfw' => 73800],
+        '73326' => ['mtow' => 89000, 'mlaw' => 75500, 'mzfw' => 71500],
+        '73270' => ['mtow' => 233000, 'mlaw' => 180000, 'mzfw' => 168000],
+        '73328' => ['mtow' => 233000, 'mlaw' => 182000, 'mzfw' => 170000],
+        '73848' => ['mtow' => 235000, 'mlaw' => 187000, 'mzfw' => 173000],
+        '73849' => ['mtow' => 235000, 'mlaw' => 187000, 'mzfw' => 173000],
+        '73850' => ['mtow' => 235000, 'mlaw' => 187000, 'mzfw' => 173000],
+        '72322' => ['mtow' => 93500, 'mlaw' => 79200, 'mzfw' => 75600],
+        '72323' => ['mtow' => 93500, 'mlaw' => 79200, 'mzfw' => 75600],
+        '73322' => ['mtow' => 93500, 'mlaw' => 79200, 'mzfw' => 75600],
+        '73323' => ['mtow' => 93500, 'mlaw' => 79200, 'mzfw' => 75600],
+        '73269' => ['mtow' => 79015, 'mlaw' => 66360, 'mzfw' => 62731],
+        '73321' => ['mtow' => 79015, 'mlaw' => 66360, 'mzfw' => 62731],
+        '73311' => ['mtow' => 73508, 'mlaw' => 65317, 'mzfw' => 61688],
+        '73312' => ['mtow' => 73508, 'mlaw' => 65317, 'mzfw' => 61688],
+        '73313' => ['mtow' => 79000, 'mlaw' => 66360, 'mzfw' => 62731],
+        '73316' => ['mtow' => 79000, 'mlaw' => 66360, 'mzfw' => 62731],
+        '73317' => ['mtow' => 79000, 'mlaw' => 66360, 'mzfw' => 62731],
+        '73314' => ['mtow' => 79015, 'mlaw' => 66360, 'mzfw' => 62731],
+        '73315' => ['mtow' => 79015, 'mlaw' => 66360, 'mzfw' => 62731],
+        '73318' => ['mtow' => 79000, 'mlaw' => 66360, 'mzfw' => 62731],
+        '73319' => ['mtow' => 78925, 'mlaw' => 65770, 'mzfw' => 62731],
+        '73343' => ['mtow' => 85139, 'mlaw' => 71350, 'mzfw' => 67721],
+        '73344' => ['mtow' => 85139, 'mlaw' => 71350, 'mzfw' => 67721],
+        '73340' => ['mtow' => 294835, 'mlaw' => 208652, 'mzfw' => 195044],
+        '73341' => ['mtow' => 294835, 'mlaw' => 208652, 'mzfw' => 195044],
+        '73342' => ['mtow' => 344548, 'mlaw' => 251290, 'mzfw' => 237682],
+        '73847' => ['mtow' => 344548, 'mlaw' => 251290, 'mzfw' => 237682],
+        '73272' => ['mtow' => 294835, 'mlaw' => 208652, 'mzfw' => 195044],
+        '73347' => ['mtow' => 286670, 'mlaw' => 208652, 'mzfw' => 195044],
+        '02739' => ['mtow' => 50300, 'mlaw' => 43000, 'mzfw' => 40800],
+        '02740' => ['mtow' => 50300, 'mlaw' => 43000, 'mzfw' => 40800],
+        '02741' => ['mtow' => 50300, 'mlaw' => 43000, 'mzfw' => 40800],
+        '02743' => ['mtow' => 50300, 'mlaw' => 43000, 'mzfw' => 40800]
+    ];
+    $mw = $maxWeightsMap[$tail] ?? ['mtow' => null, 'mlaw' => null, 'mzfw' => null];
+
+    // 9. Сборка матрицы кухонь и экипажей
+    $pantryCodes = [];
+    $totalTok = count($tokens);
+    for ($i = 0; $i < $totalTok; $i++) {
+        $t = $tokens[$i];
+        if (in_array($t, ['A', 'B', 'D', 'E', 'F', 'G', 'K'])) {
+            $sub = array_slice($tokens, $i, 7);
+            $allPantry = true;
+            foreach ($sub as $x) {
+                if (!in_array($x, ['A', 'B', 'D', 'E', 'F', 'G', 'K'])) {
+                    $allPantry = false;
+                    break;
+                }
+            }
+            if ($allPantry && count($sub) >= 3) {
+                $pantryCodes = array_values(array_unique($sub));
+                break;
+            }
+        }
+    }
+    if (empty($pantryCodes)) {
+        $pantryCodes = $isIkar ? ['A', 'B', 'E'] : ['A', 'B', 'D', 'E', 'F', 'G', 'K'];
+    }
+
+    $matrix = [];
+    $i = 0;
+    while ($i < $totalTok) {
+        $t = $tokens[$i];
+        if (preg_match('/^\d+\/\d+$/', $t)) {
+            $crew = $t;
+            if (!isset($matrix[$crew])) {
+                $matrix[$crew] = [];
+            }
+            $idx = $i + 1;
+            foreach ($pantryCodes as $p) {
+                if ($idx + 1 < $totalTok) {
+                    $wStr = str_replace([' ', ','], ['', '.'], $tokens[$idx]);
+                    $iStr = str_replace([' ', ','], ['', '.'], $tokens[$idx + 1]);
+                    if (preg_match('/^\d{5,6}$/', $wStr) && preg_match('/^\d+[,\.]\d{1,2}$/', $iStr)) {
+                        $matrix[$crew][$p] = [
+                            'dow' => (int)round((float)$wStr),
+                            'doi' => (float)$iStr
+                        ];
+                        $idx += 2;
+                    }
+                }
+            }
+            $i = max($i + 1, $idx);
+        } else {
+            $i++;
+        }
+    }
+
+    return [
+        'file' => $fname,
+        'operator' => $operator,
+        'tail' => $tail,
+        'model' => $model,
+        'revision' => $revision,
+        'date' => $dateVal,
+        'basic_weight' => $basicWeight,
+        'basic_index' => $basicIndex,
+        'max_weights' => $mw,
+        'fly_kit_mode' => $flyKitMode,
+        'crew_count' => count($matrix),
+        'pantry_codes' => $pantryCodes,
+        'matrix' => $matrix
+    ];
+}
+
+// ----------------------------------------------------
 // ЭНДПОИНТЫ: /admin/fleet_wb/* (Реестр флота W&B и DOW/DOI)
 // ----------------------------------------------------
 if (strpos($route, '/admin/fleet_wb') === 0) {
@@ -3505,6 +3728,69 @@ if (strpos($route, '/admin/fleet_wb') === 0) {
         }
         http_response_code(500);
         echo json_encode(['detail' => 'Файл базы данных флота fleet_wb.json не найден']);
+        exit;
+    }
+
+    if (($route === '/admin/fleet_wb/upload' || $route === '/admin/fleet_wb_upload') && $method === 'POST') {
+        if ($authUser['role'] !== 'admin' && $authUser['role'] !== 'moderator') {
+            http_response_code(403);
+            echo json_encode(['detail' => 'Загрузка центровочных графиков WBR разрешена только Администратору или Модератору']);
+            exit;
+        }
+
+        if (empty($_FILES['file']) || empty($_FILES['file']['tmp_name'])) {
+            http_response_code(400);
+            echo json_encode(['detail' => 'Файл центровочного графика WBR не передан']);
+            exit;
+        }
+
+        $uploadedFile = $_FILES['file'];
+        $origName = $uploadedFile['name'] ?? 'wbr.pdf';
+        if (!preg_match('/\.pdf$/i', $origName)) {
+            http_response_code(400);
+            echo json_encode(['detail' => 'Поддерживаются только PDF-файлы центровочных графиков WBR']);
+            exit;
+        }
+
+        $pdfBinary = @file_get_contents($uploadedFile['tmp_name']);
+        if (!$pdfBinary) {
+            http_response_code(400);
+            echo json_encode(['detail' => 'Не удалось прочитать загруженный файл PDF']);
+            exit;
+        }
+
+        $parsed = parseWbrPdfBinary($pdfBinary, $origName);
+        if (!$parsed || empty($parsed['tail']) || $parsed['tail'] === 'UNKNOWN') {
+            http_response_code(422);
+            echo json_encode(['detail' => 'Не удалось распознать бортовой номер или структуру PDF-графика WBR']);
+            exit;
+        }
+
+        $key = "{$parsed['tail']}_{$parsed['operator']}";
+        if (!empty($parsed['fly_kit_mode']) && in_array($parsed['fly_kit_mode'], ['FAK_2AKE', 'NO_FAK'])) {
+            $key = "{$key}_{$parsed['fly_kit_mode']}";
+        }
+        $parsed['suggested_key'] = $key;
+
+        // Если в активном fleet_wb.json уже есть этот борт, сохраняем его структурные пределы весов, если в новом не заданы
+        if ($activeFleetFile && file_exists($activeFleetFile)) {
+            $existingFleet = @json_decode(file_get_contents($activeFleetFile), true);
+            if (is_array($existingFleet) && isset($existingFleet[$key]['max_weights'])) {
+                foreach (['mtow', 'mlaw', 'mzfw'] as $wKey) {
+                    if (empty($parsed['max_weights'][$wKey]) && !empty($existingFleet[$key]['max_weights'][$wKey])) {
+                        $parsed['max_weights'][$wKey] = $existingFleet[$key]['max_weights'][$wKey];
+                    }
+                }
+            }
+        }
+
+        logSystemEvent('INFO', 'system', "Распознан центровочный график WBR для RA-{$parsed['tail']} ({$parsed['operator']}, {$parsed['revision']}) из файла $origName", null, $authUser['id'], $authUser['username'], getClientIp());
+
+        echo json_encode([
+            'success' => true,
+            'key' => $key,
+            'parsed' => $parsed
+        ]);
         exit;
     }
 }

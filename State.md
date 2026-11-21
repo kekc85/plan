@@ -599,3 +599,6 @@
     - В api_server.py и parser.py внедрена поддержка отдельных параметров NW/IK и эндпоинт 2FA;
     - В AdminModal.jsx вкладка «Шлюз AviaBit» разделена на 2 карточки авиакомпаний с независимой проверкой, отображением статуса куки и формой ввода кода подтверждения 2FA;
     - Собрана фронтенд-часть (Vite build) и запушена в ветку origin/plan_2 для автодеплоя на Beget.
+  * Реализован серверный парсер и API эндпоинт /admin/fleet_wb/upload для загрузки центровочных графиков WBR (PDF) на Beget:
+    - В web_app/public/api/index.php и web_app/dist/api/index.php добавлена функция parseWbrPdfBinary для извлечения текстовых потоков FlateDecode (zlib), определения ВС, ревизии, даты, базовых весов и сборки центровочных матриц DOW/DOI;
+    - Добавлен эндпоинт POST /admin/fleet_wb/upload для валидации и предпросмотра графиков в FleetWbManager.
