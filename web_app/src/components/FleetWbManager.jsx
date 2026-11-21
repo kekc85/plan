@@ -27,6 +27,10 @@ export default function FleetWbManager() {
   const [simCrew, setSimCrew] = useState('');
   const [simPantry, setSimPantry] = useState('');
 
+  // Режимы учета багажа экипажа и аптечки (Fly-Away Kit) для графиков с подматрицами (Ikar B739 / E190)
+  const [crewBagMode, setCrewBagMode] = useState('included'); // 'included' | 'excluded'
+  const [fakMode, setFakMode] = useState('included');         // 'included' | 'excluded'
+
   // Редактирование максимальных весов (MZFW, MTOW, MLAW)
   const [isEditingWeights, setIsEditingWeights] = useState(false);
   const [editMzfw, setEditMzfw] = useState('');
@@ -122,19 +126,43 @@ export default function FleetWbManager() {
   // Текущий выбранный самолёт
   const currentAircraft = fleet[selectedKey] || null;
 
-  // Инициализация симулятора при переключении борта
-  useEffect(() => {
-    if (currentAircraft && currentAircraft.matrix) {
-      const crewKeys = Object.keys(currentAircraft.matrix);
-      const defaultCrew = crewKeys.includes('2/5') ? '2/5' : (crewKeys.includes('2/2') ? '2/2' : crewKeys[0] || '');
-      setSimCrew(defaultCrew);
+  // Ключ подматрицы (багаж экипажа x аптечка FAK)
+  const activeSubKey = `bag_${crewBagMode === 'included' ? 'inc' : 'exc'}_fak_${fakMode === 'included' ? 'inc' : 'exc'}`;
 
-      const pantryList = defaultCrew && currentAircraft.matrix[defaultCrew]
-        ? Object.keys(currentAircraft.matrix[defaultCrew])
+  // Активная матрица DOW/DOI с учётом выбранных тумблеров (или стандартная)
+  const activeMatrix = useMemo(() => {
+    if (!currentAircraft) return {};
+    if (currentAircraft.sub_matrices && currentAircraft.sub_matrices[activeSubKey]) {
+      return currentAircraft.sub_matrices[activeSubKey];
+    }
+    return currentAircraft.matrix || {};
+  }, [currentAircraft, activeSubKey]);
+
+  // Сброс тумблеров при переключении борта
+  useEffect(() => {
+    setCrewBagMode('included');
+    setFakMode('included');
+  }, [selectedKey]);
+
+  // Инициализация симулятора при переключении борта или матрицы
+  useEffect(() => {
+    if (currentAircraft && activeMatrix) {
+      const crewKeys = Object.keys(activeMatrix);
+      if (crewKeys.length > 0) {
+        if (!simCrew || !crewKeys.includes(simCrew)) {
+          const defaultCrew = crewKeys.includes('2/5') ? '2/5' : (crewKeys.includes('2/2') ? '2/2' : crewKeys[0] || '');
+          setSimCrew(defaultCrew);
+        }
+      }
+
+      const pantryList = simCrew && activeMatrix[simCrew]
+        ? Object.keys(activeMatrix[simCrew])
         : (currentAircraft.pantry_codes || []);
       
-      const defaultPantry = pantryList.includes('E') ? 'E' : (pantryList[0] || '');
-      setSimPantry(defaultPantry);
+      if (!simPantry || !pantryList.includes(simPantry)) {
+        const defaultPantry = pantryList.includes('E') ? 'E' : (pantryList[0] || '');
+        setSimPantry(defaultPantry);
+      }
 
       // Инициализация максимальных весов
       const mw = currentAircraft.max_weights || {};
@@ -143,15 +171,15 @@ export default function FleetWbManager() {
       setEditMlaw(mw.mlaw ? String(mw.mlaw) : '');
       setIsEditingWeights(false);
     }
-  }, [selectedKey, currentAircraft]);
+  }, [selectedKey, currentAircraft, activeMatrix, simCrew, simPantry]);
 
   // Рассчитанные значения для симулятора
   const simResult = useMemo(() => {
-    if (!currentAircraft || !currentAircraft.matrix || !simCrew || !simPantry) return null;
-    const crewData = currentAircraft.matrix[simCrew];
+    if (!currentAircraft || !activeMatrix || !simCrew || !simPantry) return null;
+    const crewData = activeMatrix[simCrew];
     if (!crewData) return null;
     return crewData[simPantry] || null;
-  }, [currentAircraft, simCrew, simPantry]);
+  }, [currentAircraft, activeMatrix, simCrew, simPantry]);
 
   // Сохранение отредактированных весов
   const handleSaveWeights = async () => {
@@ -267,7 +295,7 @@ export default function FleetWbManager() {
   // --- РУЧНОЕ РЕДАКТИРОВАНИЕ ЦЕНТРОВОЧНОЙ МАТРИЦЫ WBR ---
   const handleStartEditMatrix = () => {
     if (!currentAircraft) return;
-    setEditMatrix(JSON.parse(JSON.stringify(currentAircraft.matrix || {})));
+    setEditMatrix(JSON.parse(JSON.stringify(activeMatrix || {})));
     setEditRevision(currentAircraft.revision || '');
     setEditDate(currentAircraft.date || '');
     setEditBasicWeight(currentAircraft.basic_weight ? String(currentAircraft.basic_weight) : '');
@@ -330,9 +358,22 @@ export default function FleetWbManager() {
         revision: editRevision.trim() || currentAircraft.revision,
         date: editDate.trim() || currentAircraft.date,
         basic_weight: editBasicWeight ? parseInt(editBasicWeight.replace(/\D/g, ''), 10) : currentAircraft.basic_weight,
-        basic_index: editBasicIndex ? parseFloat(editBasicIndex.replace(',', '.')) : currentAircraft.basic_index,
-        matrix: cleanMatrix
+        basic_index: editBasicIndex ? parseFloat(editBasicIndex.replace(',', '.')) : currentAircraft.basic_index
       };
+
+      if (currentAircraft.sub_matrices) {
+        const updatedSub = {
+          ...currentAircraft.sub_matrices,
+          [activeSubKey]: cleanMatrix
+        };
+        updatedAircraft.sub_matrices = updatedSub;
+        // Если правим стандартную подматрицу (багаж вкл + аптечка вкл) — обновляем и базовую matrix
+        if (activeSubKey === 'bag_inc_fak_inc') {
+          updatedAircraft.matrix = cleanMatrix;
+        }
+      } else {
+        updatedAircraft.matrix = cleanMatrix;
+      }
 
       const updatedFleet = { ...fleet, [selectedKey]: updatedAircraft };
       setFleet(updatedFleet);
@@ -723,6 +764,83 @@ export default function FleetWbManager() {
                 </div>
               </div>
 
+              {/* КОНФИГУРАЦИОННЫЕ ТУМБЛЕРЫ (Багаж экипажа / Аптечка FAK) для графиков Ikar */}
+              {(currentAircraft.has_crew_bag_modes || currentAircraft.sub_matrices) && (
+                <div className="bg-slate-50 dark:bg-slate-850/90 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                    <div>
+                      <div className="text-xs font-black text-slate-800 dark:text-slate-200">
+                        Вариант центровочного графика (DOW / DOI)
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        Официальный документ содержит 4 варианта: переключайте тумблеры для моментального перерасчета
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {/* Тумблер Багаж экипажа */}
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-[11px] font-bold text-slate-500">Багаж экипажа:</span>
+                      <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setCrewBagMode('included')}
+                          className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                            crewBagMode === 'included'
+                              ? 'bg-sky-500 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                          }`}
+                        >
+                          Включен (Included)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCrewBagMode('excluded')}
+                          className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                            crewBagMode === 'excluded'
+                              ? 'bg-amber-500 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                          }`}
+                        >
+                          Исключен (Excluded)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Тумблер Аптечка (FAK) */}
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-[11px] font-bold text-slate-500">Аптечка (FAK):</span>
+                      <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setFakMode('included')}
+                          className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                            fakMode === 'included'
+                              ? 'bg-purple-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                          }`}
+                        >
+                          В комплекте (Inc FAK)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFakMode('excluded')}
+                          className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                            fakMode === 'excluded'
+                              ? 'bg-slate-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                          }`}
+                        >
+                          Без аптечки (Exc FAK)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ИНТЕРАКТИВНЫЙ СИМУЛЯТОР / КАЛЬКУЛЯТОР W&B */}
               <div className="bg-sky-50/70 dark:bg-sky-950/30 p-3 rounded-xl border border-sky-200 dark:border-sky-800/60 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -748,7 +866,7 @@ export default function FleetWbManager() {
                       onChange={(e) => setSimCrew(e.target.value)}
                       className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-sky-300 dark:border-sky-700 rounded-lg text-xs font-bold font-mono text-slate-900 dark:text-slate-100 focus:outline-none"
                     >
-                      {currentAircraft.matrix && Object.keys(currentAircraft.matrix).map(crew => (
+                      {activeMatrix && Object.keys(activeMatrix).map(crew => (
                         <option key={crew} value={crew}>{crew}</option>
                       ))}
                     </select>
@@ -762,7 +880,7 @@ export default function FleetWbManager() {
                       onChange={(e) => setSimPantry(e.target.value)}
                       className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-sky-300 dark:border-sky-700 rounded-lg text-xs font-bold font-mono text-slate-900 dark:text-slate-100 focus:outline-none"
                     >
-                      {simCrew && currentAircraft.matrix?.[simCrew] && Object.keys(currentAircraft.matrix[simCrew]).map(pantry => (
+                      {simCrew && activeMatrix?.[simCrew] && Object.keys(activeMatrix[simCrew]).map(pantry => (
                         <option key={pantry} value={pantry}>Pantry {pantry}</option>
                       ))}
                     </select>
@@ -819,7 +937,7 @@ export default function FleetWbManager() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono text-[11px]">
-                      {currentAircraft.matrix && Object.entries(currentAircraft.matrix).map(([crewCode, pantries]) => (
+                      {activeMatrix && Object.entries(activeMatrix).map(([crewCode, pantries]) => (
                         <tr key={crewCode} className="hover:bg-slate-50/80 dark:hover:bg-slate-850/50 transition-colors">
                           <td className="px-3 py-1.5 font-bold text-slate-800 dark:text-slate-200 bg-slate-50/50 dark:bg-slate-900/50 sticky left-0 z-10 whitespace-nowrap">
                             {crewCode}
@@ -1057,6 +1175,78 @@ export default function FleetWbManager() {
                   Вносите числовые изменения в ячейки матрицы ниже
                 </div>
               )}
+
+              {/* Тумблеры вариантов матрицы в модальном окне */}
+              {(currentAircraft.has_crew_bag_modes || currentAircraft.sub_matrices) && (
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
+                    <Sliders className="w-3.5 h-3.5 text-sky-500" />
+                    <span>Вариант таблицы WBR:</span>
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-1 text-xs">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold">Багаж экипажа:</span>
+                      <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-[11px]">
+                        <button
+                          type="button"
+                          disabled={isEditingMatrix}
+                          onClick={() => setCrewBagMode('included')}
+                          className={`px-2 py-0.5 rounded font-bold transition-all ${
+                            crewBagMode === 'included'
+                              ? 'bg-sky-500 text-white shadow-xs'
+                              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          } ${isEditingMatrix ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          Включен
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isEditingMatrix}
+                          onClick={() => setCrewBagMode('excluded')}
+                          className={`px-2 py-0.5 rounded font-bold transition-all ${
+                            crewBagMode === 'excluded'
+                              ? 'bg-amber-500 text-white shadow-xs'
+                              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          } ${isEditingMatrix ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          Исключен
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-xs">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold">Аптечка:</span>
+                      <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-[11px]">
+                        <button
+                          type="button"
+                          disabled={isEditingMatrix}
+                          onClick={() => setFakMode('included')}
+                          className={`px-2 py-0.5 rounded font-bold transition-all ${
+                            fakMode === 'included'
+                              ? 'bg-purple-600 text-white shadow-xs'
+                              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          } ${isEditingMatrix ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          С аптечкой
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isEditingMatrix}
+                          onClick={() => setFakMode('excluded')}
+                          className={`px-2 py-0.5 rounded font-bold transition-all ${
+                            fakMode === 'excluded'
+                              ? 'bg-slate-600 text-white shadow-xs'
+                              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          } ${isEditingMatrix ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          Без аптечки
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Просторная полная таблица всей матрицы W&B */}
@@ -1076,7 +1266,7 @@ export default function FleetWbManager() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                  {currentAircraft.matrix && Object.entries(currentAircraft.matrix).map(([crewCode, pantries]) => (
+                  {activeMatrix && Object.entries(activeMatrix).map(([crewCode, pantries]) => (
                     <tr key={crewCode} className="hover:bg-sky-50/50 dark:hover:bg-sky-950/20 transition-colors">
                       <td className="px-4 py-2 font-black text-slate-900 dark:text-slate-100 bg-slate-100/90 dark:bg-slate-850 sticky left-0 z-10 border-r border-slate-200 dark:border-slate-800 whitespace-nowrap">
                         {crewCode}

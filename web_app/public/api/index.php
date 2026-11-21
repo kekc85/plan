@@ -3781,11 +3781,18 @@ if (strpos($route, '/admin/fleet_wb') === 0) {
         // Если в активном fleet_wb.json уже есть этот борт, сохраняем его структурные пределы весов, если в новом не заданы
         if ($activeFleetFile && file_exists($activeFleetFile)) {
             $existingFleet = @json_decode(file_get_contents($activeFleetFile), true);
-            if (is_array($existingFleet) && isset($existingFleet[$key]['max_weights'])) {
-                foreach (['mtow', 'mlaw', 'mzfw'] as $wKey) {
-                    if (empty($parsed['max_weights'][$wKey]) && !empty($existingFleet[$key]['max_weights'][$wKey])) {
-                        $parsed['max_weights'][$wKey] = $existingFleet[$key]['max_weights'][$wKey];
+            if (is_array($existingFleet) && isset($existingFleet[$key])) {
+                if (isset($existingFleet[$key]['max_weights'])) {
+                    foreach (['mtow', 'mlaw', 'mzfw'] as $wKey) {
+                        if (empty($parsed['max_weights'][$wKey]) && !empty($existingFleet[$key]['max_weights'][$wKey])) {
+                            $parsed['max_weights'][$wKey] = $existingFleet[$key]['max_weights'][$wKey];
+                        }
                     }
+                }
+                if (!empty($existingFleet[$key]['sub_matrices']) && empty($parsed['sub_matrices'])) {
+                    $parsed['sub_matrices'] = $existingFleet[$key]['sub_matrices'];
+                    $parsed['has_crew_bag_modes'] = true;
+                    $parsed['has_fak_modes'] = true;
                 }
             }
         }

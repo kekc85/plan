@@ -348,7 +348,7 @@ def parse_wbr_file(filepath):
                         r_idx += 3
 
             else:
-                # B739 и E190: официальный стандарт - левый блок CREW BAGGAGE INCLUDED -> Including Fly-Away Kit (кухни A, B, E)
+                # B739 и E190: 4 квадранта (CREW BAGGAGE INCLUDED / EXCLUDED x Including / Excluding Fly-Away Kit)
                 pantry_codes_list = ['A', 'B', 'E']
                 tbl = tables[1]
                 header_row_idx = -1
@@ -358,9 +358,15 @@ def parse_wbr_file(filepath):
                         header_row_idx = r_idx
                         break
 
-                if header_row_idx != -1:
-                    col_map = {'A': 1, 'B': 2, 'E': 3}
+                quad_maps = {
+                    "bag_inc_fak_inc": {'A': 1, 'B': 2, 'E': 3},
+                    "bag_inc_fak_exc": {'A': 4, 'B': 5, 'E': 6},
+                    "bag_exc_fak_inc": {'A': 8, 'B': 9, 'E': 10},
+                    "bag_exc_fak_exc": {'A': 11, 'B': 12, 'E': 13}
+                }
+                sub_matrices = {q: {} for q in quad_maps}
 
+                if header_row_idx != -1:
                     r_idx = header_row_idx + 1
                     while r_idx < len(tbl):
                         row_wt = tbl[r_idx]
@@ -375,21 +381,25 @@ def parse_wbr_file(filepath):
                             r_idx += 1
                             continue
 
-                        matrix[crew_str] = {}
-                        for p_code, c_idx in col_map.items():
-                            cell_wt = row_wt[c_idx] if c_idx < len(row_wt) else None
-                            cell_idx = row_idx[c_idx] if row_idx and c_idx < len(row_idx) else None
+                        for q_name, col_map in quad_maps.items():
+                            sub_matrices[q_name][crew_str] = {}
+                            for p_code, c_idx in col_map.items():
+                                c_wt = row_wt[c_idx] if c_idx < len(row_wt) else None
+                                c_id = row_idx[c_idx] if row_idx and c_idx < len(row_idx) else None
 
-                            dow_val = parse_cell_num(cell_wt)
-                            doi_val = parse_cell_num(cell_idx)
+                                dow_val = parse_cell_num(c_wt)
+                                doi_val = parse_cell_num(c_id)
 
-                            if dow_val is not None:
-                                matrix[crew_str][p_code] = {
-                                    "dow": dow_val,
-                                    "doi": doi_val
-                                }
+                                if dow_val is not None:
+                                    sub_matrices[q_name][crew_str][p_code] = {
+                                        "dow": dow_val,
+                                        "doi": doi_val
+                                    }
 
                         r_idx += 3
+
+                # Основная матрица по умолчанию: багаж включен + аптечка включена
+                matrix = sub_matrices["bag_inc_fak_inc"]
 
         mw = MAX_WEIGHTS_MAP.get(tail, {"mtow": None, "mlaw": None, "mzfw": None})
 
@@ -406,7 +416,10 @@ def parse_wbr_file(filepath):
             "fly_kit_mode": fly_kit_mode,
             "crew_count": len(matrix),
             "pantry_codes": pantry_codes_list if pantry_codes_list else (list(next(iter(matrix.values())).keys()) if matrix else []),
-            "matrix": matrix
+            "matrix": matrix,
+            "sub_matrices": sub_matrices if 'sub_matrices' in locals() and sub_matrices else None,
+            "has_crew_bag_modes": bool('sub_matrices' in locals() and sub_matrices),
+            "has_fak_modes": bool('sub_matrices' in locals() and sub_matrices)
         }
 
 
@@ -470,20 +483,21 @@ def main():
             )
         """)
 
-        # Безопасная миграция колонок предельных весов если таблица уже существовала
+        # Безопасная миграция колонок если таблица уже существовала
         c.execute("PRAGMA table_info(plan_fleet_wb)")
         existing_cols = [row[1] for row in c.fetchall()]
-        for col, col_type in [('mtow', 'INTEGER'), ('mlaw', 'INTEGER'), ('mzfw', 'INTEGER')]:
+        for col, col_type in [('mtow', 'INTEGER'), ('mlaw', 'INTEGER'), ('mzfw', 'INTEGER'), ('sub_matrices_json', 'TEXT')]:
             if col not in existing_cols:
                 c.execute(f"ALTER TABLE plan_fleet_wb ADD COLUMN {col} {col_type}")
 
         for key, item in fleet_dict.items():
             p_str = ','.join(item['pantry_codes'])
             mw = item.get('max_weights', {})
+            sub_m_json = json.dumps(item.get('sub_matrices'), ensure_ascii=False) if item.get('sub_matrices') else None
             c.execute("""
                 INSERT OR REPLACE INTO plan_fleet_wb
-                (config_key, tail, operator, model, revision, rev_date, basic_weight, basic_index, mtow, mlaw, mzfw, fly_kit_mode, pantry_codes, matrix_json, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                (config_key, tail, operator, model, revision, rev_date, basic_weight, basic_index, mtow, mlaw, mzfw, fly_kit_mode, pantry_codes, matrix_json, sub_matrices_json, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
             """, (
                 key,
                 item['tail'],
@@ -498,7 +512,8 @@ def main():
                 mw.get('mzfw'),
                 item['fly_kit_mode'],
                 p_str,
-                json.dumps(item['matrix'], ensure_ascii=False)
+                json.dumps(item['matrix'], ensure_ascii=False),
+                sub_m_json
             ))
         conn.commit()
         conn.close()
