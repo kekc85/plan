@@ -498,3 +498,17 @@ export function detectPlaneType(flight = {}) {
   }
   return '';
 }
+
+/**
+ * Определение режима интегрированного комплекса (контуры plan_2 / plan_test с переходами в AeroBag и Loadsheet).
+ * Основной контур (/plan/) работает как автономное приложение AeroPlan.
+ */
+export function isIntegratedSuiteContour() {
+  return (
+    typeof window !== 'undefined' &&
+    (window.location.pathname.includes('plan_2') ||
+     window.location.pathname.includes('plan_test') ||
+     String(import.meta.env?.BASE_URL || '').includes('plan_2') ||
+     String(import.meta.env?.BASE_URL || '').includes('plan_test'))
+  );
+}

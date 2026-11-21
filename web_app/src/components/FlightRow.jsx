@@ -15,7 +15,8 @@ import {
   isFlightReleaseOverdue,
   isRenDeparture,
   normalizePlaneType,
-  detectPlaneType
+  detectPlaneType,
+  isIntegratedSuiteContour
 } from '../utils/validators';
 import { getSafeUnreadChanges, TRACKED_AVIABIT_FIELDS, formatFlightChangesTooltip } from '../utils/deltaSync';
 import { lookupFleetWb, getAircraftMtow } from '../utils/fleetWbLookup';
@@ -58,6 +59,8 @@ function FlightRow({
   onOpenHistory,
   timeMode = 'MSK'
 }) {
+
+  const isIntegratedSuite = isIntegratedSuiteContour();
 
   // Временные поля рейса с учетом активного часового пояса (МСК или UTC)
   const displayTimes = getDisplayFlightTimes(flight, timeMode);
@@ -756,34 +759,38 @@ function FlightRow({
               <Check className="w-2.5 h-2.5 stroke-[3] text-amber-700 dark:text-amber-400 shrink-0" />
             </button>
           )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenAeroBag();
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="inline-flex items-center justify-center gap-1 bg-sky-500/10 hover:bg-sky-500/20 dark:bg-sky-950/60 dark:hover:bg-sky-900/80 text-sky-700 dark:text-sky-300 border border-sky-400/50 hover:border-sky-400 font-mono text-[9px] font-black px-1 py-0.5 rounded shadow-2xs hover:shadow-xs transition-all active:scale-95 cursor-pointer shrink-0 w-[58px]"
-            title="Открыть расчет коммерческой загрузки в AeroBag Predictor"
-          >
-            <Luggage className="w-2.5 h-2.5 text-sky-600 dark:text-sky-400 shrink-0" />
-            <span className="tracking-tighter">AeroBag</span>
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenLoadsheet();
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="inline-flex items-center justify-center gap-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 text-emerald-700 dark:text-emerald-300 border border-emerald-400/50 hover:border-emerald-400 font-mono text-[9px] font-black px-1 py-0.5 rounded shadow-2xs hover:shadow-xs transition-all active:scale-95 cursor-pointer shrink-0 w-[58px]"
-            title="Открыть центровочный график W&B Loadsheet"
-          >
-            <FileText className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="tracking-tighter">Loadsheet</span>
-          </button>
+          {isIntegratedSuite && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenAeroBag();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="inline-flex items-center justify-center gap-1 bg-sky-500/10 hover:bg-sky-500/20 dark:bg-sky-950/60 dark:hover:bg-sky-900/80 text-sky-700 dark:text-sky-300 border border-sky-400/50 hover:border-sky-400 font-mono text-[9px] font-black px-1 py-0.5 rounded shadow-2xs hover:shadow-xs transition-all active:scale-95 cursor-pointer shrink-0 w-[58px]"
+                title="Открыть расчет коммерческой загрузки в AeroBag Predictor"
+              >
+                <Luggage className="w-2.5 h-2.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                <span className="tracking-tighter">AeroBag</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenLoadsheet();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="inline-flex items-center justify-center gap-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 text-emerald-700 dark:text-emerald-300 border border-emerald-400/50 hover:border-emerald-400 font-mono text-[9px] font-black px-1 py-0.5 rounded shadow-2xs hover:shadow-xs transition-all active:scale-95 cursor-pointer shrink-0 w-[58px]"
+                title="Открыть центровочный график W&B Loadsheet"
+              >
+                <FileText className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="tracking-tighter">Loadsheet</span>
+              </button>
+            </>
+          )}
         </div>
       </td>
 

@@ -1,3 +1,8 @@
+- 2026-11-21: Автономный режим для основного AeroPlan (`/plan/`, ветка `main`) без кнопок и разделов перехода к AeroBag и Loadsheet (Вариант 1):
+  - В `web_app/src/utils/validators.js` добавлен общий хелпер `isIntegratedSuiteContour()` (`true` только для контуров `plan_2` и `plan_test`).
+  - В `web_app/src/components/Header.jsx` и `web_app/src/components/FlightRow.jsx` кнопки быстрого перехода `AeroBag` и `Loadsheet` скрыты для `/plan/`, оставлены активными в `plan_2`.
+  - В `web_app/src/components/DownloadManualModal.jsx` при `!isIntegratedSuite` рендерится автономное модальное окно руководства исключительно по AeroPlan без вкладок и упоминаний AeroBag и Loadsheet.
+  - В `/plan/` сохранены все доработки: подкачка продаж AviaBit, строгий фильтр SVO, авторасчет DOW/DOI/MTOW и 2FA AviaBit.
 - 2026-11-21: Замена кнопки «↩ Назад» в Loadsheet (`loadsheet/index.html`) на две постоянные кнопки навигации («📋 AeroPlan» и «🧳 AeroBag»):
   - Удалена скрытая кнопка `#btnBackToOrigin`; в `.top-toolbar` добавлены постоянные `#btnGoToAeroPlan` (`handleNavigateToAeroPlan()`) и `#btnGoToAeroBag` (`handleNavigateToAeroBag()`).
   - Реализовано определение контура (`isLoadsheetTestContour`, `resolveAeroPlanTargetUrl`), в т.ч. извлечение вложенного `return_url` при переходе AeroPlan -> AeroBag -> Loadsheet.

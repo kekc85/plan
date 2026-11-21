@@ -25,7 +25,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
-import { formatValidDateInterval } from '../utils/validators';
+import { formatValidDateInterval, isIntegratedSuiteContour } from '../utils/validators';
 
 // Статические форматтеры времени Европа/Москва (создаются один раз, предотвращая утечки памяти)
 const mskDateFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -297,6 +297,8 @@ export default function Header({
   setIsMobileMenuCollapsed
 }) {
 
+  const isIntegratedSuite = isIntegratedSuiteContour();
+
   const [internalTimeMode, setInternalTimeMode] = useState(() => {
     try {
       return localStorage.getItem('aeroplan_time_mode') || 'MSK';
@@ -532,58 +534,62 @@ export default function Header({
               />
             </div>
 
-            {/* Кнопка быстрого перехода в AeroBag (без выбора рейса) */}
-            <button
-              type="button"
-              onClick={() => {
-                const isLocal = typeof window !== 'undefined' && 
-                               (window.location.hostname === 'localhost' || 
-                                window.location.hostname === '127.0.0.1');
-                const isPlan2 = window.location.href.includes('plan_2');
-                const isTest = !isPlan2 && (window.location.href.includes('plan_test') || isLocal);
-                
-                let targetAeroBagUrl = (isPlan2 || isTest)
-                  ? 'https://boostandgo.ru/aerobag-test/' 
-                  : 'https://boostandgo.ru/aerobag/';
-                if (isLocal) {
-                  targetAeroBagUrl = `${window.location.origin}/aerobag/`;
-                }
-                const params = new URLSearchParams();
-                params.set('return_url', window.location.href);
-                window.location.href = `${targetAeroBagUrl}?${params.toString()}`;
-              }}
-              className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer border border-cyan-400/40 shrink-0"
-              title="Открыть калькулятор AeroBag Predictor (без привязки к рейсу)"
-            >
-              <span className="text-sm leading-none">🧳</span>
-              <span className="tracking-tight font-sans">AeroBag</span>
-            </button>
+            {isIntegratedSuite && (
+              <>
+                {/* Кнопка быстрого перехода в AeroBag (без выбора рейса) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isLocal = typeof window !== 'undefined' && 
+                                   (window.location.hostname === 'localhost' || 
+                                    window.location.hostname === '127.0.0.1');
+                    const isPlan2 = window.location.href.includes('plan_2');
+                    const isTest = !isPlan2 && (window.location.href.includes('plan_test') || isLocal);
+                    
+                    let targetAeroBagUrl = (isPlan2 || isTest)
+                      ? 'https://boostandgo.ru/aerobag-test/' 
+                      : 'https://boostandgo.ru/aerobag/';
+                    if (isLocal) {
+                      targetAeroBagUrl = `${window.location.origin}/aerobag/`;
+                    }
+                    const params = new URLSearchParams();
+                    params.set('return_url', window.location.href);
+                    window.location.href = `${targetAeroBagUrl}?${params.toString()}`;
+                  }}
+                  className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer border border-cyan-400/40 shrink-0"
+                  title="Открыть калькулятор AeroBag Predictor (без привязки к рейсу)"
+                >
+                  <span className="text-sm leading-none">🧳</span>
+                  <span className="tracking-tight font-sans">AeroBag</span>
+                </button>
 
-            {/* Кнопка быстрого перехода в W&B Loadsheet (без выбора рейса) */}
-            <button
-              type="button"
-              onClick={() => {
-                const isLocal = typeof window !== 'undefined' && 
-                               (window.location.hostname === 'localhost' || 
-                                window.location.hostname === '127.0.0.1');
-                const isPlan2 = window.location.href.includes('plan_2');
-                const isTest = !isPlan2 && (window.location.href.includes('plan_test') || isLocal);
-                let targetLoadsheetUrl = isTest 
-                  ? 'https://boostandgo.ru/loadsheet_test/' 
-                  : 'https://boostandgo.ru/loadsheet/';
-                if (isLocal) {
-                  targetLoadsheetUrl = `${window.location.origin}/loadsheet/`;
-                }
-                const params = new URLSearchParams();
-                params.set('return_url', window.location.href);
-                window.location.href = `${targetLoadsheetUrl}?${params.toString()}`;
-              }}
-              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer border border-emerald-400/40 shrink-0"
-              title="Открыть центровочный график W&B Loadsheet (без привязки к рейсу)"
-            >
-              <span className="text-sm leading-none">📄</span>
-              <span className="tracking-tight font-sans">Loadsheet</span>
-            </button>
+                {/* Кнопка быстрого перехода в W&B Loadsheet (без выбора рейса) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isLocal = typeof window !== 'undefined' && 
+                                   (window.location.hostname === 'localhost' || 
+                                    window.location.hostname === '127.0.0.1');
+                    const isPlan2 = window.location.href.includes('plan_2');
+                    const isTest = !isPlan2 && (window.location.href.includes('plan_test') || isLocal);
+                    let targetLoadsheetUrl = isTest 
+                      ? 'https://boostandgo.ru/loadsheet_test/' 
+                      : 'https://boostandgo.ru/loadsheet/';
+                    if (isLocal) {
+                      targetLoadsheetUrl = `${window.location.origin}/loadsheet/`;
+                    }
+                    const params = new URLSearchParams();
+                    params.set('return_url', window.location.href);
+                    window.location.href = `${targetLoadsheetUrl}?${params.toString()}`;
+                  }}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer border border-emerald-400/40 shrink-0"
+                  title="Открыть центровочный график W&B Loadsheet (без привязки к рейсу)"
+                >
+                  <span className="text-sm leading-none">📄</span>
+                  <span className="tracking-tight font-sans">Loadsheet</span>
+                </button>
+              </>
+            )}
           </div>
 
           {/* Action Buttons Toolbar */}
