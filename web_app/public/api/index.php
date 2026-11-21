@@ -1903,6 +1903,10 @@ function getAviaBitCookie($name, $defaultCookie) {
             return $data['connect.sid'];
         }
     }
+    $dbCookie = getSystemSetting("aviabit_cookie_{$name}", '');
+    if (!empty($dbCookie)) {
+        return $dbCookie;
+    }
     return $defaultCookie;
 }
 
@@ -2021,6 +2025,220 @@ function resetAviaBitSessions() {
             @unlink($sf);
         }
     }
+}
+
+/**
+ * Пакетное выполнение HTTP GET-запросов к AviaBit через curl_multi с ограничением пула.
+ * Возвращает ассоциативный массив результатов вида ['ok' => [key => json], 'failed' => [req...]].
+ */
+function execCurlMultiBatch($requests, $batchSize = 10, $timeoutSec = 12) {
+    $ok = [];
+    $failed = [];
+    if (empty($requests)) {
+        return ['ok' => $ok, 'failed' => $failed];
+    }
+
+    $chunks = array_chunk($requests, max(1, (int)$batchSize));
+    foreach ($chunks as $chunk) {
+        $mh = curl_multi_init();
+        $handles = [];
+        $reqByKey = [];
+
+        foreach ($chunk as $req) {
+            $key = $req['key'];
+            $baseUrl = $req['baseUrl'];
+            $cookieVal = $req['cookie'];
+            $reqByKey[$key] = $req;
+
+            $ch = curl_init($req['url']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $timeoutSec);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Origin: $baseUrl",
+                "Referer: $baseUrl/plan-flight",
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept: application/json, text/plain, */*',
+                "Cookie: connect.sid=$cookieVal"
+            ]);
+            curl_multi_add_handle($mh, $ch);
+            $handles[$key] = $ch;
+        }
+
+        $running = null;
+        do {
+            curl_multi_exec($mh, $running);
+            if ($running > 0) {
+                curl_multi_select($mh, 0.2);
+            }
+        } while ($running > 0);
+
+        foreach ($handles as $key => $ch) {
+            $resp = curl_multi_getcontent($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $parsed = ($code === 200 && $resp !== false && $resp !== '') ? json_decode($resp, true) : null;
+            if ($code === 200 && is_array($parsed)) {
+                $ok[$key] = $parsed;
+            } else {
+                $failed[] = $reqByKey[$key];
+            }
+            curl_multi_remove_handle($mh, $ch);
+            curl_close($ch);
+        }
+        curl_multi_close($mh);
+    }
+
+    return ['ok' => $ok, 'failed' => $failed];
+}
+
+/**
+ * Разбор данных о пассажирах из блоков load и preliminary.
+ */
+function parseAviaBitPaxData($preliminaryList, $loadList, $fallbackPaxRaw = '') {
+    $paxRaw = trim((string)$fallbackPaxRaw);
+    $layout = '';
+
+    if (!empty($preliminaryList) && is_array($preliminaryList)) {
+        $leg0 = $preliminaryList[0] ?? [];
+        if (is_array($leg0)) {
+            $preInfo = trim((string)($leg0['prePassengerInfo'] ?? ''));
+            if ($preInfo !== '') {
+                $paxRaw = $preInfo;
+            }
+            $layout = trim((string)($leg0['prePlaneComponovkaInfo'] ?? ''));
+        }
+    }
+
+    $paxCount = '';
+    $paxM = '';
+    $paxF = '';
+    $paxCh = '';
+    $paxInf = '';
+
+    if (!empty($loadList) && is_array($loadList)) {
+        $ld0 = $loadList[0] ?? [];
+        if (is_array($ld0)) {
+            $m = $ld0['M'] ?? $ld0['Male'] ?? $ld0['Man'] ?? null;
+            $w = $ld0['W'] ?? $ld0['F'] ?? $ld0['Female'] ?? $ld0['Woman'] ?? null;
+            $ch = $ld0['CHD'] ?? $ld0['CH'] ?? $ld0['C'] ?? null;
+            $inf = $ld0['INF'] ?? $ld0['Inf'] ?? $ld0['I'] ?? null;
+            $adt = $ld0['ADT'] ?? $ld0['Adult'] ?? $ld0['A'] ?? null;
+
+            if ($m !== null || $w !== null) {
+                $paxM = $m !== null ? (string)(int)$m : '';
+                $paxF = $w !== null ? (string)(int)$w : '';
+            } elseif ($adt !== null) {
+                $adtVal = (int)$adt;
+                $mVal = (int)ceil($adtVal / 2);
+                $fVal = $adtVal - $mVal;
+                $paxM = $mVal > 0 ? (string)$mVal : '';
+                $paxF = $fVal > 0 ? (string)$fVal : '';
+            }
+
+            if ($ch !== null) {
+                $paxCh = (string)(int)$ch;
+            }
+            if ($inf !== null) {
+                $paxInf = (string)(int)$inf;
+            }
+
+            $totAdt = (int)$paxM + (int)$paxF;
+            $totCh = (int)$paxCh;
+            if ($totAdt + $totCh > 0) {
+                $paxCount = (string)($totAdt + $totCh);
+            } elseif (($m !== null || $w !== null || $adt !== null) && $paxRaw === '') {
+                // В load явно пришли нулевые поля пассажиров
+                $paxCount = '0';
+            }
+        }
+    }
+
+    if ($paxCount === '' && $paxRaw !== '') {
+        $parts = explode('/', $paxRaw);
+        if (count($parts) >= 4) {
+            $paxM = trim($parts[0]);
+            $paxF = trim($parts[1]);
+            $paxCh = trim($parts[2]);
+            $paxInf = trim($parts[3]);
+            $paxCount = (string)((int)$paxM + (int)$paxF + (int)$paxCh);
+        } elseif (count($parts) === 3) {
+            $adt = (int)trim($parts[0]);
+            $paxCh = trim($parts[1]);
+            $paxInf = trim($parts[2]);
+            $mVal = (int)ceil($adt / 2);
+            $fVal = $adt - $mVal;
+            $paxM = (string)$mVal;
+            $paxF = (string)$fVal;
+            $paxCount = (string)($adt + (int)$paxCh);
+        } elseif (count($parts) >= 2) {
+            $adt = (int)trim($parts[0]);
+            $paxCh = trim($parts[1]);
+            $mVal = (int)ceil($adt / 2);
+            $fVal = $adt - $mVal;
+            $paxM = (string)$mVal;
+            $paxF = (string)$fVal;
+            $paxCount = (string)($adt + (int)$paxCh);
+        } elseif (count($parts) === 1 && is_numeric(trim($parts[0]))) {
+            $adt = (int)trim($parts[0]);
+            $mVal = (int)ceil($adt / 2);
+            $fVal = $adt - $mVal;
+            $paxM = (string)$mVal;
+            $paxF = (string)$fVal;
+            $paxCount = (string)$adt;
+        } else {
+            $paxCount = $paxRaw;
+        }
+    }
+
+    return [
+        'pax' => $paxCount,
+        'pax_m' => $paxM,
+        'pax_f' => $paxF,
+        'pax_ch' => $paxCh,
+        'pax_inf' => $paxInf,
+        'layout' => $layout,
+        'pax_raw' => $paxRaw
+    ];
+}
+
+/**
+ * Фолбэк-парсинг экипажа из XML-строки поля crew в plan-flight.
+ */
+function parseAviaBitCrewXml($crewXmlStr) {
+    if (empty($crewXmlStr) || !is_string($crewXmlStr)) return '';
+    if (preg_match('/<!DOCTYPE|<!ENTITY/i', $crewXmlStr)) return '';
+
+    $cockpit = 0;
+    $cabin = 0;
+    $its = 0;
+    $pax = 0;
+
+    if (preg_match_all('/<employee\b([^>]*)\/?>/iu', $crewXmlStr, $matches)) {
+        foreach ($matches[1] as $attrs) {
+            $ctype = '';
+            $arm = '';
+            if (preg_match('/\bcrewType\s*=\s*["\'](\d+)["\']/iu', $attrs, $m)) {
+                $ctype = $m[1];
+            }
+            if (preg_match('/\barmChair\s*=\s*["\']([^"\']*)["\']/iu', $attrs, $m)) {
+                $arm = trim($m[1]);
+            }
+
+            if ($ctype === '0') $cockpit++;
+            elseif ($ctype === '1') $cabin++;
+            elseif ($ctype === '2') $its++;
+            elseif ($ctype === '4') $pax++;
+            elseif ($arm !== '') {
+                if (in_array($arm, ['КС', '2П', 'ПИ', 'КСи', 'КВС/Н'], true)) $cockpit++;
+                elseif (in_array($arm, ['СБ', 'БП', 'БИ'], true)) $cabin++;
+                elseif (in_array($arm, ['ИС', 'ИТС'], true)) $its++;
+                elseif ($arm === 'П') $pax++;
+            }
+        }
+    }
+
+    return ($cockpit > 0 || $cabin > 0 || $its > 0 || $pax > 0) ? "{$cockpit}/{$cabin}/{$its}/{$pax}" : '';
 }
 
 function fetchAviaBitSchedule($baseUrl, $username, $password, $startTsMs, $endTsMs, $name = 'nordwind', &$diag = []) {
@@ -2298,95 +2516,112 @@ if ($route === '/fetch_schedule') {
         $candidates[] = $fl;
     }
 
-    // 2. Параллельная загрузка оперативной информации (пассажиры, загрузка, экипаж) и списка телеграмм
+    // 2. Двухэтапная батч-загрузка оперативной информации (пассажиры/экипаж) и телеграмм с ретраями
     $preliminaries = [];
     $telexLists = [];
     $telegrams = [];
+    $cfpTelegrams = [];
+
+    $defaultCookies = [
+        'nordwind' => 's%3ArghcgrAycdgvsI__Q2iZay-vUij_Yaze.uyVqX6K71%2FcuQ7tYDw%2BH91oWDKhclzgYq6w6HGSqvsM',
+        'ikar' => 's%3AS9kWveGtvxwmmq_YoZv0H6tOW0GW9a2O.MscjJmSqUjyniNClfqtbf61hqLGMwCfjXRuFNW6USUw'
+    ];
+    $cookiesByAirline = [
+        'nordwind' => getAviaBitCookie('nordwind', $defaultCookies['nordwind']),
+        'ikar' => getAviaBitCookie('ikar', $defaultCookies['ikar'])
+    ];
 
     if (!empty($candidates)) {
-        $mh = curl_multi_init();
-        $handles = [];
-        $defaultCookies = [
-            'nordwind' => 's%3ArghcgrAycdgvsI__Q2iZay-vUij_Yaze.uyVqX6K71%2FcuQ7tYDw%2BH91oWDKhclzgYq6w6HGSqvsM',
-            'ikar' => 's%3AS9kWveGtvxwmmq_YoZv0H6tOW0GW9a2O.MscjJmSqUjyniNClfqtbf61hqLGMwCfjXRuFNW6USUw'
-        ];
-
+        // 2.1 Батч-загрузка ТОЛЬКО preliminary-crew-load (порциями по 10) с повторной попыткой
+        $prelimReqs = [];
         foreach ($candidates as $c) {
             $pfId = $c['pfRecordId'] ?? null;
             if (!$pfId) continue;
             $airlineName = $c['_airline'] ?? 'nordwind';
             $baseUrl = ($airlineName === 'ikar') ? 'https://aviabit.ikar.aero' : 'https://aviabit.nordwindairlines.ru';
-            $cookieVal = getAviaBitCookie($airlineName, $defaultCookies[$airlineName] ?? '');
-            
-            // 2.1 Запрос preliminary
-            $urlPrelim = "$baseUrl/api/preliminary-crew-load?planFlightId=$pfId&eng=false";
-            $ch1 = curl_init($urlPrelim);
-            curl_setopt($ch1, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch1, CURLOPT_TIMEOUT, 6);
-            curl_setopt($ch1, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch1, CURLOPT_HTTPHEADER, [
-                "Origin: $baseUrl",
-                "Referer: $baseUrl/plan-flight",
-                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
-                'Accept: application/json, text/plain, */*',
-                "Cookie: connect.sid=$cookieVal"
-            ]);
-            curl_multi_add_handle($mh, $ch1);
-            $handles["prelim_{$pfId}"] = $ch1;
-
-            // 2.2 Запрос списка телеграмм (telex-list)
-            $urlTelexList = "$baseUrl/api/telex-list?planFlightId=$pfId";
-            $ch2 = curl_init($urlTelexList);
-            curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch2, CURLOPT_TIMEOUT, 6);
-            curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch2, CURLOPT_HTTPHEADER, [
-                "Origin: $baseUrl",
-                "Referer: $baseUrl/plan-flight",
-                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
-                'Accept: application/json, text/plain, */*',
-                "Cookie: connect.sid=$cookieVal"
-            ]);
-            curl_multi_add_handle($mh, $ch2);
-            $handles["tlist_{$pfId}"] = $ch2;
+            $cookieVal = $cookiesByAirline[$airlineName] ?? ($defaultCookies[$airlineName] ?? '');
+            $prelimReqs[] = [
+                'key' => (string)$pfId,
+                'url' => "$baseUrl/api/preliminary-crew-load?planFlightId=$pfId&eng=false",
+                'baseUrl' => $baseUrl,
+                'cookie' => $cookieVal
+            ];
         }
 
-        $running = null;
-        do {
-            curl_multi_exec($mh, $running);
-            curl_multi_select($mh);
-        } while ($running > 0);
+        $batchRes1 = execCurlMultiBatch($prelimReqs, 10, 12);
+        foreach ($batchRes1['ok'] as $pfKey => $json) {
+            $preliminaries[(int)$pfKey] = $json;
+        }
+        $failedAfterRetry = 0;
+        if (!empty($batchRes1['failed'])) {
+            $retryRes = execCurlMultiBatch($batchRes1['failed'], 6, 15);
+            foreach ($retryRes['ok'] as $pfKey => $json) {
+                $preliminaries[(int)$pfKey] = $json;
+            }
+            $failedAfterRetry = count($retryRes['failed']);
+        }
+        $diag[] = "prelim: total=" . count($prelimReqs) . ", loaded=" . count($preliminaries) . ", failed_after_retry=" . $failedAfterRetry;
 
-        foreach ($handles as $key => $ch) {
-            $resp = curl_multi_getcontent($ch);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            if ($code === 200 && $resp) {
-                $json = json_decode($resp, true);
-                if (is_array($json)) {
-                    if (strpos($key, 'prelim_') === 0) {
-                        $pfId = (int)substr($key, 7);
-                        $preliminaries[$pfId] = $json;
-                    } elseif (strpos($key, 'tlist_') === 0) {
-                        $pfId = (int)substr($key, 6);
-                        $telexLists[$pfId] = $json;
-                    }
+        // 2.2 Ранняя фильтрация (включая строгую проверку SVO) ДО загрузки телеграмм
+        $filteredCandidates = [];
+        foreach ($candidates as $c) {
+            $dep = strtoupper(trim($c['airPortTOCode'] ?? ''));
+            $pfId = $c['pfRecordId'] ?? null;
+            $operData = $pfId ? ($preliminaries[$pfId] ?? []) : [];
+            $preliminaryList = $operData['preliminary'] ?? [];
+            $loadList = $operData['load'] ?? [];
+
+            $paxData = parseAviaBitPaxData($preliminaryList, $loadList, $c['prePassengerInfo'] ?? '');
+            $paxCount = $paxData['pax'];
+
+            // Строгий фильтр SVO: допускаем в план ТОЛЬКО если preliminary реально получен и пассажиров ровно 0
+            if ($dep === 'SVO') {
+                $hasPrelimData = $pfId && isset($preliminaries[$pfId]) && (!empty($preliminaryList) || !empty($loadList));
+                if (!$hasPrelimData || $paxCount === '' || !is_numeric($paxCount) || (int)$paxCount > 0) {
+                    continue;
                 }
             }
-            curl_multi_remove_handle($mh, $ch);
-            curl_close($ch);
+
+            $c['_parsed_pax'] = $paxData;
+            $filteredCandidates[] = $c;
         }
-        curl_multi_close($mh);
+        $candidates = $filteredCandidates;
+        $diag[] = "filtered_candidates=" . count($candidates);
 
-        // 2.3 Выбор наиболее приоритетной телеграммы (FBL -> FFM -> UWS -> LDM) и CFP и дозагрузка текста
-        $msgHandles = [];
-        $mh2 = curl_multi_init();
+        // 2.3 Батч-загрузка списка телеграмм (telex-list) ТОЛЬКО для прошедших фильтр рейсов
+        $tlistReqs = [];
+        foreach ($candidates as $c) {
+            $pfId = $c['pfRecordId'] ?? null;
+            if (!$pfId) continue;
+            $airlineName = $c['_airline'] ?? 'nordwind';
+            $baseUrl = ($airlineName === 'ikar') ? 'https://aviabit.ikar.aero' : 'https://aviabit.nordwindairlines.ru';
+            $cookieVal = $cookiesByAirline[$airlineName] ?? ($defaultCookies[$airlineName] ?? '');
+            $tlistReqs[] = [
+                'key' => (string)$pfId,
+                'url' => "$baseUrl/api/telex-list?planFlightId=$pfId",
+                'baseUrl' => $baseUrl,
+                'cookie' => $cookieVal
+            ];
+        }
+
+        $tlistBatch1 = execCurlMultiBatch($tlistReqs, 10, 10);
+        foreach ($tlistBatch1['ok'] as $pfKey => $json) {
+            $telexLists[(int)$pfKey] = $json;
+        }
+        if (!empty($tlistBatch1['failed'])) {
+            $tlistRetry = execCurlMultiBatch($tlistBatch1['failed'], 6, 12);
+            foreach ($tlistRetry['ok'] as $pfKey => $json) {
+                $telexLists[(int)$pfKey] = $json;
+            }
+        }
+
+        // 2.4 Выбор приоритетной грузовой телеграммы (FBL -> FFM -> UWS -> LDM) и CFP и батч-загрузка их текстов
+        $msgReqs = [];
         $bestMeta = [];
-        $cfpTelegrams = [];
-
         foreach ($candidates as $c) {
             $pfId = $c['pfRecordId'] ?? null;
             if (!$pfId || empty($telexLists[$pfId])) continue;
-            
+
             $tData = $telexLists[$pfId];
             $allTelegrams = [];
             foreach ($tData as $route => $items) {
@@ -2395,7 +2630,6 @@ if ($route === '/fetch_schedule') {
                 }
             }
 
-            // 1. Поиск лучшей грузовой телеграммы (FBL -> FFM -> UWS -> LDM)
             $bestT = null;
             foreach (['FBL', 'FFM', 'UWS', 'LDM'] as $targetName) {
                 foreach ($allTelegrams as $t) {
@@ -2408,7 +2642,6 @@ if ($route === '/fetch_schedule') {
                 if ($bestT) break;
             }
 
-            // 2. Поиск CFP телеграммы для топлива
             $bestCfp = null;
             for ($k = count($allTelegrams) - 1; $k >= 0; $k--) {
                 $tName = strtoupper($allTelegrams[$k]['name'] ?? $allTelegrams[$k]['telexCode'] ?? '');
@@ -2420,79 +2653,52 @@ if ($route === '/fetch_schedule') {
 
             $airlineName = $c['_airline'] ?? 'nordwind';
             $baseUrl = ($airlineName === 'ikar') ? 'https://aviabit.ikar.aero' : 'https://aviabit.nordwindairlines.ru';
-            $cookieVal = getAviaBitCookie($airlineName, $defaultCookies[$airlineName] ?? '');
+            $cookieVal = $cookiesByAirline[$airlineName] ?? ($defaultCookies[$airlineName] ?? '');
 
             if ($bestT) {
                 $tId = $bestT['id'] ?? $bestT['telexID'] ?? null;
                 $tName = strtoupper($bestT['name'] ?? $bestT['telexCode'] ?? '');
                 if ($tId) {
-                    $urlMsg = "$baseUrl/api/telex-message?id=$tId";
-                    $chM = curl_init($urlMsg);
-                    curl_setopt($chM, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($chM, CURLOPT_TIMEOUT, 6);
-                    curl_setopt($chM, CURLOPT_SSL_VERIFYPEER, false);
-                    curl_setopt($chM, CURLOPT_HTTPHEADER, [
-                        "Origin: $baseUrl",
-                        "Referer: $baseUrl/plan-flight",
-                        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
-                        'Accept: application/json, text/plain, */*',
-                        "Cookie: connect.sid=$cookieVal"
-                    ]);
-                    curl_multi_add_handle($mh2, $chM);
-                    $msgHandles["load_{$pfId}"] = $chM;
-                    $bestMeta["load_{$pfId}"] = $tName;
+                    $msgKey = "load_{$pfId}";
+                    $bestMeta[$msgKey] = $tName;
+                    $msgReqs[] = [
+                        'key' => $msgKey,
+                        'url' => "$baseUrl/api/telex-message?id=$tId",
+                        'baseUrl' => $baseUrl,
+                        'cookie' => $cookieVal
+                    ];
                 }
             }
 
             if ($bestCfp) {
                 $cfpId = $bestCfp['id'] ?? $bestCfp['telexID'] ?? null;
                 if ($cfpId) {
-                    $urlCfp = "$baseUrl/api/telex-message?id=$cfpId";
-                    $chCfp = curl_init($urlCfp);
-                    curl_setopt($chCfp, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($chCfp, CURLOPT_TIMEOUT, 6);
-                    curl_setopt($chCfp, CURLOPT_SSL_VERIFYPEER, false);
-                    curl_setopt($chCfp, CURLOPT_HTTPHEADER, [
-                        "Origin: $baseUrl",
-                        "Referer: $baseUrl/plan-flight",
-                        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
-                        'Accept: application/json, text/plain, */*',
-                        "Cookie: connect.sid=$cookieVal"
-                    ]);
-                    curl_multi_add_handle($mh2, $chCfp);
-                    $msgHandles["cfp_{$pfId}"] = $chCfp;
+                    $msgReqs[] = [
+                        'key' => "cfp_{$pfId}",
+                        'url' => "$baseUrl/api/telex-message?id=$cfpId",
+                        'baseUrl' => $baseUrl,
+                        'cookie' => $cookieVal
+                    ];
                 }
             }
         }
 
-        if (!empty($msgHandles)) {
-            $running2 = null;
-            do {
-                curl_multi_exec($mh2, $running2);
-                curl_multi_select($mh2);
-            } while ($running2 > 0);
-
-            foreach ($msgHandles as $hKey => $chM) {
-                $resp = curl_multi_getcontent($chM);
-                $code = curl_getinfo($chM, CURLINFO_HTTP_CODE);
-                if ($code === 200 && $resp) {
-                    $json = json_decode($resp, true);
-                    if (is_array($json)) {
-                        if (strpos($hKey, 'load_') === 0) {
-                            $pfId = (int)substr($hKey, 5);
-                            $json['target_name'] = $bestMeta[$hKey] ?? '';
-                            $telegrams[$pfId] = $json;
-                        } elseif (strpos($hKey, 'cfp_') === 0) {
-                            $pfId = (int)substr($hKey, 4);
-                            $cfpTelegrams[$pfId] = $json;
-                        }
-                    }
-                }
-                curl_multi_remove_handle($mh2, $chM);
-                curl_close($chM);
+        $msgBatch1 = execCurlMultiBatch($msgReqs, 10, 10);
+        $msgCombined = $msgBatch1['ok'];
+        if (!empty($msgBatch1['failed'])) {
+            $msgRetry = execCurlMultiBatch($msgBatch1['failed'], 6, 12);
+            $msgCombined = array_merge($msgCombined, $msgRetry['ok']);
+        }
+        foreach ($msgCombined as $hKey => $json) {
+            if (strpos($hKey, 'load_') === 0) {
+                $pfId = (int)substr($hKey, 5);
+                $json['target_name'] = $bestMeta[$hKey] ?? '';
+                $telegrams[$pfId] = $json;
+            } elseif (strpos($hKey, 'cfp_') === 0) {
+                $pfId = (int)substr($hKey, 4);
+                $cfpTelegrams[$pfId] = $json;
             }
         }
-        curl_multi_close($mh2);
     }
 
     // 3. Формирование итогового списка рейсов
@@ -2525,106 +2731,21 @@ if ($route === '/fetch_schedule') {
         $loadList = $operData['load'] ?? [];
         $crewList = $operData['crew'] ?? [];
 
-        // Извлекаем количество пассажиров: Взрослые (ADT) + РБ (CHD), без младенцев РМ (Inf)
-        $paxRaw = '';
-        if (!empty($preliminaryList) && is_array($preliminaryList)) {
-            $leg0 = $preliminaryList[0] ?? [];
-            if (is_array($leg0)) {
-                $paxRaw = trim($leg0['prePassengerInfo'] ?? '');
-                if (empty($layout)) {
-                    $layout = trim($leg0['prePlaneComponovkaInfo'] ?? '');
-                }
-            }
+        $paxData = $fl['_parsed_pax'] ?? parseAviaBitPaxData($preliminaryList, $loadList, $fl['prePassengerInfo'] ?? '');
+        if (empty($layout) && !empty($paxData['layout'])) {
+            $layout = $paxData['layout'];
         }
-
         if (empty($acType) && !empty($layout)) {
             $acType = detectPlaneType('', $tail, $layout);
         }
 
-        $paxCount = '';
-        $paxM = '';
-        $paxF = '';
-        $paxCh = '';
-        $paxInf = '';
+        $paxCount = $paxData['pax'];
+        $paxM = $paxData['pax_m'];
+        $paxF = $paxData['pax_f'];
+        $paxCh = $paxData['pax_ch'];
+        $paxInf = $paxData['pax_inf'];
 
-        if (!empty($loadList) && is_array($loadList)) {
-            $ld0 = $loadList[0] ?? [];
-            if (is_array($ld0)) {
-                $m = $ld0['M'] ?? $ld0['Male'] ?? $ld0['Man'] ?? null;
-                $w = $ld0['W'] ?? $ld0['F'] ?? $ld0['Female'] ?? $ld0['Woman'] ?? null;
-                $ch = $ld0['CHD'] ?? $ld0['CH'] ?? $ld0['C'] ?? null;
-                $inf = $ld0['INF'] ?? $ld0['Inf'] ?? $ld0['I'] ?? null;
-                $adt = $ld0['ADT'] ?? $ld0['Adult'] ?? $ld0['A'] ?? null;
-
-                if ($m !== null || $w !== null) {
-                    $paxM = $m !== null ? (string)(int)$m : '';
-                    $paxF = $w !== null ? (string)(int)$w : '';
-                } elseif ($adt !== null) {
-                    $adtVal = (int)$adt;
-                    $mVal = (int)ceil($adtVal / 2);
-                    $fVal = $adtVal - $mVal;
-                    $paxM = $mVal > 0 ? (string)$mVal : '';
-                    $paxF = $fVal > 0 ? (string)$fVal : '';
-                }
-
-                if ($ch !== null) {
-                    $paxCh = (string)(int)$ch;
-                }
-                if ($inf !== null) {
-                    $paxInf = (string)(int)$inf;
-                }
-
-                $totAdt = (int)$paxM + (int)$paxF;
-                $totCh = (int)$paxCh;
-                if ($totAdt + $totCh > 0) {
-                    $paxCount = (string)($totAdt + $totCh);
-                }
-            }
-        }
-        if ($paxCount === '' && !empty($paxRaw)) {
-            $parts = explode('/', $paxRaw);
-            if (count($parts) >= 4) {
-                $paxM = trim($parts[0]);
-                $paxF = trim($parts[1]);
-                $paxCh = trim($parts[2]);
-                $paxInf = trim($parts[3]);
-                $paxCount = (string)((int)$paxM + (int)$paxF + (int)$paxCh);
-            } elseif (count($parts) === 3) {
-                $adt = (int)trim($parts[0]);
-                $paxCh = trim($parts[1]);
-                $paxInf = trim($parts[2]);
-                $mVal = (int)ceil($adt / 2);
-                $fVal = $adt - $mVal;
-                $paxM = (string)$mVal;
-                $paxF = (string)$fVal;
-                $paxCount = (string)($adt + (int)$paxCh);
-            } elseif (count($parts) >= 2) {
-                $adt = (int)trim($parts[0]);
-                $paxCh = trim($parts[1]);
-                $mVal = (int)ceil($adt / 2);
-                $fVal = $adt - $mVal;
-                $paxM = (string)$mVal;
-                $paxF = (string)$fVal;
-                $paxCount = (string)($adt + (int)$paxCh);
-            } elseif (count($parts) === 1 && is_numeric(trim($parts[0]))) {
-                $adt = (int)trim($parts[0]);
-                $mVal = (int)ceil($adt / 2);
-                $fVal = $adt - $mVal;
-                $paxM = (string)$mVal;
-                $paxF = (string)$fVal;
-                $paxCount = (string)$adt;
-            } else {
-                $paxCount = trim($paxRaw);
-            }
-        }
-
-        // Условие для SVO: рейсы из SVO включаются только если пассажиров 0 (пустые)
-        if ($dep === 'SVO') {
-            $paxInt = is_numeric($paxCount) ? (int)$paxCount : 0;
-            if ($paxInt > 0) continue;
-        }
-
-        // Экипаж: Летный / Салон / ИТС / Пасс
+        // Экипаж: Летный / Салон / ИТС / Пасс (с фолбэком на XML-строку crew из расписания)
         $cockpit = 0; $cabin = 0; $its = 0; $paxCrew = 0;
         if (!empty($crewList) && is_array($crewList)) {
             foreach ($crewList as $cr) {
@@ -2637,6 +2758,9 @@ if ($route === '/fetch_schedule') {
             }
         }
         $crewStr = ($cockpit > 0 || $cabin > 0 || $its > 0 || $paxCrew > 0) ? "{$cockpit}/{$cabin}/{$its}/{$paxCrew}" : '';
+        if ($crewStr === '' && !empty($fl['crew'])) {
+            $crewStr = parseAviaBitCrewXml($fl['crew']);
+        }
 
         // Город прилёта (назначения)
         $cityName = $iataCities[$arr] ?? '';

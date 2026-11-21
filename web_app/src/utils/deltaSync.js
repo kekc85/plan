@@ -734,6 +734,18 @@ export function smartMergeWithDelta(currentFlights = [], incomingFlights = [], o
         }
       }
 
+      // Очистка ложных рейсов из SVO (если сервер AviaBit вернул актуальный список, где этот рейс уже отсеян,
+      // например из-за наличия пассажиров, а ранее он попал по таймауту с пустым PAX и без ручной работы диспетчера)
+      if (incomingFlights.length > 0) {
+        const isSvoDep = /^(SVO)[\-\s\/]/i.test(String(f.route_airports || f.airports || '').trim());
+        const hasNoPax = !f.pax || String(f.pax).trim() === '0';
+        const isPending = !f.status || f.status === 'pending';
+        const hasNoManualWork = !f.lir_sent && !f.szv_sent && !f.ldm_sent && !f.fuel_confirmed && !f.notes && !f.baggage;
+        if (isSvoDep && hasNoPax && isPending && hasNoManualWork) {
+          return;
+        }
+      }
+
       mergedFlights.push(f);
     }
   });

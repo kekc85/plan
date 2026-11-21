@@ -1050,10 +1050,9 @@ def process_flights(
                 if ml and int(ml) > 0:
                     mail_val = str(ml)
 
-        # Условие для SVO: рейсы с вылетом из SVO включаются ТОЛЬКО если пассажиров 0 (пустые/перегоночные)
+        # Условие для SVO: рейсы с вылетом из SVO включаются ТОЛЬКО если пассажиров 0 (и данные достоверно загружены)
         if dep == "SVO":
-            pax_int = int(pax_notes) if str(pax_notes).isdigit() else 0
-            if pax_notes and pax_int > 0:
+            if not pax_notes or not str(pax_notes).isdigit() or int(pax_notes) > 0:
                 continue
 
         # Маршрут: город ПРИЛЁТА сверху, DEP-ARR снизу
