@@ -393,18 +393,18 @@ export default function FleetWbManager() {
   };
 
   return (
-    <div className="space-y-4 text-slate-800 dark:text-slate-100 animate-in fade-in">
+    <div className="space-y-4 text-slate-800 dark:text-slate-100 animate-in fade-in min-w-0 max-w-full">
       
       {/* 1. ВЕРХНЯЯ ПАНЕЛЬ: ЗАГОЛОВОК, СТАТИСТИКА И ДЕЙСТВИЯ */}
       <div className="bg-slate-50 dark:bg-slate-850 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold shrink-0">
             <Scale className="w-5 h-5" />
           </div>
-          <div>
-            <h3 className="font-extrabold text-sm sm:text-base flex items-center gap-2">
+          <div className="min-w-0">
+            <h3 className="font-extrabold text-sm sm:text-base flex items-center gap-2 flex-wrap">
               <span>Реестр центровочных графиков флота (W&B)</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-100 dark:bg-sky-950/70 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-100 dark:bg-sky-950/70 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 shrink-0">
                 {configKeys.length} ВС
               </span>
             </h3>
@@ -415,17 +415,17 @@ export default function FleetWbManager() {
         </div>
 
         {/* Кнопки экспорта и загрузки */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={handleExportJson}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 transition-all shadow-sm"
+            className="flex-1 sm:flex-initial justify-center flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 transition-all shadow-sm whitespace-nowrap"
             title="Экспортировать актуальную базу W&B флота в файл fleet_wb.json"
           >
             <Download className="w-3.5 h-3.5 text-sky-500" />
             <span>Экспорт JSON</span>
           </button>
 
-          <label className="flex items-center gap-1.5 px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white rounded-xl text-xs font-extrabold cursor-pointer transition-all shadow-sm">
+          <label className="flex-1 sm:flex-initial justify-center flex items-center gap-1.5 px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white rounded-xl text-xs font-extrabold cursor-pointer transition-all shadow-sm whitespace-nowrap">
             <UploadCloud className="w-4 h-4" />
             <span>Загрузить WBR (PDF)</span>
             <input
@@ -460,10 +460,10 @@ export default function FleetWbManager() {
       )}
 
       {/* 2. ПАНЕЛЬ ФИЛЬТРОВ И ПОИСКА */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 bg-slate-100/70 dark:bg-slate-900/70 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 bg-slate-100/70 dark:bg-slate-900/70 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 min-w-0">
         
         {/* Поисковая строка */}
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
+        <div className="relative flex-1 w-full sm:w-auto sm:min-w-[200px] sm:max-w-xs">
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -480,28 +480,28 @@ export default function FleetWbManager() {
         </div>
 
         {/* Фильтры авиакомпании */}
-        <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
+        <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-bold w-full sm:w-auto">
           <button
             onClick={() => setOperatorFilter('ALL')}
-            className={`px-2.5 py-1 rounded-md transition-all ${operatorFilter === 'ALL' ? 'bg-sky-500 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'}`}
+            className={`px-2.5 py-1 rounded-md transition-all whitespace-nowrap ${operatorFilter === 'ALL' ? 'bg-sky-500 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'}`}
           >
             Все ({configKeys.length})
           </button>
           <button
             onClick={() => setOperatorFilter('N4')}
-            className={`px-2.5 py-1 rounded-md transition-all ${operatorFilter === 'N4' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'}`}
+            className={`px-2.5 py-1 rounded-md transition-all whitespace-nowrap ${operatorFilter === 'N4' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-rose-600'}`}
           >
             Nordwind (N4)
           </button>
           <button
             onClick={() => setOperatorFilter('EO')}
-            className={`px-2.5 py-1 rounded-md transition-all ${operatorFilter === 'EO' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-sky-600'}`}
+            className={`px-2.5 py-1 rounded-md transition-all whitespace-nowrap ${operatorFilter === 'EO' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-sky-600'}`}
           >
             Икар (EO)
           </button>
           <button
             onClick={() => setOperatorFilter('WET_LEASE')}
-            className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${operatorFilter === 'WET_LEASE' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-amber-600'}`}
+            className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 whitespace-nowrap ${operatorFilter === 'WET_LEASE' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-amber-600'}`}
             title="Борта RA-73343 и RA-73344 с двумя разными центровками"
           >
             <ArrowRightLeft className="w-3 h-3" />
@@ -510,12 +510,12 @@ export default function FleetWbManager() {
         </div>
 
         {/* Фильтры типов ВС */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar text-[11px] font-bold">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar text-[11px] font-bold max-w-full w-full sm:w-auto">
           {['ALL', 'B738', 'B739', 'A321', 'A332', 'A333', 'B772', 'E190'].map(type => (
             <button
               key={type}
               onClick={() => setTypeFilter(type)}
-              className={`px-2 py-0.5 rounded-md border transition-all ${
+              className={`px-2 py-0.5 rounded-md border transition-all whitespace-nowrap shrink-0 ${
                 typeFilter === type
                   ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 border-transparent shadow-xs'
                   : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-400'
@@ -531,7 +531,7 @@ export default function FleetWbManager() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         
         {/* ЛЕВАЯ КОЛОНКА: СПИСОК ВС (40% ширины) */}
-        <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2.5 space-y-2 max-h-[680px] overflow-y-auto shadow-sm">
+        <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2.5 space-y-2 max-h-[360px] lg:max-h-[680px] overflow-y-auto shadow-sm min-w-0">
           <div className="px-2 py-1 flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
             <span>Воздушные суда ({filteredKeys.length})</span>
             <span>Базовый DOW / DOI</span>
@@ -624,15 +624,15 @@ export default function FleetWbManager() {
         </div>
 
         {/* ПРАВАЯ КОЛОНКА: ДЕТАЛЬНЫЙ ПРОСМОТР И МАТРИЦА W&B (60% ширины) */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-4 min-w-0">
           {currentAircraft ? (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-4 shadow-sm">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 sm:p-4 space-y-4 shadow-sm min-w-0 overflow-hidden">
               
               {/* Шапка выбранного ВС */}
               <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-mono font-black text-xl text-slate-900 dark:text-slate-100 tracking-tight">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="font-mono font-black text-lg sm:text-xl text-slate-900 dark:text-slate-100 tracking-tight">
                       RA-{currentAircraft.tail}
                     </h2>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
@@ -647,9 +647,9 @@ export default function FleetWbManager() {
                     </span>
                   </div>
 
-                  <div className="mt-1 text-[11px] text-slate-400 flex items-center gap-2 flex-wrap">
-                    <span className="flex items-center gap-1 text-slate-600 dark:text-slate-300 font-medium">
-                      <FileText className="w-3.5 h-3.5 text-sky-500" />
+                  <div className="mt-1 text-[11px] text-slate-400 flex items-center gap-x-2 gap-y-1 flex-wrap">
+                    <span className="flex items-center gap-1 text-slate-600 dark:text-slate-300 font-medium break-all">
+                      <FileText className="w-3.5 h-3.5 text-sky-500 shrink-0" />
                       {currentAircraft.file || 'WBR График центровки'}
                     </span>
                     <span>•</span>
@@ -660,7 +660,7 @@ export default function FleetWbManager() {
                 </div>
 
                 {/* Базовые параметры */}
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <div className="text-[10px] uppercase font-bold text-slate-400">Basic Weight / Index</div>
                   <div className="font-mono font-black text-sm text-sky-600 dark:text-sky-400">
                     {currentAircraft.basic_weight ? `${currentAircraft.basic_weight.toLocaleString()} кг` : <span className="text-slate-400 font-medium text-xs">В матрице W&B</span>} 
@@ -673,10 +673,10 @@ export default function FleetWbManager() {
 
               {/* КАРТОЧКИ ПРЕДЕЛЬНЫХ ВЕСОВ: MZFW, MTOW, MLAW */}
               <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="font-extrabold flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-                    <Scale className="w-3.5 h-3.5 text-sky-500" />
-                    Предельные взлетно-посадочные веса (Structural Limits)
+                    <Scale className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                    <span>Предельные взлетно-посадочные веса (Structural Limits)</span>
                   </span>
                   
                   {!isEditingWeights ? (
@@ -707,10 +707,10 @@ export default function FleetWbManager() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2.5 pt-1">
+                <div className={`grid gap-2 sm:gap-2.5 pt-1 ${isEditingWeights ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 min-[380px]:grid-cols-3'}`}>
                   {/* MZFW */}
-                  <div className="bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200/80 dark:border-slate-700/80">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase">MZFW (Zero Fuel)</div>
+                  <div className="bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200/80 dark:border-slate-700/80 min-w-0">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase truncate">MZFW (Zero Fuel)</div>
                     {isEditingWeights ? (
                       <input
                         type="number"
@@ -720,15 +720,15 @@ export default function FleetWbManager() {
                         className="w-full mt-0.5 px-2 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono font-bold focus:ring-1 focus:ring-sky-500"
                       />
                     ) : (
-                      <div className="font-mono font-black text-xs sm:text-sm text-slate-900 dark:text-slate-100 mt-0.5">
+                      <div className="font-mono font-black text-xs sm:text-sm text-slate-900 dark:text-slate-100 mt-0.5 whitespace-nowrap">
                         {currentAircraft.max_weights?.mzfw ? `${currentAircraft.max_weights.mzfw.toLocaleString()} кг` : <span className="text-slate-400 font-normal text-xs">Не задан</span>}
                       </div>
                     )}
                   </div>
 
                   {/* MTOW */}
-                  <div className="bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200/80 dark:border-slate-700/80">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase">MTOW (Take-Off)</div>
+                  <div className="bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200/80 dark:border-slate-700/80 min-w-0">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase truncate">MTOW (Take-Off)</div>
                     {isEditingWeights ? (
                       <input
                         type="number"
@@ -738,15 +738,15 @@ export default function FleetWbManager() {
                         className="w-full mt-0.5 px-2 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono font-bold focus:ring-1 focus:ring-sky-500"
                       />
                     ) : (
-                      <div className="font-mono font-black text-xs sm:text-sm text-slate-900 dark:text-slate-100 mt-0.5">
+                      <div className="font-mono font-black text-xs sm:text-sm text-slate-900 dark:text-slate-100 mt-0.5 whitespace-nowrap">
                         {currentAircraft.max_weights?.mtow ? `${currentAircraft.max_weights.mtow.toLocaleString()} кг` : <span className="text-slate-400 font-normal text-xs">Не задан</span>}
                       </div>
                     )}
                   </div>
 
                   {/* MLAW */}
-                  <div className="bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200/80 dark:border-slate-700/80">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase">MLAW (Landing)</div>
+                  <div className="bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200/80 dark:border-slate-700/80 min-w-0">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase truncate">MLAW (Landing)</div>
                     {isEditingWeights ? (
                       <input
                         type="number"
@@ -756,7 +756,7 @@ export default function FleetWbManager() {
                         className="w-full mt-0.5 px-2 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono font-bold focus:ring-1 focus:ring-sky-500"
                       />
                     ) : (
-                      <div className="font-mono font-black text-xs sm:text-sm text-slate-900 dark:text-slate-100 mt-0.5">
+                      <div className="font-mono font-black text-xs sm:text-sm text-slate-900 dark:text-slate-100 mt-0.5 whitespace-nowrap">
                         {currentAircraft.max_weights?.mlaw ? `${currentAircraft.max_weights.mlaw.toLocaleString()} кг` : <span className="text-slate-400 font-normal text-xs">Не задан</span>}
                       </div>
                     )}
@@ -767,9 +767,9 @@ export default function FleetWbManager() {
               {/* КОНФИГУРАЦИОННЫЕ ТУМБЛЕРЫ (Багаж экипажа / Аптечка FAK) для графиков Ikar */}
               {(currentAircraft.has_crew_bag_modes || currentAircraft.sub_matrices) && (
                 <div className="bg-slate-50 dark:bg-slate-850/90 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
-                  <div className="flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-                    <div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Sliders className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                    <div className="min-w-0">
                       <div className="text-xs font-black text-slate-800 dark:text-slate-200">
                         Вариант центровочного графика (DOW / DOI)
                       </div>
@@ -779,15 +779,15 @@ export default function FleetWbManager() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 flex-wrap w-full lg:w-auto">
                     {/* Тумблер Багаж экипажа */}
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="text-[11px] font-bold text-slate-500">Багаж экипажа:</span>
-                      <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5 text-xs w-full sm:w-auto">
+                      <span className="text-[11px] font-bold text-slate-500 shrink-0">Багаж экипажа:</span>
+                      <div className="grid grid-cols-2 sm:inline-flex w-full sm:w-auto rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-xs">
                         <button
                           type="button"
                           onClick={() => setCrewBagMode('included')}
-                          className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                          className={`px-2 py-1.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs text-center leading-tight rounded-md font-bold transition-all ${
                             crewBagMode === 'included'
                               ? 'bg-sky-500 text-white shadow-xs'
                               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -798,7 +798,7 @@ export default function FleetWbManager() {
                         <button
                           type="button"
                           onClick={() => setCrewBagMode('excluded')}
-                          className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                          className={`px-2 py-1.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs text-center leading-tight rounded-md font-bold transition-all ${
                             crewBagMode === 'excluded'
                               ? 'bg-amber-500 text-white shadow-xs'
                               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -810,13 +810,13 @@ export default function FleetWbManager() {
                     </div>
 
                     {/* Тумблер Аптечка (FAK) */}
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="text-[11px] font-bold text-slate-500">Аптечка (FAK):</span>
-                      <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5 text-xs w-full sm:w-auto">
+                      <span className="text-[11px] font-bold text-slate-500 shrink-0">Аптечка (FAK):</span>
+                      <div className="grid grid-cols-2 sm:inline-flex w-full sm:w-auto rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-xs">
                         <button
                           type="button"
                           onClick={() => setFakMode('included')}
-                          className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                          className={`px-2 py-1.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs text-center leading-tight rounded-md font-bold transition-all ${
                             fakMode === 'included'
                               ? 'bg-purple-600 text-white shadow-xs'
                               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -827,7 +827,7 @@ export default function FleetWbManager() {
                         <button
                           type="button"
                           onClick={() => setFakMode('excluded')}
-                          className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                          className={`px-2 py-1.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs text-center leading-tight rounded-md font-bold transition-all ${
                             fakMode === 'excluded'
                               ? 'bg-slate-600 text-white shadow-xs'
                               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
@@ -843,11 +843,11 @@ export default function FleetWbManager() {
 
               {/* ИНТЕРАКТИВНЫЙ СИМУЛЯТОР / КАЛЬКУЛЯТОР W&B */}
               <div className="bg-sky-50/70 dark:bg-sky-950/30 p-3 rounded-xl border border-sky-200 dark:border-sky-800/60 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-sky-500 text-white flex items-center justify-center font-bold shadow-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-sky-500 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
                     <Sparkles className="w-4 h-4" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-xs font-black text-sky-950 dark:text-sky-200">
                       Интерактивный симулятор расчета DOW / DOI
                     </div>
@@ -857,7 +857,7 @@ export default function FleetWbManager() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                   {/* Селектор экипажа */}
                   <div className="flex items-center gap-1.5">
                     <label className="text-[11px] font-bold text-slate-500">Экипаж:</label>
@@ -888,12 +888,12 @@ export default function FleetWbManager() {
 
                   {/* Результат симуляции */}
                   {simResult ? (
-                    <div className="flex items-center gap-2 px-3 py-1 bg-white dark:bg-slate-800 border border-sky-300 dark:border-sky-700 rounded-xl shadow-xs font-mono">
-                      <div>
+                    <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 px-3 py-1.5 sm:py-1 bg-white dark:bg-slate-800 border border-sky-300 dark:border-sky-700 rounded-xl shadow-xs font-mono w-full sm:w-auto">
+                      <div className="whitespace-nowrap">
                         <span className="text-[10px] font-bold text-slate-400 mr-1">DOW:</span>
                         <strong className="text-xs text-emerald-600 dark:text-emerald-400 font-black">{simResult.dow.toLocaleString()} кг</strong>
                       </div>
-                      <div className="border-l border-slate-200 dark:border-slate-700 pl-2">
+                      <div className="border-l border-slate-200 dark:border-slate-700 pl-2 whitespace-nowrap">
                         <span className="text-[10px] font-bold text-slate-400 mr-1">DOI:</span>
                         <strong className="text-xs text-sky-600 dark:text-sky-400 font-black">{simResult.doi}</strong>
                       </div>
@@ -907,24 +907,24 @@ export default function FleetWbManager() {
               </div>
 
               {/* ПОЛНАЯ ТАБЛИЦА МАТРИЦЫ W&B */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <div className="flex items-center justify-between gap-2 flex-wrap text-[11px] font-bold text-slate-400">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className="text-slate-700 dark:text-slate-200">Полная центровочная матрица графиков WBR</span>
                     <span className="text-[10px] text-slate-400 hidden sm:inline">• Клик по ячейке для моментального выбора</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setShowFullMatrixModal(true)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold bg-sky-50 dark:bg-sky-950/50 hover:bg-sky-100 dark:hover:bg-sky-900 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 rounded-lg shadow-xs transition-all"
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold bg-sky-50 dark:bg-sky-950/50 hover:bg-sky-100 dark:hover:bg-sky-900 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 rounded-lg shadow-xs transition-all max-w-full"
                     title="Открыть всю таблицу весов и индексов целиком как в оригинале"
                   >
-                    <Maximize2 className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-                    <span>Вся таблица целиком (Оригинал WBR)</span>
+                    <Maximize2 className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                    <span className="truncate">Вся таблица целиком (Оригинал WBR)</span>
                   </button>
                 </div>
 
-                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[380px] overflow-y-auto overflow-x-auto">
+                <div className="w-full max-w-full border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[380px] overflow-y-auto overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead className="bg-slate-100 dark:bg-slate-850 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 text-[10px] font-extrabold uppercase text-slate-600 dark:text-slate-300">
                       <tr>
@@ -1000,14 +1000,14 @@ export default function FleetWbManager() {
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
             
             {/* Шапка модалки */}
-            <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/90 dark:bg-slate-850/90 flex-wrap gap-2">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-sky-600/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold">
+            <div className="px-3 sm:px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/90 dark:bg-slate-850/90 flex-wrap gap-2">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-sky-600/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold shrink-0">
                   <FileSpreadsheet className="w-5 h-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-mono font-black text-lg text-slate-900 dark:text-slate-100">
+                    <h3 className="font-mono font-black text-base sm:text-lg text-slate-900 dark:text-slate-100">
                       RA-{currentAircraft.tail}
                     </h3>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
@@ -1026,13 +1026,13 @@ export default function FleetWbManager() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 break-all">
                     {currentAircraft.file || 'WBR'} • Ревизия: <strong>{isEditingMatrix ? editRevision : (currentAircraft.revision || '1.0')}</strong> • Дата: <strong>{isEditingMatrix ? editDate : (currentAircraft.date || '—')}</strong>
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {!isEditingMatrix ? (
                   <>
                     <button
@@ -1095,10 +1095,10 @@ export default function FleetWbManager() {
             </div>
 
             {/* Базовые веса и пределы ВС */}
-            <div className="px-5 py-2.5 bg-slate-100/70 dark:bg-slate-850/50 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
-              <div className="flex items-center gap-5 flex-wrap">
+            <div className="px-3 sm:px-5 py-2.5 bg-slate-100/70 dark:bg-slate-850/50 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 sm:gap-4 text-xs font-mono">
+              <div className="flex items-center gap-3 sm:gap-5 flex-wrap w-full sm:w-auto">
                 {isEditingMatrix ? (
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[10px] uppercase font-bold text-slate-500">Ревизия:</span>
                       <input
@@ -1119,7 +1119,7 @@ export default function FleetWbManager() {
                         className="w-24 px-2 py-1 text-xs font-mono font-bold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                       />
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[10px] uppercase font-bold text-slate-500">Basic Wt/Idx:</span>
                       <input
                         type="text"
@@ -1149,15 +1149,15 @@ export default function FleetWbManager() {
 
                 {currentAircraft.max_weights && (
                   <>
-                    <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
+                    <div className="sm:border-l border-slate-200 dark:border-slate-700 sm:pl-4">
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">MZFW (Zero Fuel):</span>
                       <strong className="text-slate-800 dark:text-slate-200">{currentAircraft.max_weights.mzfw ? `${currentAircraft.max_weights.mzfw.toLocaleString()} кг` : '—'}</strong>
                     </div>
-                    <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
+                    <div className="sm:border-l border-slate-200 dark:border-slate-700 sm:pl-4">
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">MTOW (Take-Off):</span>
                       <strong className="text-slate-800 dark:text-slate-200">{currentAircraft.max_weights.mtow ? `${currentAircraft.max_weights.mtow.toLocaleString()} кг` : '—'}</strong>
                     </div>
-                    <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
+                    <div className="sm:border-l border-slate-200 dark:border-slate-700 sm:pl-4">
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">MLAW (Landing):</span>
                       <strong className="text-slate-800 dark:text-slate-200">{currentAircraft.max_weights.mlaw ? `${currentAircraft.max_weights.mlaw.toLocaleString()} кг` : '—'}</strong>
                     </div>
@@ -1178,21 +1178,21 @@ export default function FleetWbManager() {
 
               {/* Тумблеры вариантов матрицы в модальном окне */}
               {(currentAircraft.has_crew_bag_modes || currentAircraft.sub_matrices) && (
-                <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5 w-full">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
-                    <Sliders className="w-3.5 h-3.5 text-sky-500" />
+                    <Sliders className="w-3.5 h-3.5 text-sky-500 shrink-0" />
                     <span>Вариант таблицы WBR:</span>
                   </div>
 
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex items-center gap-1 text-xs">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold">Багаж экипажа:</span>
-                      <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-[11px]">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-wrap w-full sm:w-auto">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 text-xs w-full sm:w-auto">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold shrink-0">Багаж экипажа:</span>
+                      <div className="grid grid-cols-2 sm:inline-flex w-full sm:w-auto rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-[11px]">
                         <button
                           type="button"
                           disabled={isEditingMatrix}
                           onClick={() => setCrewBagMode('included')}
-                          className={`px-2 py-0.5 rounded font-bold transition-all ${
+                          className={`px-2 py-1 sm:py-0.5 rounded font-bold transition-all text-center ${
                             crewBagMode === 'included'
                               ? 'bg-sky-500 text-white shadow-xs'
                               : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -1204,7 +1204,7 @@ export default function FleetWbManager() {
                           type="button"
                           disabled={isEditingMatrix}
                           onClick={() => setCrewBagMode('excluded')}
-                          className={`px-2 py-0.5 rounded font-bold transition-all ${
+                          className={`px-2 py-1 sm:py-0.5 rounded font-bold transition-all text-center ${
                             crewBagMode === 'excluded'
                               ? 'bg-amber-500 text-white shadow-xs'
                               : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -1215,14 +1215,14 @@ export default function FleetWbManager() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 text-xs">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold">Аптечка:</span>
-                      <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-[11px]">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 text-xs w-full sm:w-auto">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold shrink-0">Аптечка:</span>
+                      <div className="grid grid-cols-2 sm:inline-flex w-full sm:w-auto rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-white dark:bg-slate-900 text-[11px]">
                         <button
                           type="button"
                           disabled={isEditingMatrix}
                           onClick={() => setFakMode('included')}
-                          className={`px-2 py-0.5 rounded font-bold transition-all ${
+                          className={`px-2 py-1 sm:py-0.5 rounded font-bold transition-all text-center ${
                             fakMode === 'included'
                               ? 'bg-purple-600 text-white shadow-xs'
                               : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -1234,7 +1234,7 @@ export default function FleetWbManager() {
                           type="button"
                           disabled={isEditingMatrix}
                           onClick={() => setFakMode('excluded')}
-                          className={`px-2 py-0.5 rounded font-bold transition-all ${
+                          className={`px-2 py-1 sm:py-0.5 rounded font-bold transition-all text-center ${
                             fakMode === 'excluded'
                               ? 'bg-slate-600 text-white shadow-xs'
                               : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -1250,7 +1250,7 @@ export default function FleetWbManager() {
             </div>
 
             {/* Просторная полная таблица всей матрицы W&B */}
-            <div className="p-4 sm:p-5 overflow-auto flex-1">
+            <div className="p-2.5 sm:p-5 overflow-auto flex-1">
               <table className="w-full text-left border-collapse font-mono text-xs border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-xs">
                 <thead className="bg-slate-200/90 dark:bg-slate-800 sticky top-0 z-20 text-slate-800 dark:text-slate-200 uppercase font-extrabold text-[11px]">
                   <tr>
@@ -1341,7 +1341,7 @@ export default function FleetWbManager() {
             </div>
 
             {/* Подвал модалки */}
-            <div className="px-5 py-3 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 flex-wrap gap-2">
+            <div className="px-3 sm:px-5 py-3 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 flex-wrap gap-2">
               <span>
                 {isEditingMatrix
                   ? 'Режим редактирования: вносите изменения в ячейки и нажмите «Сохранить изменения» для обновления реестра W&B'
@@ -1384,14 +1384,14 @@ export default function FleetWbManager() {
 
             {/* 4. МОДАЛЬНОЕ ОКНО ПРЕДПРОСМОТРА И ПОДТВЕРЖДЕНИЯ ЗАГРУЖЕННОГО WBR PDF */}
       {showUploadModal && uploadPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-xl w-full p-5 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-2 sm:p-3 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-xl w-full max-h-[92vh] overflow-y-auto p-3.5 sm:p-5 space-y-4">
+            <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold shrink-0">
                   <CheckCircle2 className="w-4 h-4" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
                     Успешный разбор центровочного графика WBR
                   </h3>
@@ -1400,7 +1400,7 @@ export default function FleetWbManager() {
                   </p>
                 </div>
               </div>
-              <button onClick={() => setShowUploadModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowUploadModal(false)} className="text-slate-400 hover:text-slate-600 shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1430,7 +1430,7 @@ export default function FleetWbManager() {
                 <span className="text-[10px] text-slate-400 font-bold block">BASIC INDEX:</span>
                 <strong className="text-sky-600 dark:text-sky-400">{uploadPreview.data.basic_index}</strong>
               </div>
-              <div className="col-span-2 pt-1 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between font-sans">
+              <div className="col-span-2 pt-1 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 font-sans">
                 <span>Вариантов экипажей: <strong>{uploadPreview.data.crew_count}</strong></span>
                 <span>Кухни (Galleys): <strong>{(uploadPreview.data.pantry_codes || []).join(', ')}</strong></span>
               </div>

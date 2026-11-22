@@ -721,11 +721,11 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-2 sm:p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden max-h-[94vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-1.5 sm:p-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl min-w-0 overflow-hidden max-h-[95vh] sm:max-h-[94vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header Row: Title + Role Badge + Close Button */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-850/90 gap-2 shrink-0">
+        <div className="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-850/90 gap-2 shrink-0">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 flex items-center justify-center shadow-sm shrink-0">
               <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -759,14 +759,14 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
         </div>
 
         {/* Dedicated Responsive Tab Bar */}
-        <div className="px-3 sm:px-6 py-2 bg-slate-100/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar shrink-0 shadow-inner">
+        <div className="px-2.5 sm:px-6 py-2 bg-slate-100/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-2 sm:overflow-x-auto no-scrollbar shrink-0 shadow-inner">
           <button
             onClick={() => {
               setActiveTab('users');
               setErrorMsg('');
               setSuccessMsg('');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'users'
                 ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
@@ -785,7 +785,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
               setErrorMsg('');
               setSuccessMsg('');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'logs'
                 ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
@@ -806,7 +806,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
               setErrorMsg('');
               setSuccessMsg('');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'archives'
                 ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
@@ -827,7 +827,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
               setErrorMsg('');
               setSuccessMsg('');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'telegram'
                 ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
@@ -846,7 +846,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
               setErrorMsg('');
               setSuccessMsg('');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'aviabit'
                 ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
@@ -862,7 +862,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
               setErrorMsg('');
               setSuccessMsg('');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'fleet_wb'
                 ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
@@ -894,7 +894,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
         </div>
 
         {/* Body */}
-        <div className="p-3 sm:p-5 overflow-y-auto space-y-4 flex-1">
+        <div className="p-2.5 sm:p-5 overflow-y-auto overflow-x-hidden space-y-4 flex-1 min-w-0">
           
           {/* ========================================================== */}
           {/* ВКЛАДКА 1: ПОЛЬЗОВАТЕЛИ */}
@@ -903,7 +903,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
             <div className="space-y-4">
 
           {/* Action Toolbar */}
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
             <button
               onClick={() => {
                 setShowAddForm(!showAddForm);
@@ -929,7 +929,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
 
           {/* Form: Add User */}
           {showAddForm && (
-            <form onSubmit={handleCreate} className="p-4 bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800/60 rounded-2xl space-y-3 animate-in fade-in">
+            <form onSubmit={handleCreate} className="p-3 sm:p-4 bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800/60 rounded-2xl space-y-3 animate-in fade-in">
               <h4 className="text-xs font-extrabold text-sky-900 dark:text-sky-300 flex items-center gap-1.5 uppercase tracking-wider">
                 <UserPlus className="w-4 h-4" />
                 Новая учётная запись
@@ -1304,13 +1304,13 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
           </div>
 
           {/* Панель фильтров и управления */}
-          <div className="p-3 bg-slate-50 dark:bg-slate-850/40 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="p-2.5 sm:p-3 bg-slate-50 dark:bg-slate-850/40 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
               
               {/* Фильтры: Уровень, Модуль, Поиск */}
-              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0 w-full sm:min-w-[280px]">
                 {/* Уровень */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1 text-xs">
+                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1 text-xs max-w-full min-w-0">
                   <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <select
                     value={logFilterLevel}
@@ -1319,7 +1319,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                       setLogFilterLevel(val);
                       loadLogs({ level: val !== 'ALL' ? val : undefined });
                     }}
-                    className="bg-transparent text-slate-800 dark:text-slate-200 font-bold focus:outline-none cursor-pointer text-xs"
+                    className="bg-transparent text-slate-800 dark:text-slate-200 font-bold focus:outline-none cursor-pointer text-xs min-w-0 max-w-full"
                   >
                     <option value="ALL">Все уровни</option>
                     <option value="ERROR">🔴 Ошибки (ERROR)</option>
@@ -1329,7 +1329,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                 </div>
 
                 {/* Модуль */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1 text-xs">
+                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1 text-xs max-w-full min-w-0">
                   <Server className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <select
                     value={logFilterModule}
@@ -1338,7 +1338,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                       setLogFilterModule(val);
                       loadLogs({ module: val !== 'all' ? val : undefined });
                     }}
-                    className="bg-transparent text-slate-800 dark:text-slate-200 font-bold focus:outline-none cursor-pointer text-xs"
+                    className="bg-transparent text-slate-800 dark:text-slate-200 font-bold focus:outline-none cursor-pointer text-xs min-w-0 max-w-full"
                   >
                     <option value="all">Все модули</option>
                     <option value="aviabit">AviaBit (Парсер)</option>
@@ -1351,7 +1351,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                 </div>
 
                 {/* Поиск */}
-                <div className="relative flex-1 min-w-[160px]">
+                <div className="relative flex-1 min-w-[140px] w-full sm:w-auto">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
@@ -1365,11 +1365,13 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
               </div>
 
               {/* Настройки срока хранения логов (3 / 7 / 14 / 30 дней) */}
-              <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1 text-xs">
-                <Clock className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium whitespace-nowrap">
-                  Хранить логи:
-                </span>
+              <div className="flex items-center justify-between sm:justify-start gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1 text-xs w-full sm:w-auto">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                  <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium whitespace-nowrap">
+                    Хранить логи:
+                  </span>
+                </div>
                 <select
                   value={retentionDays}
                   disabled={isChangingRetention || isModerator}
@@ -1385,7 +1387,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
               </div>
 
               {/* Кнопки действий */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => loadLogs()}
                   disabled={logsLoading}
@@ -1680,7 +1682,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             
             {/* Левая колонка: Форма настроек */}
-            <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-3.5 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 min-w-0">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 flex items-center justify-center">
@@ -1863,7 +1865,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
             </div>
 
             {/* Правая колонка: Инструкция по настройке */}
-            <div className="bg-slate-50 dark:bg-slate-850/60 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3.5 text-xs text-slate-600 dark:text-slate-300">
+            <div className="bg-slate-50 dark:bg-slate-850/60 p-3.5 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3.5 text-xs text-slate-600 dark:text-slate-300 min-w-0">
               <h4 className="font-extrabold text-xs text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-1.5">
                 <HelpCircle className="w-4 h-4 text-sky-500" />
                 Инструкция по настройке
@@ -1915,19 +1917,19 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 
                 {/* КАРТОЧКА 1: NORDWIND AIRLINES */}
-                <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+                <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 min-w-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
                         <Plane className="w-5 h-5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">Nordwind Airlines</h4>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">Шлюз суточного плана и центровки N4</p>
                       </div>
                     </div>
 
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 ${
                       avbHasNwSession
                         ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
@@ -1991,7 +1993,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                   </div>
 
                   {/* Кнопка проверки Nordwind */}
-                  <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800">
                     <button
                       type="button"
                       onClick={handleTestNordwind}
@@ -2016,11 +2018,11 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
 
                   {/* Блок 2FA для Nordwind */}
                   {(avbNwTestResult?.need_2fa || showManualNw2Fa) && (
-                    <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-xl space-y-2">
+                    <div className="p-3 sm:p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-xl space-y-2">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-start gap-2 min-w-0">
                           <KeyRound className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                          <div className="text-[11px] text-amber-900 dark:text-amber-200">
+                          <div className="text-[11px] text-amber-900 dark:text-amber-200 min-w-0">
                             <span className="font-bold">Подтверждение 2FA (Nordwind):</span>
                             <p className="text-[10px] text-amber-800/80 dark:text-amber-300/80">
                               {avbNwTestResult?.sending_info
@@ -2032,25 +2034,25 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                         <button
                           type="button"
                           onClick={() => setShowManualNw2Fa(false)}
-                          className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-1.5 py-0.5 rounded hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                          className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-1.5 py-0.5 rounded hover:bg-amber-100 dark:hover:bg-amber-900/40 shrink-0"
                         >
                           ✕
                         </button>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                         <input
                           type="text"
                           value={avbNw2FaCode}
                           onChange={(e) => setAvbNw2FaCode(e.target.value)}
                           placeholder="6-значный код"
                           maxLength={10}
-                          className="flex-1 px-3 py-1.5 text-xs font-mono font-bold tracking-widest text-center rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          className="flex-1 min-w-0 px-3 py-1.5 text-xs font-mono font-bold tracking-widest text-center rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
                         />
                         <button
                           type="button"
                           onClick={() => handleConfirm2FA('nordwind')}
                           disabled={avbNw2FaConfirming || !avbNw2FaCode.trim()}
-                          className="px-3.5 py-1.5 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-lg shadow-sm transition-all disabled:opacity-50"
+                          className="w-full sm:w-auto px-3.5 py-1.5 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-lg shadow-sm transition-all disabled:opacity-50 shrink-0"
                         >
                           {avbNw2FaConfirming ? 'Проверка...' : 'Подтвердить'}
                         </button>
@@ -2071,19 +2073,19 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                 </div>
 
                 {/* КАРТОЧКА 2: IKAR AIRLINES */}
-                <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+                <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 min-w-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
                         <Plane className="w-5 h-5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">Ikar Airlines</h4>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">Шлюз суточного плана и центровки EO / KAR</p>
                       </div>
                     </div>
 
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 ${
                       avbHasIkSession
                         ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
@@ -2147,7 +2149,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                   </div>
 
                   {/* Кнопка проверки Ikar */}
-                  <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800">
                     <button
                       type="button"
                       onClick={handleTestIkar}
@@ -2172,11 +2174,11 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
 
                   {/* Блок 2FA для Ikar */}
                   {(avbIkTestResult?.need_2fa || showManualIk2Fa) && (
-                    <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-xl space-y-2">
+                    <div className="p-3 sm:p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-xl space-y-2">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-start gap-2 min-w-0">
                           <KeyRound className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                          <div className="text-[11px] text-amber-900 dark:text-amber-200">
+                          <div className="text-[11px] text-amber-900 dark:text-amber-200 min-w-0">
                             <span className="font-bold">Подтверждение 2FA (Ikar):</span>
                             <p className="text-[10px] text-amber-800/80 dark:text-amber-300/80">
                               {avbIkTestResult?.sending_info
@@ -2188,25 +2190,25 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                         <button
                           type="button"
                           onClick={() => setShowManualIk2Fa(false)}
-                          className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-1.5 py-0.5 rounded hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                          className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-1.5 py-0.5 rounded hover:bg-amber-100 dark:hover:bg-amber-900/40 shrink-0"
                         >
                           ✕
                         </button>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                         <input
                           type="text"
                           value={avbIk2FaCode}
                           onChange={(e) => setAvbIk2FaCode(e.target.value)}
                           placeholder="6-значный код"
                           maxLength={10}
-                          className="flex-1 px-3 py-1.5 text-xs font-mono font-bold tracking-widest text-center rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          className="flex-1 min-w-0 px-3 py-1.5 text-xs font-mono font-bold tracking-widest text-center rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
                         />
                         <button
                           type="button"
                           onClick={() => handleConfirm2FA('ikar')}
                           disabled={avbIk2FaConfirming || !avbIk2FaCode.trim()}
-                          className="px-3.5 py-1.5 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-lg shadow-sm transition-all disabled:opacity-50"
+                          className="w-full sm:w-auto px-3.5 py-1.5 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-lg shadow-sm transition-all disabled:opacity-50 shrink-0"
                         >
                           {avbIk2FaConfirming ? 'Проверка...' : 'Подтвердить'}
                         </button>
@@ -2229,17 +2231,17 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
               </div>
 
               {/* Общие действия внизу */}
-              <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-3">
+              <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
                 <button
                   type="submit"
                   disabled={avbSaving}
-                  className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white rounded-xl shadow-sm transition-all disabled:opacity-50"
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white rounded-xl shadow-sm transition-all disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   <span>{avbSaving ? 'Сохранение...' : 'Сохранить все учётные записи'}</span>
                 </button>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto">
                   <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                     <Info className="w-3.5 h-3.5 text-sky-500 shrink-0" />
                     <span>Сессии сохраняются в зашифрованном виде в БД</span>
@@ -2249,7 +2251,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
                     type="button"
                     onClick={handleResetAviabitSession}
                     disabled={avbResetting}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-all"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-all"
                     title="Сбросить сессионные куки и заставить парсер авторизоваться заново"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${avbResetting ? 'animate-spin' : ''}`} />
@@ -2275,8 +2277,8 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
       <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-2 sm:p-4 animate-in fade-in duration-150">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden max-h-[88vh] flex flex-col animate-in fade-in zoom-in-95">
           
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
+            <div className="flex items-center gap-2 min-w-0">
               {getLevelBadge(selectedLogDetail.level)}
               <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100">
                 Подробности события #{selectedLogDetail.id}
@@ -2299,10 +2301,10 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
             </div>
           </div>
 
-          <div className="p-5 overflow-y-auto space-y-3 font-mono text-xs flex-1">
+          <div className="p-3 sm:p-5 overflow-y-auto space-y-3 font-mono text-xs flex-1 min-w-0">
             <div>
               <span className="text-slate-400 text-[11px] block font-sans font-bold mb-0.5">Сообщение:</span>
-              <div className="p-3 bg-slate-100 dark:bg-slate-800/60 rounded-xl font-bold text-slate-900 dark:text-slate-100 font-sans">
+              <div className="p-3 bg-slate-100 dark:bg-slate-800/60 rounded-xl font-bold text-slate-900 dark:text-slate-100 font-sans break-words">
                 {selectedLogDetail.message}
               </div>
             </div>
@@ -2353,25 +2355,25 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95">
           
           {/* Header детального снимка */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-3 sm:py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
                 <Archive className="w-4 h-4" />
               </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  Архивный снимок смены #{selectedArchiveDetail.id}
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+              <div className="min-w-0">
+                <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
+                  <span>Архивный снимок смены #{selectedArchiveDetail.id}</span>
+                  <span className="text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
                     {selectedArchiveDetail.date_interval}
                   </span>
                 </h4>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 break-words">
                   Диспетчер: <strong>{selectedArchiveDetail.dispatcher_name}</strong> • Снимок от: {selectedArchiveDetail.created_at} • Рейсов: {selectedArchiveDetail.flights_count}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => handleExportArchiveJson(selectedArchiveDetail)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
@@ -2390,8 +2392,8 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
           </div>
 
           {/* Фильтр по рейсам архива */}
-          <div className="px-5 py-2.5 bg-slate-50/50 dark:bg-slate-850/40 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-xs">
+          <div className="px-3 sm:px-5 py-2.5 bg-slate-50/50 dark:bg-slate-850/40 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+            <div className="relative flex-1 min-w-[180px] sm:max-w-xs">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -2402,7 +2404,7 @@ export default function AdminModal({ isOpen, onClose, currentUser }) {
               />
             </div>
             {selectedArchiveDetail.shift_metadata?.notes && (
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-md">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 break-words max-w-full sm:max-w-md sm:truncate">
                 <strong>Заметки смены:</strong> {selectedArchiveDetail.shift_metadata.notes}
               </div>
             )}
