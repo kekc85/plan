@@ -1423,7 +1423,7 @@
             <td class="calc-val center" id="tot_pax_f"></td>
             <td class="calc-val center" id="tot_pax_ch"></td>
             <td class="calc-val center" id="tot_pax_inf"></td>
-            <td class="calc-val" id="tot_cabin_bag"></td>
+            <td class="calc-val center" id="tot_cabin_bag"></td>
             <td colspan="2" class="calc-val font-bold" id="tot_cargo_deadload"></td>
             <td class="calc-val" id="tot_cpt_1"></td>
             <td class="calc-val" id="tot_cpt_2"></td>
@@ -2193,21 +2193,21 @@
             tr.innerHTML += `<td><input type="number" min="0" class="ls-input text-center" id="pax_tr_f_${d}" oninput="onPaxInput(${d})"></td>`;
             tr.innerHTML += `<td><input type="number" min="0" class="ls-input text-center" id="pax_tr_ch_${d}" oninput="onPaxInput(${d})"></td>`;
             tr.innerHTML += `<td><input type="number" min="0" class="ls-input text-center" id="pax_tr_inf_${d}" oninput="calculate()"></td>`;
-            tr.innerHTML += `<td><input type="number" min="0" class="ls-input text-right" id="cabin_bag_tr_${d}" oninput="calculate()"></td>`;
+            tr.innerHTML += `<td><input type="number" min="0" class="ls-input text-center" id="cabin_bag_tr_${d}" oninput="calculate()"></td>`;
           } else if (idx === 1) {
             // Основная зона (B..ULD): PAX M, F, CH, INF и CABIN BAG WT
             tr.innerHTML += `<td rowspan="4"><input type="number" min="0" class="ls-input text-center" id="pax_m_${d}" oninput="onPaxInput(${d})"></td>`;
             tr.innerHTML += `<td rowspan="4"><input type="number" min="0" class="ls-input text-center" id="pax_f_${d}" oninput="onPaxInput(${d})"></td>`;
             tr.innerHTML += `<td rowspan="4"><input type="number" min="0" class="ls-input text-center" id="pax_ch_${d}" oninput="onPaxInput(${d})"></td>`;
             tr.innerHTML += `<td rowspan="4"><input type="number" min="0" class="ls-input text-center" id="pax_inf_${d}" oninput="calculate()"></td>`;
-            tr.innerHTML += `<td rowspan="4"><input type="number" min="0" class="ls-input text-right" id="cabin_bag_${d}" oninput="calculate()"></td>`;
+            tr.innerHTML += `<td rowspan="4"><input type="number" min="0" class="ls-input text-center" id="cabin_bag_${d}" oninput="calculate()"></td>`;
           } else if (isTotalRow) {
             tr.innerHTML += `<td id="dest_t_${d}" class="traffic-shaded-t-cell border-b-thick"></td>`;
             tr.innerHTML += `<td id="pax_m_t_${d}" class="traffic-shaded-t-cell calc-val center font-bold border-b-thick"></td>`;
             tr.innerHTML += `<td id="pax_f_t_${d}" class="traffic-shaded-t-cell calc-val center font-bold border-b-thick"></td>`;
             tr.innerHTML += `<td id="pax_ch_t_${d}" class="traffic-shaded-t-cell calc-val center font-bold border-b-thick"></td>`;
             tr.innerHTML += `<td id="pax_inf_t_${d}" class="traffic-shaded-t-cell calc-val center font-bold border-b-thick"></td>`;
-            tr.innerHTML += `<td id="cabin_bag_t_${d}" class="traffic-shaded-t-cell calc-val font-bold border-b-thick"></td>`;
+            tr.innerHTML += `<td id="cabin_bag_t_${d}" class="traffic-shaded-t-cell calc-val center font-bold border-b-thick"></td>`;
           }
 
           // 2. Метка подтипа груза: TR, B, C, M, ULD, T
@@ -2231,17 +2231,17 @@
             }
           }
 
-          // 5. Ремарки PAX C, Y / PAD C, Y
+          // 5. Ремарки PAX C, Y / PAD C, Y (TR в верхней строке, основные цифры во 2-й строке B)
           if (idx === 0) {
+            tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_tr_pax_c_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_tr_pax_y_${d}" oninput="calculate()"></td>`;
+            tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_tr_pad_c_${d}" oninput="calculate()"></td>`;
+            tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_tr_pad_y_${d}" oninput="calculate()"></td>`;
+          } else if (idx === 1) {
             tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_pax_c_${d}" oninput="onPaxInput(${d})"></td>`;
             tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_pax_y_${d}" oninput="calculate()"></td>`;
             tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_pad_c_${d}" oninput="calculate()"></td>`;
             tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_pad_y_${d}" oninput="calculate()"></td>`;
-          } else if (idx === 1) {
-            tr.innerHTML += `<td style="background:#fff;"></td>`;
-            tr.innerHTML += `<td style="background:#fff;"></td>`;
-            tr.innerHTML += `<td style="background:#fff;"></td>`;
-            tr.innerHTML += `<td style="background:#fff;"></td>`;
           } else if (idx === 2) {
             tr.innerHTML += `<td colspan="4" rowspan="4" class="remarks-shaded-cell border-b-thick"><div class="remarks-shaded-inner"><span class="remarks-shaded-item"><span class="remarks-shaded-lbl">PAX</span><span class="remarks-shaded-val" id="rem_shaded_pax_${d}"></span></span><span class="remarks-shaded-item"><span class="remarks-shaded-lbl">PAD</span><span class="remarks-shaded-val" id="rem_shaded_pad_${d}"></span></span></div></td>`;
           }
@@ -2253,23 +2253,31 @@
 
     // Автоматический расчет количества пассажиров экономического класса (Y = Adults + Child - Business C) и нулей PAD
     function onPaxInput(d) {
-      const m = numVal(`pax_m_${d}`) + numVal(`pax_tr_m_${d}`);
-      const f = numVal(`pax_f_${d}`) + numVal(`pax_tr_f_${d}`);
-      const ch = numVal(`pax_ch_${d}`) + numVal(`pax_tr_ch_${d}`);
-      const c = numVal(`rem_pax_c_${d}`);
-      const seated = m + f + ch;
+      const mainSeated = numVal(`pax_m_${d}`) + numVal(`pax_f_${d}`) + numVal(`pax_ch_${d}`);
+      const mainC = numVal(`rem_pax_c_${d}`);
       const yInput = document.getElementById(`rem_pax_y_${d}`);
       if (yInput) {
-        if (seated > 0 || c > 0) {
-          yInput.value = Math.max(0, seated - c);
+        if (mainSeated > 0 || mainC > 0) {
+          yInput.value = Math.max(0, mainSeated - mainC);
         } else {
           yInput.value = '';
         }
       }
 
+      const trSeated = numVal(`pax_tr_m_${d}`) + numVal(`pax_tr_f_${d}`) + numVal(`pax_tr_ch_${d}`);
+      const trC = numVal(`rem_tr_pax_c_${d}`);
+      const yTrInput = document.getElementById(`rem_tr_pax_y_${d}`);
+      if (yTrInput) {
+        if (trSeated > 0 || trC > 0) {
+          yTrInput.value = Math.max(0, trSeated - trC);
+        } else {
+          yTrInput.value = '';
+        }
+      }
+
       const padC = document.getElementById(`rem_pad_c_${d}`);
       const padY = document.getElementById(`rem_pad_y_${d}`);
-      if (seated > 0) {
+      if (mainSeated > 0) {
         if (padC && padC.value === '') padC.value = '0';
         if (padY && padY.value === '') padY.value = '0';
       }
@@ -2568,8 +2576,8 @@
 
         if (hasM) hasPaxMVal = true;
         if (hasF) hasPaxFVal = true;
-        if (hasInputVal(`rem_pad_c_${d}`)) hasPadCVal = true;
-        if (hasInputVal(`rem_pad_y_${d}`)) hasPadYVal = true;
+        if (hasInputVal(`rem_pad_c_${d}`) || hasInputVal(`rem_tr_pad_c_${d}`)) hasPadCVal = true;
+        if (hasInputVal(`rem_pad_y_${d}`) || hasInputVal(`rem_tr_pad_y_${d}`)) hasPadYVal = true;
 
         const m = numVal(`pax_m_${d}`) + numVal(`pax_tr_m_${d}`);
         const f = numVal(`pax_f_${d}`) + numVal(`pax_tr_f_${d}`);
@@ -2610,11 +2618,11 @@
           sumCpt[cIdx - 1] += cptDestSum;
         }
 
-        // Ремарки
-        const dRemPaxC = numVal(`rem_pax_c_${d}`);
-        const dRemPaxY = numVal(`rem_pax_y_${d}`);
-        const dRemPadC = numVal(`rem_pad_c_${d}`);
-        const dRemPadY = numVal(`rem_pad_y_${d}`);
+        // Ремарки (основная строка B + транзитная строка TR)
+        const dRemPaxC = numVal(`rem_pax_c_${d}`) + numVal(`rem_tr_pax_c_${d}`);
+        const dRemPaxY = numVal(`rem_pax_y_${d}`) + numVal(`rem_tr_pax_y_${d}`);
+        const dRemPadC = numVal(`rem_pad_c_${d}`) + numVal(`rem_tr_pad_c_${d}`);
+        const dRemPadY = numVal(`rem_pad_y_${d}`) + numVal(`rem_tr_pad_y_${d}`);
         sumRem.pax_c += dRemPaxC;
         sumRem.pax_y += dRemPaxY;
         sumRem.pad_c += dRemPadC;
@@ -2628,7 +2636,7 @@
         const shadedPadTotal = dRemPadC + dRemPadY;
         const shadedPaxEl = document.getElementById(`rem_shaded_pax_${d}`);
         if (shadedPaxEl) {
-          shadedPaxEl.textContent = (blockUsed && (shadedPaxTotal > 0 || hasM || hasInputVal(`rem_pax_y_${d}`)))
+          shadedPaxEl.textContent = (blockUsed && (shadedPaxTotal > 0 || hasM || hasInputVal(`rem_pax_y_${d}`) || hasInputVal(`rem_tr_pax_y_${d}`)))
             ? String(shadedPaxTotal)
             : '';
         }
@@ -2987,7 +2995,9 @@
         return true;
       }
       if (numVal(`rem_pax_c_${d}`) > 0 || numVal(`rem_pax_y_${d}`) > 0 ||
-          numVal(`rem_pad_c_${d}`) > 0 || numVal(`rem_pad_y_${d}`) > 0) {
+          numVal(`rem_pad_c_${d}`) > 0 || numVal(`rem_pad_y_${d}`) > 0 ||
+          numVal(`rem_tr_pax_c_${d}`) > 0 || numVal(`rem_tr_pax_y_${d}`) > 0 ||
+          numVal(`rem_tr_pad_c_${d}`) > 0 || numVal(`rem_tr_pad_y_${d}`) > 0) {
         return true;
       }
       for (const t of ['tr', 'b', 'c', 'm', 'uld']) {
@@ -3045,7 +3055,7 @@
               const bagTd = document.getElementById(`cabin_bag_tr_${d}`)?.closest('td') || document.getElementById(`cabin_bag_${d}`)?.closest('td');
               const destBottomTd = document.getElementById(`dest_t_${d}`);
               const cargoBotTd = document.getElementById(`cargo_label_t_${d}`);
-              const padEndTd = document.getElementById(`rem_pad_y_${d}`)?.closest('td');
+              const padEndTd = document.getElementById(`rem_tr_pad_y_${d}`)?.closest('td') || document.getElementById(`rem_pad_y_${d}`)?.closest('td');
 
               const leftBox = getCellBoxInTable(destTd, trafficTable);
               const bagBox = getCellBoxInTable(bagTd, trafficTable);
