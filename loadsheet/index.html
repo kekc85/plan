@@ -423,9 +423,27 @@
       min-height: 0;
     }
 
-    /* Левая секция: расчет весов + 5 колонок отсеков (CPT 1..5) - ~45% */
+    /* Объединённая левая + средняя область (75.3%) с нижним белым полем */
+    .lower-left-mid-group {
+      width: 75.3%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1.5px solid #000;
+      min-height: 0;
+    }
+
+    .lower-left-mid-top {
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+    }
+
+    /* Левая секция: расчет весов + 5 колонок отсеков (CPT 1..5) */
     .lower-col-left {
-      width: 44.8%;
+      width: 59.5%;
       border-right: 1.5px solid #000;
       display: flex;
       flex-direction: column;
@@ -565,13 +583,40 @@
       border-right: none;
     }
 
-    /* Средняя колонка: Allowed TL / Underload / LMC (6 строк) + вертикальная полоса (30.5%) */
+    /* Средняя колонка: Allowed TL / Underload / LMC (6 строк) + вертикальная полоса */
     .lower-col-mid {
-      width: 30.5%;
-      border-right: 1.5px solid #000;
+      width: 40.5%;
       display: flex;
       flex-direction: row;
       align-items: stretch;
+    }
+
+    /* Чистое белое поле внизу (под LANDING WEIGHT и LMC TOTAL +/-) */
+    .lower-bottom-white-bar {
+      height: 8.9mm;
+      flex-shrink: 0;
+      width: 100%;
+      background: #fff;
+      border-top: 1.5px solid #000;
+      box-sizing: border-box;
+      display: flex;
+      align-items: stretch;
+    }
+
+    .lower-bottom-white-input {
+      width: 100%;
+      height: 100%;
+      border: none;
+      outline: none;
+      resize: none;
+      background: transparent;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8.5px;
+      font-weight: 600;
+      color: #000;
+      padding: 2px 5px;
+      box-sizing: border-box;
+      overflow: hidden;
     }
 
     .mid-content-wrap {
@@ -783,6 +828,13 @@
       font-weight: 700;
       color: #000;
       line-height: 1.1;
+    }
+
+    .traffic-table tbody td.traffic-shaded-t-cell {
+      background-color: #e6e7e9;
+      background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.08) 0px, rgba(0, 0, 0, 0.08) 1px, transparent 1px, transparent 3px);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
     .balance-header-row {
@@ -1391,9 +1443,10 @@
 
       <!-- 4. Нижний расчетный блок (полное 1-в-1 соответствие оригинальному бланку NWS) -->
       <div class="lower-block-container">
-        
-        <!-- Левая колонка: Расчет весов самолета + 6 колонок отсеков (~44.8%) -->
-        <div class="lower-col-left">
+        <div class="lower-left-mid-group">
+          <div class="lower-left-mid-top">
+            <!-- Левая колонка: Расчет весов самолета + 6 колонок отсеков -->
+            <div class="lower-col-left">
           <table class="lower-weights-table">
             <colgroup>
               <col style="width: 71.5%;">
@@ -1779,33 +1832,6 @@
                 </td>
               </tr>
 
-              <!-- 9: Пустые замыкающие строки сетки (2 строки по 4.45 мм) -->
-              <tr>
-                <td></td>
-                <td>
-                  <div class="cpt-digit-grid">
-                    <div class="cpt-digit-cell"></div>
-                    <div class="cpt-digit-cell"></div>
-                    <div class="cpt-digit-cell"></div>
-                    <div class="cpt-digit-cell"></div>
-                    <div class="cpt-digit-cell"></div>
-                    <div class="cpt-digit-cell"></div>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td></td>
-                <td>
-                  <div class="cpt-digit-grid">
-                    <div class="cpt-digit-cell"></div>
-                    <div class="cpt-digit-cell"></div>
-                    <div class="cpt-digit-cell"></div>
-                    <div class="cpt-digit-cell"></div>
-                    <div class="cpt-digit-cell"></div>
-                    <div class="cpt-digit-cell"></div>
-                  </div>
-                </td>
-              </tr>
             </tbody>
           </table>
         </div>
@@ -2010,21 +2036,6 @@
                   <td colspan="4" class="cell-label-sm font-bold" style="padding-left:3px; text-align:center;">LMC TOTAL &nbsp; +/&minus;</td>
                   <td class="calc-val font-bold" id="disp_lmc_total" style="font-size:9.5px;"></td>
                 </tr>
-                <!-- Замыкающие пустые строки LMC (2 строки по 4.45 мм) -->
-                <tr>
-                  <td></td>
-                  <td></td>
-                  <td></td>
-                  <td></td>
-                  <td></td>
-                </tr>
-                <tr>
-                  <td></td>
-                  <td></td>
-                  <td></td>
-                  <td></td>
-                  <td></td>
-                </tr>
               </tbody>
             </table>
           </div>
@@ -2037,6 +2048,12 @@
               <span class="check-lmc-text">CHECK LMC TOTAL WITH UNDERLOAD</span>
               <span class="check-lmc-arrow">&darr;</span>
             </div>
+          </div>
+        </div>
+          </div>
+          <!-- Чистое белое поле внизу (под LANDING WEIGHT и LMC TOTAL +/-) -->
+          <div class="lower-bottom-white-bar">
+            <textarea class="lower-bottom-white-input" id="inp_bottom_remarks" placeholder=""></textarea>
           </div>
         </div>
 
@@ -2170,16 +2187,23 @@
           const isLastSubRow = (idx === CARGO_TYPES.length - 1);
           const borderBottomClass = isLastSubRow ? ' border-b-thick' : '';
 
-          // 1. Первая колонка DEST (объединяет 6 подстрок)
+          // 1. Первая колонка DEST (объединяет 5 подстрок: TR, B, C, M, ULD; строка T заштрихована отдельно)
           if (idx === 0) {
-            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="text" class="ls-input text-center font-bold" id="dest_code_${d}" oninput="calculate()"></td>`;
+            tr.innerHTML += `<td rowspan="5"><input type="text" class="ls-input text-center font-bold" id="dest_code_${d}" oninput="calculate()"></td>`;
             // PAX M, F, CH, INF
-            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-center" id="pax_m_${d}" oninput="onPaxInput(${d})"></td>`;
-            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-center" id="pax_f_${d}" oninput="onPaxInput(${d})"></td>`;
-            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-center" id="pax_ch_${d}" oninput="onPaxInput(${d})"></td>`;
-            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-center" id="pax_inf_${d}" oninput="calculate()"></td>`;
+            tr.innerHTML += `<td rowspan="5"><input type="number" min="0" class="ls-input text-center" id="pax_m_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td rowspan="5"><input type="number" min="0" class="ls-input text-center" id="pax_f_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td rowspan="5"><input type="number" min="0" class="ls-input text-center" id="pax_ch_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td rowspan="5"><input type="number" min="0" class="ls-input text-center" id="pax_inf_${d}" oninput="calculate()"></td>`;
             // CABIN BAG
-            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-right" id="cabin_bag_${d}" oninput="calculate()"></td>`;
+            tr.innerHTML += `<td rowspan="5"><input type="number" min="0" class="ls-input text-right" id="cabin_bag_${d}" oninput="calculate()"></td>`;
+          } else if (isTotalRow) {
+            tr.innerHTML += `<td id="dest_t_${d}" class="traffic-shaded-t-cell border-b-thick"></td>`;
+            tr.innerHTML += `<td class="traffic-shaded-t-cell border-b-thick"></td>`;
+            tr.innerHTML += `<td class="traffic-shaded-t-cell border-b-thick"></td>`;
+            tr.innerHTML += `<td class="traffic-shaded-t-cell border-b-thick"></td>`;
+            tr.innerHTML += `<td class="traffic-shaded-t-cell border-b-thick"></td>`;
+            tr.innerHTML += `<td class="traffic-shaded-t-cell border-b-thick"></td>`;
           }
 
           // 2. Метка подтипа груза: TR, B, C, M, ULD, T
@@ -3000,17 +3024,21 @@
               if (usedFlags[d - 1]) continue;
               const destTd = document.getElementById(`dest_code_${d}`)?.closest('td');
               const bagTd = document.getElementById(`cabin_bag_${d}`)?.closest('td');
+              const destBottomTd = document.getElementById(`dest_t_${d}`);
               const cargoBotTd = document.getElementById(`cargo_label_t_${d}`);
               const padEndTd = document.getElementById(`rem_pad_y_${d}`)?.closest('td');
 
               const leftBox = getCellBoxInTable(destTd, trafficTable);
               const bagBox = getCellBoxInTable(bagTd, trafficTable);
-              if (leftBox && bagBox) {
-                appendDiagonalSlash(trafficSvg, leftBox.left, leftBox.bottom, bagBox.right, bagBox.top);
-              }
-
+              const destBottomBox = getCellBoxInTable(destBottomTd, trafficTable);
               const cargoBotBox = getCellBoxInTable(cargoBotTd, trafficTable);
               const padEndBox = getCellBoxInTable(padEndTd, trafficTable);
+
+              const leftBottomY = destBottomBox ? destBottomBox.bottom : (cargoBotBox ? cargoBotBox.bottom : leftBox?.bottom);
+              if (leftBox && bagBox) {
+                appendDiagonalSlash(trafficSvg, leftBox.left, leftBottomY, bagBox.right, bagBox.top);
+              }
+
               if (cargoBotBox && padEndBox) {
                 appendDiagonalSlash(trafficSvg, cargoBotBox.left, cargoBotBox.bottom, padEndBox.right, padEndBox.top);
               }
