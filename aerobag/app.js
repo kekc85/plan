@@ -3066,6 +3066,8 @@ function handleReturnToAeroPlan(e) {
 
 let currentIncomingFlightData = {
     flight: '',
+    flight_full: '',
+    operator: '',
     date: '',
     ac_num: '',
     ac_config: '',
@@ -3083,6 +3085,8 @@ let currentIncomingFlightData = {
     pax_ch: '',
     pax_inf: '',
     to_fuel: '',
+    fuel_block: '',
+    fuel_taxi: '',
     trip_fuel: '',
     cargo: '',
     mail: '',
@@ -3262,6 +3266,7 @@ function lookupFleetWb(flight = {}) {
         basic_weight: cfg.basic_weight || '',
         basic_index: cfg.basic_index || '',
         model: cfg.model,
+        operator: cfg.operator || operator || '',
         revision: cfg.revision,
         crew: crewCode,
         crew_is_default: isDefaultCrew,
@@ -3393,15 +3398,33 @@ function openWbLoadsheet() {
     let paxCh = activePred?.pax_ch || currentIncomingFlightData.pax_ch || matchedAeroPlanFlight?.pax_ch || document.getElementById('manual-rb')?.value || '';
     let paxInf = activePred?.pax_inf || currentIncomingFlightData.pax_inf || matchedAeroPlanFlight?.pax_inf || document.getElementById('manual-rm')?.value || '';
 
-    if (!paxM && !paxF && effPax > 0) {
-        const halfM = Math.ceil(effPax / 2);
-        paxM = String(halfM);
-        paxF = String(effPax - halfM);
+    // Взрослых записываем в M, в F ставим 0
+    const parsedPaxM = parseInt(paxM, 10) || 0;
+    const parsedPaxF = parseInt(paxF, 10) || 0;
+    const parsedPaxCh = parseInt(paxCh, 10) || 0;
+    if (parsedPaxM + parsedPaxF > 0) {
+        paxM = String(parsedPaxM + parsedPaxF);
+        paxF = '0';
+    } else if (effPax > 0) {
+        paxM = String(Math.max(0, effPax - parsedPaxCh));
+        paxF = '0';
     }
 
+    let operatorVal = activePred?.operator || currentIncomingFlightData.operator || detectFlightOperator({
+        flight: activePred?.flight_full || currentIncomingFlightData.flight_full || matchedAeroPlanFlight?.flight || flightNumber,
+        operator: matchedAeroPlanFlight?.operator
+    }) || '';
+
     let crewVal = (activePred?.crew || currentIncomingFlightData.crew || matchedAeroPlanFlight?.crew || '').trim();
-    const toFuel = activePred?.fuel_block || activePred?.to_fuel || currentIncomingFlightData.to_fuel || currentIncomingFlightData.fuel_block || matchedAeroPlanFlight?.fuel_block || '';
-    const tripFuel = activePred?.fuel_trip || activePred?.trip_fuel || currentIncomingFlightData.trip_fuel || matchedAeroPlanFlight?.fuel_trip || '';
+    const blockFuelRaw = String(activePred?.fuel_block || currentIncomingFlightData.fuel_block || matchedAeroPlanFlight?.fuel_block || '').replace(/\D/g, '');
+    const taxiFuelRaw = String(activePred?.fuel_taxi || currentIncomingFlightData.fuel_taxi || matchedAeroPlanFlight?.fuel_taxi || '').replace(/\D/g, '');
+    let toFuel = '';
+    if (blockFuelRaw && taxiFuelRaw !== '') {
+        toFuel = String(Math.max(0, (parseInt(blockFuelRaw, 10) || 0) - (parseInt(taxiFuelRaw, 10) || 0)));
+    } else {
+        toFuel = String(activePred?.to_fuel || currentIncomingFlightData.to_fuel || blockFuelRaw || '').replace(/\D/g, '');
+    }
+    const tripFuel = String(activePred?.fuel_trip || activePred?.trip_fuel || currentIncomingFlightData.trip_fuel || matchedAeroPlanFlight?.fuel_trip || '').replace(/\D/g, '');
     const cargoVal = activePred?.cargo || currentIncomingFlightData.cargo || matchedAeroPlanFlight?.cargo || '';
     const mailVal = activePred?.mail || currentIncomingFlightData.mail || matchedAeroPlanFlight?.mail || '';
     let dowVal = activePred?.dow || currentIncomingFlightData.dow || matchedAeroPlanFlight?.dow || '';
@@ -3415,12 +3438,14 @@ function openWbLoadsheet() {
     if (selectedTail && typeof lookupFleetWb === 'function') {
         const flightForWb = {
             flight: flightNumber,
+            operator: operatorVal,
             ac_num: selectedTail,
             crew: crewVal,
             galley: galleyVal
         };
         const wbRes = lookupFleetWb(flightForWb);
         if (wbRes && wbRes.success) {
+            if (!operatorVal && wbRes.operator) operatorVal = String(wbRes.operator);
             if (!dowVal && wbRes.dow) dowVal = String(wbRes.dow);
             if (!doiVal && wbRes.doi) doiVal = String(wbRes.doi);
             if (!mzfwVal && wbRes.mzfw) mzfwVal = String(wbRes.mzfw);
@@ -3430,6 +3455,13 @@ function openWbLoadsheet() {
             if (!galleyVal && wbRes.galley) galleyVal = String(wbRes.galley);
         }
     }
+
+    const cleanFlightNum = typeof extractNumericFlightNumber === 'function'
+        ? extractNumericFlightNumber(flightNumber)
+        : String(flightNumber || '').replace(/\D/g, '');
+    const flightForLoadsheet = (operatorVal && cleanFlightNum)
+        ? `${operatorVal} ${cleanFlightNum}`
+        : (flightNumber || cleanFlightNum);
 
     // 5. Определение стенда Loadsheet
     const isLocal = window.location.hostname === 'localhost' || 
@@ -3443,7 +3475,8 @@ function openWbLoadsheet() {
     }
 
     const params = new URLSearchParams();
-    if (flightNumber) params.set('flight', flightNumber);
+    if (flightForLoadsheet) params.set('flight', flightForLoadsheet);
+    if (operatorVal) params.set('operator', operatorVal);
     if (fromAirport) params.set('from', fromAirport);
     if (toAirport) params.set('to', toAirport);
     if (flightDate) params.set('date', flightDate);
@@ -3456,6 +3489,8 @@ function openWbLoadsheet() {
     if (paxInf) params.set('pax_inf', paxInf);
     if (paxTotal) params.set('pax', paxTotal);
     if (toFuel) params.set('to_fuel', toFuel);
+    if (blockFuelRaw) params.set('fuel_block', blockFuelRaw);
+    if (taxiFuelRaw) params.set('taxi_fuel', taxiFuelRaw);
     if (tripFuel) params.set('trip_fuel', tripFuel);
     if (dowVal) params.set('dow', dowVal);
     if (doiVal) params.set('doi', doiVal);
@@ -3478,7 +3513,8 @@ function openWbLoadsheet() {
 
     try {
         const payload = {
-            flight: flightNumber,
+            flight: flightForLoadsheet,
+            operator: operatorVal,
             from: fromAirport,
             to: toAirport,
             date: flightDate,
@@ -3491,6 +3527,8 @@ function openWbLoadsheet() {
             pax_inf: paxInf,
             pax: paxTotal,
             to_fuel: toFuel,
+            fuel_block: blockFuelRaw,
+            taxi_fuel: taxiFuelRaw,
             trip_fuel: tripFuel,
             dow: dowVal,
             doi: doiVal,
@@ -3530,6 +3568,8 @@ function extractNumericFlightNumber(flightStr) {
 function checkIncomingFlightParameters() {
     const urlParams = new URLSearchParams(window.location.search);
     const flightParam = urlParams.get('flight') || urlParams.get('flt') || urlParams.get('flight_no');
+    const flightFullParam = urlParams.get('flight_full');
+    const operatorParam = urlParams.get('operator') || urlParams.get('airline');
     const fromParam = urlParams.get('from');
     const toParam = urlParams.get('to');
     const dateParam = urlParams.get('date');
@@ -3542,7 +3582,15 @@ function checkIncomingFlightParameters() {
     const paxFParam = urlParams.get('pax_f');
     const paxChParam = urlParams.get('pax_ch');
     const paxInfParam = urlParams.get('pax_inf');
-    const toFuelParam = urlParams.get('to_fuel') || urlParams.get('fuel_block') || urlParams.get('fuel');
+    const explicitToFuelParam = urlParams.get('to_fuel') || urlParams.get('takeoff_fuel');
+    const blockFuelParam = urlParams.get('fuel_block');
+    const taxiFuelParam = urlParams.get('taxi_fuel') || urlParams.get('fuel_taxi');
+    let toFuelParam = explicitToFuelParam || blockFuelParam || urlParams.get('fuel');
+    if (!explicitToFuelParam && blockFuelParam && taxiFuelParam) {
+        const blk = parseInt(String(blockFuelParam).replace(/\D/g, ''), 10) || 0;
+        const tx = parseInt(String(taxiFuelParam).replace(/\D/g, ''), 10) || 0;
+        if (blk > 0) toFuelParam = String(Math.max(0, blk - tx));
+    }
     const tripFuelParam = urlParams.get('trip_fuel') || urlParams.get('fuel_trip');
     const cargoParam = urlParams.get('cargo');
     const mailParam = urlParams.get('mail');
@@ -3553,6 +3601,14 @@ function checkIncomingFlightParameters() {
     const mzfwParam = urlParams.get('max_zfw') || urlParams.get('mzfw');
     const mtowParam = urlParams.get('max_tow') || urlParams.get('mtow');
     const mlawParam = urlParams.get('max_law') || urlParams.get('mlaw');
+
+    const resolvedOp = operatorParam
+        ? detectFlightOperator({ operator: operatorParam })
+        : detectFlightOperator({ flight: flightFullParam || flightParam });
+    if (resolvedOp) currentIncomingFlightData.operator = resolvedOp;
+    if (flightFullParam) currentIncomingFlightData.flight_full = flightFullParam;
+    if (blockFuelParam) currentIncomingFlightData.fuel_block = String(blockFuelParam).replace(/\D/g, '');
+    if (taxiFuelParam) currentIncomingFlightData.fuel_taxi = String(taxiFuelParam).replace(/\D/g, '');
 
     if (dowParam) currentIncomingFlightData.dow = dowParam;
     if (doiParam) currentIncomingFlightData.doi = doiParam;

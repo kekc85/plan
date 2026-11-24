@@ -333,15 +333,66 @@ function FlightRow({
     return { dow, doi, galley, mtow };
   };
 
+  // Извлечение кода авиакомпании (N4 / EO) и числового номера рейса
+  const extractFlightOperatorAndNumber = (rawFlightStr) => {
+    const raw = String(rawFlightStr || '').trim().toUpperCase();
+    if (!raw) return { operator: '', flightNum: '', fullFlight: '' };
+
+    let operator = '';
+    if (/^(EO|KAR|ЕО|ИК)(?=[\d\-\s]|$)/i.test(raw)) {
+      operator = 'EO';
+    } else if (/^(N4|NWS|Н4|СВ)(?=[\d\-\s]|$)/i.test(raw)) {
+      operator = 'N4';
+    } else if (flight.operator) {
+      const op = String(flight.operator).toUpperCase().trim();
+      if (op === 'EO' || op === 'KAR') operator = 'EO';
+      else if (op === 'N4' || op === 'NWS') operator = 'N4';
+    }
+
+    let cleanFlt = raw
+      .replace(/^(N4|EO|NWS|KAR|NW|WZ|S7|SU|DP|UT|A4|U6|FV|5N|7R|KL|КЛ|Н4|ЕО|СВ|ИК)[-\s]?/i, '')
+      .replace(/^[A-ZА-Я][A-ZА-Я0-9]{0,2}[-\s]?/i, '');
+    const fltMatch = cleanFlt.match(/\d+/);
+    const flightNum = fltMatch ? fltMatch[0] : cleanFlt.replace(/\D/g, '');
+    const fullFlight = (operator && flightNum) ? `${operator} ${flightNum}` : flightNum;
+    return { operator, flightNum, fullFlight };
+  };
+
+  // Расчет взлетного топлива: Block - Taxi
+  const computeTakeoffFuel = (blockRaw, taxiRaw) => {
+    const block = parseInt(String(blockRaw || '').replace(/\D/g, ''), 10) || 0;
+    const taxi = parseInt(String(taxiRaw || '').replace(/\D/g, ''), 10) || 0;
+    return block > 0 ? Math.max(0, block - taxi) : 0;
+  };
+
+  // Подготовка пассажиров: всех взрослых записываем в M, в F ставим 0
+  const resolvePassengersForTransfer = () => {
+    let ch = flight.pax_ch || (flight.pax?.includes('/') ? flight.pax.split('/')[1] : null);
+    let inf = flight.pax_inf || (flight.pax?.includes('/') && flight.pax.split('/').length > 2 ? flight.pax.split('/')[2] : null);
+    if (!ch && !inf) {
+      const notesStr = String(flight.notes || '');
+      const rbM = notesStr.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd|дет)/i);
+      const rmM = notesStr.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf|младен|инф)/i);
+      if (rbM) ch = rbM[1];
+      if (rmM) inf = rmM[1];
+    }
+
+    let totalAdt = (parseInt(flight.pax_m, 10) || 0) + (parseInt(flight.pax_f, 10) || 0);
+    if (totalAdt <= 0 && flight.pax) {
+      const pStr = String(flight.pax).trim();
+      const firstPart = pStr.includes('/') ? (parseInt(pStr.split('/')[0], 10) || 0) : (parseInt(pStr, 10) || 0);
+      totalAdt = ch ? Math.max(0, firstPart - (parseInt(ch, 10) || 0)) : firstPart;
+    }
+
+    const paxM = totalAdt > 0 ? String(totalAdt) : (flight.pax ? '0' : '');
+    const paxF = (totalAdt > 0 || flight.pax) ? '0' : '';
+    return { paxM, paxF, paxCh: ch || '', paxInf: inf || '' };
+  };
+
   // Переход в калькулятор веса коммерческой загрузки AeroBag Predictor
   const handleOpenAeroBag = () => {
     const rawFlight = (flight.flight || flight.flight_no || flight.flight_number || '').trim();
-    // Полное удаление буквенно-цифровых префиксов авиакомпаний (N4, EO, NWS, KAR, U6 и т.д.)
-    let cleanFlt = rawFlight.toUpperCase();
-    cleanFlt = cleanFlt.replace(/^(N4|EO|NWS|KAR|NW|WZ|S7|SU|DP|UT|A4|U6|FV|5N|7R|KL|КЛ|Н4|ЕО)[-\s]?/i, '');
-    cleanFlt = cleanFlt.replace(/^[A-ZА-Я][A-ZА-Я0-9]{0,2}[-\s]?/i, '');
-    const fltMatch = cleanFlt.match(/\d+/);
-    const flightNum = fltMatch ? fltMatch[0] : cleanFlt.replace(/\D/g, '');
+    const { operator, flightNum, fullFlight } = extractFlightOperatorAndNumber(rawFlight);
     if (!flightNum) return;
 
     let from = '';
@@ -407,6 +458,8 @@ function FlightRow({
 
     const params = new URLSearchParams();
     params.set('flight', flightNum);
+    if (operator) params.set('operator', operator);
+    if (fullFlight) params.set('flight_full', fullFlight);
     if (from) params.set('from', from);
     if (to) params.set('to', to);
     if (date) params.set('date', date);
@@ -415,28 +468,15 @@ function FlightRow({
     if (acConfig) params.set('ac_config', acConfig);
     if (depTime) params.set('dep_time', depTime);
     if (flight.crew) params.set('crew', flight.crew);
-    let abCh = flight.pax_ch || (flight.pax?.includes('/') ? flight.pax.split('/')[1] : null);
-    let abInf = flight.pax_inf || (flight.pax?.includes('/') && flight.pax.split('/').length > 2 ? flight.pax.split('/')[2] : null);
-    let abM = flight.pax_m;
-    let abF = flight.pax_f;
-    if (!abCh && !abInf) {
-      const notesStr = String(flight.notes || '');
-      const rbM = notesStr.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd|дет)/i);
-      const rmM = notesStr.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf|младен|инф)/i);
-      if (rbM) abCh = rbM[1];
-      if (rmM) abInf = rmM[1];
-    }
-    if (!abM && !abF && flight.pax) {
-      const pStr = String(flight.pax).trim();
-      const adt = pStr.includes('/') ? (parseInt(pStr.split('/')[0], 10) || 0) : (parseInt(pStr, 10) || 0);
-      const realAdt = abCh ? Math.max(0, adt - (parseInt(abCh, 10) || 0)) : adt;
-      if (realAdt > 0) {
-        abM = String(Math.ceil(realAdt / 2));
-        abF = String(realAdt - Math.ceil(realAdt / 2));
-      }
-    }
 
-    if (flight.fuel_block) params.set('to_fuel', String(flight.fuel_block).replace(/\D/g, ''));
+    const { paxM: abM, paxF: abF, paxCh: abCh, paxInf: abInf } = resolvePassengersForTransfer();
+    const cleanBlockFuel = String(flight.fuel_block || '').replace(/\D/g, '');
+    const cleanTaxiFuel = String(flight.fuel_taxi || '').replace(/\D/g, '');
+    const computedToFuel = computeTakeoffFuel(cleanBlockFuel, cleanTaxiFuel);
+
+    if (computedToFuel > 0) params.set('to_fuel', String(computedToFuel));
+    if (cleanBlockFuel) params.set('fuel_block', cleanBlockFuel);
+    if (cleanTaxiFuel) params.set('taxi_fuel', cleanTaxiFuel);
     if (flight.fuel_trip) params.set('trip_fuel', String(flight.fuel_trip).replace(/\D/g, ''));
     if (abM) params.set('pax_m', abM);
     if (abF) params.set('pax_f', abF);
@@ -458,11 +498,7 @@ function FlightRow({
   // Переход в центровочный график W&B Loadsheet
   const handleOpenLoadsheet = () => {
     const rawFlight = (flight.flight || flight.flight_no || flight.flight_number || '').trim();
-    let cleanFlt = rawFlight.toUpperCase();
-    cleanFlt = cleanFlt.replace(/^(N4|EO|NWS|KAR|NW|WZ|S7|SU|DP|UT|A4|U6|FV|5N|7R|KL|КЛ|Н4|ЕО)[-\s]?/i, '');
-    cleanFlt = cleanFlt.replace(/^[A-ZА-Я][A-ZА-Я0-9]{0,2}[-\s]?/i, '');
-    const fltMatch = cleanFlt.match(/\d+/);
-    const flightNum = fltMatch ? fltMatch[0] : cleanFlt.replace(/\D/g, '');
+    const { operator, flightNum, fullFlight } = extractFlightOperatorAndNumber(rawFlight);
     if (!flightNum) return;
 
     let from = '';
@@ -528,7 +564,8 @@ function FlightRow({
     }
 
     const params = new URLSearchParams();
-    params.set('flight', flightNum);
+    params.set('flight', fullFlight || flightNum);
+    if (operator) params.set('operator', operator);
     if (from) params.set('from', from);
     if (to) params.set('to', to);
     if (date) params.set('date', date);
@@ -537,28 +574,14 @@ function FlightRow({
     if (crewVal) params.set('crew', crewVal);
     if (depTime) params.set('time', depTime);
 
-    let lsCh = flight.pax_ch || (flight.pax?.includes('/') ? flight.pax.split('/')[1] : null);
-    let lsInf = flight.pax_inf || (flight.pax?.includes('/') && flight.pax.split('/').length > 2 ? flight.pax.split('/')[2] : null);
-    let lsM = flight.pax_m;
-    let lsF = flight.pax_f;
-    if (!lsCh && !lsInf) {
-      const notesStr = String(flight.notes || '');
-      const rbM = notesStr.match(/(\d+)\s*(?:РБ|Рб|рб|CHD|chd|дет)/i);
-      const rmM = notesStr.match(/(\d+)\s*(?:РМ|Рм|рм|INF|inf|младен|инф)/i);
-      if (rbM) lsCh = rbM[1];
-      if (rmM) lsInf = rmM[1];
-    }
-    if (!lsM && !lsF && flight.pax) {
-      const pStr = String(flight.pax).trim();
-      const adt = pStr.includes('/') ? (parseInt(pStr.split('/')[0], 10) || 0) : (parseInt(pStr, 10) || 0);
-      const realAdt = lsCh ? Math.max(0, adt - (parseInt(lsCh, 10) || 0)) : adt;
-      if (realAdt > 0) {
-        lsM = String(Math.ceil(realAdt / 2));
-        lsF = String(realAdt - Math.ceil(realAdt / 2));
-      }
-    }
+    const { paxM: lsM, paxF: lsF, paxCh: lsCh, paxInf: lsInf } = resolvePassengersForTransfer();
+    const cleanBlockFuel = String(flight.fuel_block || '').replace(/\D/g, '');
+    const cleanTaxiFuel = String(flight.fuel_taxi || '').replace(/\D/g, '');
+    const computedToFuel = computeTakeoffFuel(cleanBlockFuel, cleanTaxiFuel);
 
-    if (flight.fuel_block) params.set('to_fuel', String(flight.fuel_block).replace(/\D/g, ''));
+    if (computedToFuel > 0) params.set('to_fuel', String(computedToFuel));
+    if (cleanBlockFuel) params.set('fuel_block', cleanBlockFuel);
+    if (cleanTaxiFuel) params.set('taxi_fuel', cleanTaxiFuel);
     if (flight.fuel_trip) params.set('trip_fuel', String(flight.fuel_trip).replace(/\D/g, ''));
     if (lsM) params.set('pax_m', lsM);
     if (lsF) params.set('pax_f', lsF);

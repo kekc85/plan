@@ -279,6 +279,22 @@
       font-weight: 900;
     }
 
+    /* Диагональное перечёркивание неиспользуемых граф (экран + печать) */
+    .table-slash-wrap {
+      position: relative;
+      width: 100%;
+      flex-shrink: 0;
+    }
+    .slash-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 4;
+      overflow: visible;
+    }
+
     /* Границы секций */
     .border-b-thick {
       border-bottom: 1.5px solid #000 !important;
@@ -1028,7 +1044,7 @@
     <div class="toolbar-left">
       <button type="button" class="btn btn-secondary" id="btnGoToAeroPlan" onclick="handleNavigateToAeroPlan()" title="Перейти в суточный план смены AeroPlan">📋 AeroPlan</button>
       <button type="button" class="btn btn-secondary" id="btnGoToAeroBag" onclick="handleNavigateToAeroBag()" title="Перейти в расчет загрузки багажа AeroBag">🧳 AeroBag</button>
-      <span class="toolbar-title">✈ Nordwind W&amp;B LoadSheet</span>
+      <span class="toolbar-title" id="toolbarBrandTitle">✈ Nordwind W&amp;B LoadSheet</span>
       <div class="season-selector" title="Выбор сезона для стандартных весов пассажиров">
         <button type="button" class="season-btn active" id="btnSeasonSummer" onclick="setSeason('summer')">Лето (Взр 75 кг)</button>
         <button type="button" class="season-btn" id="btnSeasonWinter" onclick="setSeason('winter')">Зима (Взр 80 кг)</button>
@@ -1057,12 +1073,12 @@
   <div class="sheet-wrapper">
     <div class="blank-border">
       
-      <!-- Шапка бланка (согласно оригиналу: слева пусто, справа LOADSHEET NORDWIND AIRLINES) -->
+      <!-- Шапка бланка (согласно оригиналу: слева пусто, справа LOADSHEET + название авиакомпании) -->
       <div class="blank-header-row">
         <div class="blank-header-left"></div>
         <div class="blank-header-right">
           <h1>LOADSHEET</h1>
-          <h2>NORDWIND AIRLINES</h2>
+          <h2 id="ls_airline_title">NORDWIND AIRLINES</h2>
         </div>
       </div>
 
@@ -1108,7 +1124,9 @@
       </table>
 
       <!-- 2. Верхний блок расчета предельной коммерческой загрузки (точно 1-в-1 по оригиналу бланка) -->
-      <table class="ls-table weights-upper-table border-b-thick">
+      <div class="table-slash-wrap" id="wrap_weights_upper">
+        <svg class="slash-overlay" id="svg_weights_upper" preserveAspectRatio="none"></svg>
+        <table class="ls-table weights-upper-table border-b-thick">
         <colgroup>
           <!-- Левая часть: DOW + Топливо = Operating Weight (43%) -->
           <col style="width: 25%;">
@@ -1210,9 +1228,12 @@
           </tr>
         </tbody>
       </table>
+      </div>
 
       <!-- 3. Таблица коммерческой загрузки и распределения (No. OF PASSENGERS, BAGGAGE/CARGO, COMPARTMENTS) -->
-      <table class="ls-table traffic-table">
+      <div class="table-slash-wrap" id="wrap_traffic_table">
+        <svg class="slash-overlay" id="svg_traffic_table" preserveAspectRatio="none"></svg>
+        <table class="ls-table traffic-table">
         <colgroup>
           <!-- DEST (1) -->
           <col style="width: 5.2%;">
@@ -1295,6 +1316,7 @@
           </tr>
         </tfoot>
       </table>
+      </div>
 
       <!-- 4. Нижний расчетный блок (полное 1-в-1 соответствие оригинальному бланку NWS) -->
       <div class="lower-block-container">
@@ -2066,13 +2088,14 @@
       for (let d = 1; d <= NUM_DEST_BLOCKS; d++) {
         CARGO_TYPES.forEach((type, idx) => {
           const tr = document.createElement('tr');
+          tr.setAttribute('data-dest-block', String(d));
           const isTotalRow = (type === 'T');
           const isLastSubRow = (idx === CARGO_TYPES.length - 1);
           const borderBottomClass = isLastSubRow ? ' border-b-thick' : '';
 
           // 1. Первая колонка DEST (объединяет 6 подстрок)
           if (idx === 0) {
-            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="text" class="ls-input text-center font-bold" id="dest_code_${d}"></td>`;
+            tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="text" class="ls-input text-center font-bold" id="dest_code_${d}" oninput="calculate()"></td>`;
             // PAX M, F, CH, INF
             tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-center" id="pax_m_${d}" oninput="onPaxInput(${d})"></td>`;
             tr.innerHTML += `<td rowspan="6" class="border-b-thick"><input type="number" min="0" class="ls-input text-center" id="pax_f_${d}" oninput="onPaxInput(${d})"></td>`;
@@ -2084,7 +2107,8 @@
 
           // 2. Метка подтипа груза: TR, B, C, M, ULD, T
           const labelClass = isTotalRow ? 'sub-type-label sub-type-t' : 'sub-type-label';
-          tr.innerHTML += `<td class="${labelClass}${borderBottomClass}">${type}</td>`;
+          const labelIdAttr = isTotalRow ? ` id="cargo_label_t_${d}"` : '';
+          tr.innerHTML += `<td${labelIdAttr} class="${labelClass}${borderBottomClass}">${type}</td>`;
 
           // 3. Значение TOTAL для строки данного типа или сумма T
           if (isTotalRow) {
@@ -2120,7 +2144,7 @@
       }
     }
 
-    // Автоматический расчет количества пассажиров экономического класса (Y = Adults + Child - Business C)
+    // Автоматический расчет количества пассажиров экономического класса (Y = Adults + Child - Business C) и нулей PAD
     function onPaxInput(d) {
       const m = numVal(`pax_m_${d}`);
       const f = numVal(`pax_f_${d}`);
@@ -2134,6 +2158,13 @@
         } else {
           yInput.value = '';
         }
+      }
+
+      const padC = document.getElementById(`rem_pad_c_${d}`);
+      const padY = document.getElementById(`rem_pad_y_${d}`);
+      if (seated > 0) {
+        if (padC && padC.value === '') padC.value = '0';
+        if (padY && padY.value === '') padY.value = '0';
       }
       calculate();
     }
@@ -2411,8 +2442,22 @@
 
       let sumCpt = [0, 0, 0, 0, 0];
       let sumRem = { pax_c: 0, pax_y: 0, pad_c: 0, pad_y: 0 };
+      let hasPaxMVal = false;
+      let hasPaxFVal = false;
+      let hasPadCVal = false;
+      let hasPadYVal = false;
+
+      const hasInputVal = (id) => {
+        const el = document.getElementById(id);
+        return el ? String(el.value || '').trim() !== '' : false;
+      };
 
       for (let d = 1; d <= NUM_DEST_BLOCKS; d++) {
+        if (hasInputVal(`pax_m_${d}`)) hasPaxMVal = true;
+        if (hasInputVal(`pax_f_${d}`)) hasPaxFVal = true;
+        if (hasInputVal(`rem_pad_c_${d}`)) hasPadCVal = true;
+        if (hasInputVal(`rem_pad_y_${d}`)) hasPadYVal = true;
+
         const m = numVal(`pax_m_${d}`);
         const f = numVal(`pax_f_${d}`);
         const ch = numVal(`pax_ch_${d}`);
@@ -2453,8 +2498,8 @@
       }
 
       // Заполнение итоговой строки таблицы загрузки
-      setTxt('tot_pax_m', sumPaxM, true, false);
-      setTxt('tot_pax_f', sumPaxF, true, false);
+      setTxt('tot_pax_m', sumPaxM, true, hasPaxMVal);
+      setTxt('tot_pax_f', sumPaxF, true, hasPaxFVal);
       setTxt('tot_pax_ch', sumPaxCh, true, false);
       setTxt('tot_pax_inf', sumPaxInf, true, false);
       setTxt('tot_cabin_bag', sumCabinBag, true, false);
@@ -2465,8 +2510,8 @@
       }
       setTxt('tot_rem_pax_c', sumRem.pax_c, true, false);
       setTxt('tot_rem_pax_y', sumRem.pax_y, true, false);
-      setTxt('tot_rem_pad_c', sumRem.pad_c, true, false);
-      setTxt('tot_rem_pad_y', sumRem.pad_y, true, false);
+      setTxt('tot_rem_pad_c', sumRem.pad_c, true, hasPadCVal);
+      setTxt('tot_rem_pad_y', sumRem.pad_y, true, hasPadYVal);
 
       // Масса пассажиров
       const adultStandardWeight = (paxWeights.season === 'winter') ? paxWeights.adult_winter : paxWeights.adult_summer;
@@ -2561,6 +2606,11 @@
         maxLaw,
         adjLaw
       });
+
+      // 10. Отрисовка диагонального перечёркивания неиспользуемых граф
+      if (typeof updateUnusedSlashes === 'function') {
+        updateUnusedSlashes(lowestLimIdx);
+      }
     }
 
     // Валидация весовых ограничений
@@ -2620,6 +2670,10 @@
         if (btn) btn.textContent = '+';
       }
 
+      window._activeLoadsheetOperator = '';
+      if (typeof updateAirlineHeader === 'function') {
+        updateAirlineHeader('');
+      }
       calculate();
     }
 
@@ -2636,6 +2690,9 @@
         label.textContent = Math.round(currentZoom * 100) + '%';
       }
       localStorage.setItem('wb_loadsheet_zoom', currentZoom);
+      if (typeof updateUnusedSlashes === 'function') {
+        updateUnusedSlashes();
+      }
     }
 
     function changeZoom(delta) {
@@ -2648,11 +2705,17 @@
         wrapper.style.zoom = '1';
         wrapper.style.transform = 'none';
       }
+      if (typeof updateUnusedSlashes === 'function') {
+        updateUnusedSlashes();
+      }
       setTimeout(() => {
         window.print();
         setTimeout(() => {
           if (wrapper) {
             wrapper.style.zoom = currentZoom;
+          }
+          if (typeof updateUnusedSlashes === 'function') {
+            updateUnusedSlashes();
           }
         }, 500);
       }, 60);
@@ -2664,6 +2727,9 @@
         wrapper.style.zoom = '1';
         wrapper.style.transform = 'none';
       }
+      if (typeof updateUnusedSlashes === 'function') {
+        updateUnusedSlashes();
+      }
     });
 
     window.addEventListener('afterprint', () => {
@@ -2671,7 +2737,178 @@
       if (wrapper) {
         wrapper.style.zoom = currentZoom;
       }
+      if (typeof updateUnusedSlashes === 'function') {
+        updateUnusedSlashes();
+      }
     });
+
+    window.addEventListener('resize', () => {
+      if (typeof updateUnusedSlashes === 'function') {
+        updateUnusedSlashes();
+      }
+    });
+
+    // Распознавание авиакомпании по коду рейса или явному оператору (N4 / EO)
+    function detectLoadsheetOperator(rawFlight, explicitOp = '') {
+      const op = String(explicitOp || '').toUpperCase().trim();
+      if (op === 'EO' || op === 'KAR' || op === 'ЕО' || op === 'ИК' || op.includes('IKAR')) return 'EO';
+      if (op === 'N4' || op === 'NWS' || op === 'СВ' || op === 'Н4' || op.includes('NORDWIND')) return 'N4';
+      const flt = String(rawFlight || '').toUpperCase().trim();
+      if (/^(EO|KAR|ЕО|ИК)(?=[\d\-\s]|$)/i.test(flt)) return 'EO';
+      if (/^(N4|NWS|Н4|СВ)(?=[\d\-\s]|$)/i.test(flt)) return 'N4';
+      return '';
+    }
+
+    // Форматирование номера рейса с кодом авиакомпании (например "N4 1446" или "EO 1294")
+    function formatFlightWithOperator(rawFlight, explicitOp = '') {
+      const str = String(rawFlight || '').trim().toUpperCase();
+      if (!str) return '';
+      const op = detectLoadsheetOperator(str, explicitOp);
+      const cleanDigits = str
+        .replace(/^(N4|EO|NWS|KAR|NW|WZ|S7|SU|DP|UT|A4|U6|FV|5N|7R|KL|КЛ|Н4|ЕО|СВ|ИК)[-\s]?/i, '')
+        .replace(/^[A-ZА-Я][A-ZА-Я0-9]{0,2}[-\s]?/i, '')
+        .replace(/\s+/g, '')
+        .trim();
+      const numMatch = cleanDigits.match(/\d+/);
+      const numPart = numMatch ? numMatch[0] : cleanDigits;
+      if (op && numPart) return `${op} ${numPart}`;
+      return str;
+    }
+
+    // Обновление шапки бланка и панели инструментов по авиакомпании (NORDWIND AIRLINES / IKAR AIRLINES)
+    function updateAirlineHeader(explicitOp = '') {
+      const flightVal = document.getElementById('f_flight')?.value || '';
+      const op = detectLoadsheetOperator(flightVal, explicitOp || window._activeLoadsheetOperator || '');
+      if (op) window._activeLoadsheetOperator = op;
+      const isIkar = (op === 'EO');
+      const titleEl = document.getElementById('ls_airline_title');
+      if (titleEl) {
+        titleEl.textContent = isIkar ? 'IKAR AIRLINES' : 'NORDWIND AIRLINES';
+      }
+      const toolbarTitleEl = document.getElementById('toolbarBrandTitle');
+      if (toolbarTitleEl) {
+        toolbarTitleEl.textContent = isIkar ? '✈ Ikar W&B LoadSheet' : '✈ Nordwind W&B LoadSheet';
+      }
+      document.title = isIkar ? 'LOADSHEET - IKAR AIRLINES' : 'LOADSHEET - NORDWIND AIRLINES';
+    }
+
+    // Получение координат ячейки в единой системе SVG-вьюбокса таблицы (независимо от zoom)
+    function getCellBoxInTable(cellEl, tableEl) {
+      if (!cellEl || !tableEl) return null;
+      const w = tableEl.offsetWidth;
+      const h = tableEl.offsetHeight;
+      if (!w || !h) return null;
+      const tRect = tableEl.getBoundingClientRect();
+      const cRect = cellEl.getBoundingClientRect();
+      const sx = tRect.width ? (w / tRect.width) : 1;
+      const sy = tRect.height ? (h / tRect.height) : 1;
+      return {
+        left: (cRect.left - tRect.left) * sx,
+        right: (cRect.right - tRect.left) * sx,
+        top: (cRect.top - tRect.top) * sy,
+        bottom: (cRect.bottom - tRect.top) * sy
+      };
+    }
+
+    function appendDiagonalSlash(svg, x1, y1, x2, y2) {
+      if (typeof document.createElementNS !== 'function') return;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1.toFixed(2));
+      line.setAttribute('y1', y1.toFixed(2));
+      line.setAttribute('x2', x2.toFixed(2));
+      line.setAttribute('y2', y2.toFixed(2));
+      line.setAttribute('stroke', '#000');
+      line.setAttribute('stroke-width', '1.25');
+      line.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(line);
+    }
+
+    function isDestBlockUsed(d) {
+      const hasVal = (id) => {
+        const el = document.getElementById(id);
+        return el ? String(el.value || '').trim() !== '' : false;
+      };
+      if (hasVal(`dest_code_${d}`)) return true;
+      if (numVal(`pax_m_${d}`) > 0 || numVal(`pax_f_${d}`) > 0 || numVal(`pax_ch_${d}`) > 0 ||
+          numVal(`pax_inf_${d}`) > 0 || numVal(`cabin_bag_${d}`) > 0) {
+        return true;
+      }
+      if (numVal(`rem_pax_c_${d}`) > 0 || numVal(`rem_pax_y_${d}`) > 0 ||
+          numVal(`rem_pad_c_${d}`) > 0 || numVal(`rem_pad_y_${d}`) > 0) {
+        return true;
+      }
+      for (const t of ['tr', 'b', 'c', 'm', 'uld']) {
+        if (numVal(`cargo_${t}_${d}`) > 0) return true;
+        for (let c = 1; c <= 5; c++) {
+          if (numVal(`cpt_${c}_${t}_${d}`) > 0) return true;
+        }
+      }
+      return false;
+    }
+
+    let _lastLowestLimIdx = 0;
+
+    // Отрисовка диагонального перечёркивания неиспользуемых колонок ограничений и пустых блоков назначения
+    function updateUnusedSlashes(lowestLimIdx = _lastLowestLimIdx) {
+      _lastLowestLimIdx = lowestLimIdx || 0;
+
+      const upperSvg = document.getElementById('svg_weights_upper');
+      const upperTable = document.querySelector('#wrap_weights_upper > table');
+      if (upperSvg && upperTable) {
+        upperSvg.innerHTML = '';
+        const uw = upperTable.offsetWidth;
+        const uh = upperTable.offsetHeight;
+        if (uw > 0 && uh > 0 && _lastLowestLimIdx > 0) {
+          upperSvg.setAttribute('viewBox', `0 0 ${uw} ${uh}`);
+          [1, 2, 3].forEach((k) => {
+            if (k === _lastLowestLimIdx) return;
+            const tdTop = document.getElementById(`disp_wow_${k}`);
+            const tdBot = document.getElementById(`disp_atl_${k}`);
+            const topBox = getCellBoxInTable(tdTop, upperTable);
+            const botBox = getCellBoxInTable(tdBot, upperTable);
+            if (topBox && botBox) {
+              appendDiagonalSlash(upperSvg, topBox.left, botBox.bottom, topBox.right, topBox.top);
+            }
+          });
+        }
+      }
+
+      const trafficSvg = document.getElementById('svg_traffic_table');
+      const trafficTable = document.querySelector('#wrap_traffic_table > table');
+      if (trafficSvg && trafficTable) {
+        trafficSvg.innerHTML = '';
+        const tw = trafficTable.offsetWidth;
+        const th = trafficTable.offsetHeight;
+        if (tw > 0 && th > 0) {
+          trafficSvg.setAttribute('viewBox', `0 0 ${tw} ${th}`);
+          const usedFlags = [];
+          for (let d = 1; d <= NUM_DEST_BLOCKS; d++) {
+            usedFlags.push(isDestBlockUsed(d));
+          }
+          if (usedFlags.some(Boolean)) {
+            for (let d = 1; d <= NUM_DEST_BLOCKS; d++) {
+              if (usedFlags[d - 1]) continue;
+              const destTd = document.getElementById(`dest_code_${d}`)?.closest('td');
+              const bagTd = document.getElementById(`cabin_bag_${d}`)?.closest('td');
+              const cargoBotTd = document.getElementById(`cargo_label_t_${d}`);
+              const padEndTd = document.getElementById(`rem_pad_y_${d}`)?.closest('td');
+
+              const leftBox = getCellBoxInTable(destTd, trafficTable);
+              const bagBox = getCellBoxInTable(bagTd, trafficTable);
+              if (leftBox && bagBox) {
+                appendDiagonalSlash(trafficSvg, leftBox.left, leftBox.bottom, bagBox.right, bagBox.top);
+              }
+
+              const cargoBotBox = getCellBoxInTable(cargoBotTd, trafficTable);
+              const padEndBox = getCellBoxInTable(padEndTd, trafficTable);
+              if (cargoBotBox && padEndBox) {
+                appendDiagonalSlash(trafficSvg, cargoBotBox.left, cargoBotBox.bottom, padEndBox.right, padEndBox.top);
+              }
+            }
+          }
+        }
+      }
+    }
 
     // Определение тестового контура (loadsheet_test / plan_2 / aerobag-test)
     function isLoadsheetTestContour() {
@@ -2754,12 +2991,14 @@
 
       const getVal = (id) => String(document.getElementById(id)?.value || '').trim();
       const rawFlight = getVal('f_flight');
+      const flightOp = detectLoadsheetOperator(rawFlight, window._activeLoadsheetOperator || '');
       const cleanFlight = rawFlight
         .toUpperCase()
-        .replace(/^(N4|EO|NWS|KAR|NW|WZ|S7|SU|DP|UT|A4|U6|FV|5N|7R|KL|КЛ|Н4|ЕО)[-\s]?/i, '')
+        .replace(/^(N4|EO|NWS|KAR|NW|WZ|S7|SU|DP|UT|A4|U6|FV|5N|7R|KL|КЛ|Н4|ЕО|СВ|ИК)[-\s]?/i, '')
         .replace(/^[A-ZА-Я][A-ZА-Я0-9]{0,2}[-\s]?/i, '');
       const fltMatch = cleanFlight.match(/\d+/);
       const flightNum = fltMatch ? fltMatch[0] : cleanFlight.replace(/\D/g, '');
+      const flightFull = (flightOp && flightNum) ? `${flightOp} ${flightNum}` : rawFlight;
 
       if (!flightNum) {
         window.location.href = baseAeroBagUrl;
@@ -2799,10 +3038,14 @@
       const maxTowVal = getVal('inp_max_tow');
       const maxLawVal = getVal('inp_max_law');
       const toFuelVal = getVal('inp_takeoff_fuel');
+      const blockFuelVal = isSameIncomingFlight && inc.fuel_block ? String(inc.fuel_block).replace(/\D/g, '') : '';
+      const taxiFuelVal = isSameIncomingFlight && (inc.taxi_fuel || inc.fuel_taxi) ? String(inc.taxi_fuel || inc.fuel_taxi).replace(/\D/g, '') : '';
       const tripFuelVal = getVal('inp_trip_fuel');
 
       const params = new URLSearchParams();
       params.set('flight', flightNum);
+      if (flightOp) params.set('operator', flightOp);
+      if (flightFull) params.set('flight_full', flightFull);
       if (fromVal) params.set('from', fromVal);
       if (toVal) params.set('to', toVal);
       if (isoDateVal) params.set('date', isoDateVal);
@@ -2822,6 +3065,8 @@
       if (maxTowVal) params.set('max_tow', maxTowVal);
       if (maxLawVal) params.set('max_law', maxLawVal);
       if (toFuelVal) params.set('to_fuel', toFuelVal);
+      if (blockFuelVal) params.set('fuel_block', blockFuelVal);
+      if (taxiFuelVal) params.set('taxi_fuel', taxiFuelVal);
       if (tripFuelVal) params.set('trip_fuel', tripFuelVal);
       params.set('return_url', resolveAeroPlanTargetUrl());
 
@@ -2943,10 +3188,9 @@
       const curTail = String(curTailRaw).toUpperCase().replace(/^(RA|РА)[-\s]?/i, '').replace(/\D/g, '').trim();
       if (!curTail) return;
 
-      const curFlightStr = String(document.getElementById('f_flight')?.value || '').toUpperCase().trim();
-      let curOp = '';
-      if (/^(EO|KAR|ИК|ЕО)/i.test(curFlightStr)) curOp = 'EO';
-      else if (/^(N4|NWS|СВ|Н4)/i.test(curFlightStr)) curOp = 'N4';
+      const flightInputEl = document.getElementById('f_flight');
+      const curFlightStr = String(flightInputEl?.value || '').toUpperCase().trim();
+      const curOp = detectLoadsheetOperator(curFlightStr, window._activeLoadsheetOperator || '');
 
       const crewInpEl = document.getElementById('f_crew');
       const rawCrewVal = crewInpEl?.value || '';
@@ -2972,6 +3216,16 @@
           if (!configKey || !wbData[configKey]) return;
           const cfg = wbData[configKey];
           let needRecalc = false;
+
+          // Определение оператора по базе флота (если в поле Flight указан только номер без кода)
+          const cfgOp = detectLoadsheetOperator('', cfg.operator || '');
+          const resolvedOp = curOp || cfgOp;
+          if (resolvedOp) {
+            if (flightInputEl && curFlightStr && !detectLoadsheetOperator(curFlightStr)) {
+              flightInputEl.value = formatFlightWithOperator(curFlightStr, resolvedOp);
+            }
+            updateAirlineHeader(resolvedOp);
+          }
 
           const setFieldIfNeeded = (id, val) => {
             if (val === undefined || val === null || val === '') return;
@@ -3085,11 +3339,11 @@
 
       window._incomingLoadsheetData = data;
 
-      // 3.1. Дозаполнение отсутствующих реквизитов рейса из активной смены AeroPlan (если открыт по номеру рейса)
+      // 3.1. Дозаполнение отсутствующих реквизитов рейса из активной смены AeroPlan (вкл. код авиакомпании и топливо руления)
       try {
         const incomingFlt = String(data.flight || data.f_flight || data.flight_no || data.flight_number || '').replace(/\D/g, '');
         const cleanIncomingFlt = incomingFlt ? String(parseInt(incomingFlt, 10)) : '';
-        if (cleanIncomingFlt && (!data.acreg && !data.ac_num || !data.crew || !data.dow || !data.to_fuel && !data.fuel_block)) {
+        if (cleanIncomingFlt) {
           const rawShift = localStorage.getItem('aeroplan_shift_journal_active_flights');
           if (rawShift) {
             const shiftFlights = JSON.parse(rawShift);
@@ -3116,6 +3370,12 @@
                 return true;
               });
               if (matched) {
+                const matchedFlightStr = matched.flight || matched.flight_no || '';
+                const matchedOp = detectLoadsheetOperator(matchedFlightStr, matched.operator || '');
+                if (!data.operator && matchedOp) data.operator = matchedOp;
+                if (matchedFlightStr && !detectLoadsheetOperator(data.flight_full || data.flight || '', data.operator || '')) {
+                  data.flight = matchedFlightStr;
+                }
                 if (!data.acreg && !data.ac_num && matched.ac_num) data.acreg = matched.ac_num;
                 if (!data.version && !data.ac_config && matched.ac_config) data.version = matched.ac_config;
                 if (!data.crew && matched.crew) data.crew = matched.crew;
@@ -3123,7 +3383,13 @@
                 if (!data.dow && matched.dow) data.dow = matched.dow;
                 if (!data.doi && matched.doi) data.doi = matched.doi;
                 if (!data.max_tow && !data.mtow && matched.mtow) data.max_tow = matched.mtow;
-                if (!data.to_fuel && !data.fuel_block && matched.fuel_block) data.to_fuel = matched.fuel_block;
+                if (!data.fuel_block && matched.fuel_block) data.fuel_block = matched.fuel_block;
+                if (!data.taxi_fuel && !data.fuel_taxi && matched.fuel_taxi) data.taxi_fuel = matched.fuel_taxi;
+                if (!data.to_fuel && matched.fuel_block) {
+                  const blk = parseInt(String(matched.fuel_block).replace(/\D/g, ''), 10) || 0;
+                  const tx = parseInt(String(matched.fuel_taxi || '').replace(/\D/g, ''), 10) || 0;
+                  if (blk > 0) data.to_fuel = String(Math.max(0, blk - tx));
+                }
                 if (!data.trip_fuel && !data.fuel_trip && matched.fuel_trip) data.trip_fuel = matched.fuel_trip;
                 if (!data.cargo && matched.cargo) data.cargo = matched.cargo;
                 if (!data.mail && matched.mail) data.mail = matched.mail;
@@ -3146,9 +3412,15 @@
         }
       };
 
-      // 4. Заполнение заголовка рейса
-      setInp('f_flight', data.flight || data.f_flight || data.flight_no || data.flight_number);
-      setInp('f_originator', data.originator || data.f_originator || 'DISPATCH');
+      // 4. Заполнение заголовка рейса и названия авиакомпании
+      const rawIncomingFlight = data.flight_full || data.flight || data.f_flight || data.flight_no || data.flight_number || '';
+      const detectedOp = detectLoadsheetOperator(rawIncomingFlight, data.operator || data.airline || '');
+      const formattedFlight = formatFlightWithOperator(rawIncomingFlight, detectedOp);
+      setInp('f_flight', formattedFlight);
+      updateAirlineHeader(detectedOp);
+
+      // Originator должен оставаться пустым, если не передан явно
+      setInp('f_originator', data.originator || data.f_originator || '');
       setInp('f_acreg', data.acreg || data.ac_num || data.f_acreg || data.tail);
       let versionVal = resolveLayoutVersionFromModel(data.version || data.f_version || data.ac_config || data.layout || '');
       setInp('f_version', versionVal);
@@ -3177,12 +3449,19 @@
       }
       setInp('f_time', data.time || data.f_time || data.departure_time);
 
-      // 5. Заполнение топлива (взлетное и рейсовое)
-      const toFuelVal = data.to_fuel || data.takeoff_fuel || data.fuel_block || data.fuel || data.inp_takeoff_fuel;
-      if (toFuelVal !== undefined && toFuelVal !== null && toFuelVal !== '') {
-        const cleanToFuel = String(toFuelVal).replace(/\D/g, '');
-        if (cleanToFuel) setInp('inp_takeoff_fuel', cleanToFuel);
+      // 5. Заполнение топлива: TAKE-OFF FUEL = Block - Taxi
+      const rawBlockFuel = String(data.fuel_block || '').replace(/\D/g, '');
+      const rawTaxiFuel = String(data.taxi_fuel || data.fuel_taxi || '').replace(/\D/g, '');
+      const explicitToFuel = String(data.to_fuel || data.takeoff_fuel || data.inp_takeoff_fuel || '').replace(/\D/g, '');
+      let toFuelResolved = '';
+      if (rawBlockFuel && rawTaxiFuel !== '') {
+        toFuelResolved = String(Math.max(0, (parseInt(rawBlockFuel, 10) || 0) - (parseInt(rawTaxiFuel, 10) || 0)));
+      } else if (explicitToFuel) {
+        toFuelResolved = explicitToFuel;
+      } else {
+        toFuelResolved = rawBlockFuel || String(data.fuel || '').replace(/\D/g, '');
       }
+      if (toFuelResolved) setInp('inp_takeoff_fuel', toFuelResolved);
       const tripFuelVal = data.trip_fuel || data.fuel_trip || data.inp_trip_fuel;
       if (tripFuelVal !== undefined && tripFuelVal !== null && tripFuelVal !== '') {
         const cleanTripFuel = String(tripFuelVal).replace(/\D/g, '');
@@ -3238,8 +3517,8 @@
           if (chVal > 0) rawPaxCh = chVal;
           if (infVal > 0) rawPaxInf = infVal;
           if (!rawPaxM && !rawPaxF && adt > 0) {
-            rawPaxM = Math.ceil(adt / 2);
-            rawPaxF = adt - rawPaxM;
+            rawPaxM = adt;
+            rawPaxF = 0;
           }
         } else if (data.notes) {
           // Поиск в ремарках (например "5 РБ 2 РМ")
@@ -3251,22 +3530,23 @@
         }
       }
 
-      let numM = parseInt(rawPaxM, 10) || 0;
-      let numF = parseInt(rawPaxF, 10) || 0;
-      let numCh = parseInt(rawPaxCh, 10) || 0;
-      let numInf = parseInt(rawPaxInf, 10) || 0;
+      const numM = parseInt(rawPaxM, 10) || 0;
+      const numF = parseInt(rawPaxF, 10) || 0;
+      const numCh = parseInt(rawPaxCh, 10) || 0;
+      const numInf = parseInt(rawPaxInf, 10) || 0;
 
-      // Если есть общее количество пассажиров (например pax=175) и есть дети (numCh),
-      // а взрослые numM и numF явно не переданы — взрослые равны: totalPax - numCh
+      // Всех взрослых записываем в графу M (мужчины), в графе F (женщины) ставим 0
       const totalPax = parseInt(rawPaxStr, 10) || 0;
-      if (numM === 0 && numF === 0 && totalPax > 0) {
-        const adults = Math.max(0, totalPax - numCh);
-        numM = Math.ceil(adults / 2);
-        numF = adults - numM;
+      let totalAdults = numM + numF;
+      if (totalAdults === 0 && totalPax > 0) {
+        totalAdults = Math.max(0, totalPax - numCh);
       }
 
-      if (numM > 0) setInp('pax_m_1', numM);
-      if (numF > 0) setInp('pax_f_1', numF);
+      const hasAnyPaxData = totalAdults > 0 || numCh > 0 || numInf > 0 || rawPaxStr !== '';
+      if (hasAnyPaxData) {
+        setInp('pax_m_1', String(totalAdults));
+        setInp('pax_f_1', '0');
+      }
       if (numCh > 0) setInp('pax_ch_1', numCh);
       if (numInf > 0) setInp('pax_inf_1', numInf);
 
@@ -3298,6 +3578,12 @@
         touchedTypes.add('m');
       }
 
+      // Для активного первого направления проставляем 0 в PAD C и PAD Y (если не заданы явно)
+      if (toDest || hasAnyPaxData || touchedTypes.size > 0) {
+        setInp('rem_pad_c_1', data.pad_c !== undefined ? String(data.pad_c) : '0');
+        setInp('rem_pad_y_1', data.pad_y !== undefined ? String(data.pad_y) : '0');
+      }
+
       // Пересчитываем строчные суммы в таблице коммерческой загрузки
       touchedTypes.forEach(type => {
         if (typeof onCptInput === 'function') {
@@ -3314,8 +3600,17 @@
       loadConfigFromStorage();
       initTrafficTable();
       checkIncomingLoadsheetData();
+      updateAirlineHeader();
       calculate();
 
+      const flightEl = document.getElementById('f_flight');
+      if (flightEl) {
+        flightEl.addEventListener('input', () => updateAirlineHeader());
+        flightEl.addEventListener('change', () => {
+          updateAirlineHeader();
+          lookupAndApplyAircraftWb(true);
+        });
+      }
       const acregEl = document.getElementById('f_acreg');
       if (acregEl) {
         acregEl.addEventListener('change', () => lookupAndApplyAircraftWb(true));

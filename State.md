@@ -1,3 +1,8 @@
+- 2026-11-24: Обновлён W&B LoadSheet и сквозной проброс данных из AeroPlan/AeroBag (`FlightRow.jsx`, `aerobag/app.js`, `loadsheet/index.html`):
+  - Поле `Flight` (`#f_flight`) формируется с кодом авиакомпании (`N4 1446`, `EO 1294`); динамический заголовок `#ls_airline_title` / `toolbarBrandTitle` / `document.title` переключается между `NORDWIND AIRLINES` и `IKAR AIRLINES` (`EO`).
+  - `TAKE-OFF FUEL` вычисляется по формуле `Block - Taxi`; `Originator` (`#f_originator`) остаётся пустым по умолчанию.
+  - Все взрослые пассажиры записываются в `ADULT M`, в `ADULT F` проставляется `0`; `PAD C` / `PAD Y` активного направления и итоги `TOTAL` заполняются `0`.
+  - Внедрено SVG-перечёркивание неиспользуемых колонок `WET OPERATING WEIGHT` / `ALLOWED TRAFFIC LOAD` и пустых блоков назначения в таблице загрузки.
 - 2026-11-22: Исправлена мобильная вёрстка панели администратора (`AdminModal.jsx`, `FleetWbManager.jsx`):
   - В `AdminModal.jsx` панель вкладок переведена на `flex-wrap` на мобильных экранах (устранена обрезка «legram-бот»), добавлены `min-w-0` и `overflow-x-hidden` на тело модалки, адаптивная вёрстка фильтров логов, Telegram-бота, карточек и 2FA-блоков AviaBit, а также детальных модалок логов и архивов.
   - В `FleetWbManager.jsx` добавлен `min-w-0` на правую сетку `lg:col-span-7` (исключен выезд таблицы/карточек за границы экрана), тумблеры багажа/FAK переведены на 2-колоночную сетку на смартфонах, симулятор DOW/DOI переведён на `flex-wrap` с полной плашкой результата (`whitespace-nowrap`), адаптированы фильтры, карточка предельных весов и модалки WBR/PDF.
