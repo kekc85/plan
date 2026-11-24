@@ -1387,7 +1387,7 @@
             <th rowspan="3">DEST.</th>
             <th colspan="4">No. OF PASSENGERS</th>
             <th rowspan="3">CABIN<br>BAG<br>WT</th>
-            <th colspan="2" rowspan="2">TOTAL</th>
+            <th colspan="2" rowspan="3" style="vertical-align: top; padding-top: 3px;">TOTAL</th>
             <th colspan="5">DISTRIBUTION WEIGHT</th>
             <th colspan="4">REMARKS</th>
           </tr>
@@ -1406,8 +1406,6 @@
           <tr>
             <th>M</th>
             <th>F</th>
-            <th></th>
-            <th></th>
             <th>C</th>
             <th>Y</th>
             <th>C</th>
@@ -2199,11 +2197,11 @@
             tr.innerHTML += `<td rowspan="5"><input type="number" min="0" class="ls-input text-right" id="cabin_bag_${d}" oninput="calculate()"></td>`;
           } else if (isTotalRow) {
             tr.innerHTML += `<td id="dest_t_${d}" class="traffic-shaded-t-cell border-b-thick"></td>`;
-            tr.innerHTML += `<td class="traffic-shaded-t-cell border-b-thick"></td>`;
-            tr.innerHTML += `<td class="traffic-shaded-t-cell border-b-thick"></td>`;
-            tr.innerHTML += `<td class="traffic-shaded-t-cell border-b-thick"></td>`;
-            tr.innerHTML += `<td class="traffic-shaded-t-cell border-b-thick"></td>`;
-            tr.innerHTML += `<td class="traffic-shaded-t-cell border-b-thick"></td>`;
+            tr.innerHTML += `<td id="pax_m_t_${d}" class="traffic-shaded-t-cell calc-val center font-bold border-b-thick"></td>`;
+            tr.innerHTML += `<td id="pax_f_t_${d}" class="traffic-shaded-t-cell calc-val center font-bold border-b-thick"></td>`;
+            tr.innerHTML += `<td id="pax_ch_t_${d}" class="traffic-shaded-t-cell calc-val center font-bold border-b-thick"></td>`;
+            tr.innerHTML += `<td id="pax_inf_t_${d}" class="traffic-shaded-t-cell calc-val center font-bold border-b-thick"></td>`;
+            tr.innerHTML += `<td id="cabin_bag_t_${d}" class="traffic-shaded-t-cell calc-val font-bold border-b-thick"></td>`;
           }
 
           // 2. Метка подтипа груза: TR, B, C, M, ULD, T
@@ -2566,6 +2564,13 @@
         const ch = numVal(`pax_ch_${d}`);
         const inf = numVal(`pax_inf_${d}`);
         const cb = numVal(`cabin_bag_${d}`);
+
+        // Дублирование значений пассажиров и ручной клади в серой строке T текущего блока
+        setTxt(`pax_m_t_${d}`, m, true, hasInputVal(`pax_m_${d}`));
+        setTxt(`pax_f_t_${d}`, f, true, hasInputVal(`pax_f_${d}`));
+        setTxt(`pax_ch_t_${d}`, ch, true, hasInputVal(`pax_ch_${d}`));
+        setTxt(`pax_inf_t_${d}`, inf, true, hasInputVal(`pax_inf_${d}`));
+        setTxt(`cabin_bag_t_${d}`, cb, true, hasInputVal(`cabin_bag_${d}`));
 
         sumPaxM += m;
         sumPaxF += f;
