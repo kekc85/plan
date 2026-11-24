@@ -1,3 +1,7 @@
+- 2026-11-24: Доработка бланка `loadsheet/index.html` (секция `REMARKS`, блок `Notes`, бортовой `A/C Reg`):
+  - В `initTrafficTable()` (Вариант А) строки `C`, `M`, `ULD`, `T` под `REMARKS` (`colspan="4" rowspan="4"`) объединены в серую заштрихованную ячейку `.remarks-shaded-cell` с подписями `PAX` и `PAD` (при сохранении `print-color-adjust: exact`).
+  - Блок `.notes-box` приведён к формату образца: сплошная линия под `Notes`, выровненные строки весов с динамическими `#lbl_wt_*` и 4-строчный дисклеймер экипажа/LMC.
+  - Добавлена функция `formatAircraftRegistration()`: 5-значные номера российской регистрации и префиксы `RA`/`РА` форматируются как `RA-XXXXX` (`RA-73319`) при загрузке из URL и по `blur`/`change` на `#f_acreg`.
 - 2026-11-24: Обновлён W&B LoadSheet и сквозной проброс данных из AeroPlan/AeroBag (`FlightRow.jsx`, `aerobag/app.js`, `loadsheet/index.html`):
   - Поле `Flight` (`#f_flight`) формируется с кодом авиакомпании (`N4 1446`, `EO 1294`); динамический заголовок `#ls_airline_title` / `toolbarBrandTitle` / `document.title` переключается между `NORDWIND AIRLINES` и `IKAR AIRLINES` (`EO`).
   - `TAKE-OFF FUEL` вычисляется по формуле `Block - Taxi`; `Originator` (`#f_originator`) остаётся пустым по умолчанию.

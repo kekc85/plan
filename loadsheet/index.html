@@ -698,20 +698,77 @@
     }
 
     .notes-box {
-      font-size: 6.8px;
+      font-size: 7.4px;
       line-height: 1.15;
-      padding: 2px 3.5px;
+      padding: 2px 4px;
       border-bottom: 1px solid #000;
       height: 26.7mm;
       flex-shrink: 0;
       box-sizing: border-box;
+      overflow: hidden;
     }
 
     .notes-header-text {
-      font-weight: 900;
-      font-size: 7.2px;
-      text-decoration: underline;
-      margin-bottom: 1.5px;
+      font-weight: 700;
+      font-size: 8px;
+      line-height: 1.15;
+      border-bottom: 0.75px solid #000;
+      padding-bottom: 1px;
+      margin-bottom: 2px;
+    }
+
+    .notes-weights-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5px;
+      margin-bottom: 2.5px;
+      font-size: 7.4px;
+      line-height: 1.16;
+    }
+
+    .notes-weight-row {
+      display: flex;
+      align-items: baseline;
+    }
+
+    .notes-weight-lbl {
+      width: 58%;
+    }
+
+    .notes-weight-val {
+      flex: 1;
+    }
+
+    .notes-footer-text {
+      font-size: 5.7px;
+      line-height: 1.18;
+      color: #111;
+      letter-spacing: -0.1px;
+    }
+
+    .remarks-shaded-cell {
+      background-color: #e6e7e9;
+      background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.08) 0px, rgba(0, 0, 0, 0.08) 1px, transparent 1px, transparent 3px);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      vertical-align: top;
+      text-align: left;
+      padding: 1.5px 3px;
+    }
+
+    .remarks-shaded-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 100%;
+      align-items: start;
+    }
+
+    .remarks-shaded-lbl {
+      font-size: 6.4px;
+      font-weight: 600;
+      color: #222;
+      line-height: 1.1;
+      text-align: left;
     }
 
     .balance-header-row {
@@ -1974,12 +2031,18 @@
           <!-- Notes (точно как в бланке NWS) -->
           <div class="notes-box">
             <div class="notes-header-text">Notes</div>
-            Adult (winter): <span id="lbl_wt_winter">80</span> kg &nbsp;|&nbsp; Adult (summer): <span id="lbl_wt_summer">75</span> kg<br>
-            Child: <span id="lbl_wt_child">30</span> kg &nbsp;|&nbsp; Infant: <span id="lbl_wt_infant">15</span> kg<br>
-            <span style="font-size: 6px; color: #111; line-height: 1.15; display: inline-block; margin-top: 1px;">
-              CREW BAGGAGE WEIGHT IS INCLUDED IN DOW, based on 20 kg per crew member.<br>
-              IF UNLOADED, CHANGES MUST BE REFLECTED IN LAST MINUTE CHANGES.
-            </span>
+            <div class="notes-weights-list">
+              <div class="notes-weight-row"><span class="notes-weight-lbl">Adult (winter)</span><span class="notes-weight-val"><span id="lbl_wt_winter">80</span> kg</span></div>
+              <div class="notes-weight-row"><span class="notes-weight-lbl">Adult (summer)</span><span class="notes-weight-val"><span id="lbl_wt_summer">75</span> kg</span></div>
+              <div class="notes-weight-row"><span class="notes-weight-lbl">Child</span><span class="notes-weight-val"><span id="lbl_wt_child">30</span> kg</span></div>
+              <div class="notes-weight-row"><span class="notes-weight-lbl">Infant</span><span class="notes-weight-val"><span id="lbl_wt_infant">15</span> kg</span></div>
+            </div>
+            <div class="notes-footer-text">
+              CREW BAGGAGE WEIGHT IS INCLUDED IN DOW,<br>
+              based on 20 kg per crew member<br>
+              IF UNLOADED, CHANGES MUST BE REFLECTED<br>
+              IN LAST MINUTE CHANGES
+            </div>
           </div>
 
           <!-- BALANCE & SEATING COND. (два чистых открытых прямоугольных поля без сетки) -->
@@ -2132,11 +2195,13 @@
             tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_pax_y_${d}" oninput="calculate()"></td>`;
             tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_pad_c_${d}" oninput="calculate()"></td>`;
             tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-center" id="rem_pad_y_${d}" oninput="calculate()"></td>`;
-          } else {
-            tr.innerHTML += `<td class="${borderBottomClass}" style="background:#fff;"></td>`;
-            tr.innerHTML += `<td class="${borderBottomClass}" style="background:#fff;"></td>`;
-            tr.innerHTML += `<td class="${borderBottomClass}" style="background:#fff;"></td>`;
-            tr.innerHTML += `<td class="${borderBottomClass}" style="background:#fff;"></td>`;
+          } else if (idx === 1) {
+            tr.innerHTML += `<td style="background:#fff;"></td>`;
+            tr.innerHTML += `<td style="background:#fff;"></td>`;
+            tr.innerHTML += `<td style="background:#fff;"></td>`;
+            tr.innerHTML += `<td style="background:#fff;"></td>`;
+          } else if (idx === 2) {
+            tr.innerHTML += `<td colspan="4" rowspan="4" class="remarks-shaded-cell border-b-thick"><div class="remarks-shaded-inner"><span class="remarks-shaded-lbl">PAX</span><span class="remarks-shaded-lbl">PAD</span></div></td>`;
           }
 
           tbody.appendChild(tr);
@@ -2773,6 +2838,16 @@
       const numPart = numMatch ? numMatch[0] : cleanDigits;
       if (op && numPart) return `${op} ${numPart}`;
       return str;
+    }
+
+    // Форматирование бортового номера для российской регистрации (например "73319" -> "RA-73319")
+    function formatAircraftRegistration(raw) {
+      const s = String(raw || '').toUpperCase().trim();
+      if (!s) return '';
+      if (/^\d{5}$/.test(s)) return `RA-${s}`;
+      const raMatch = s.match(/^(?:RA|РА)[-\s]?(\d{5})$/i);
+      if (raMatch) return `RA-${raMatch[1]}`;
+      return s;
     }
 
     // Обновление шапки бланка и панели инструментов по авиакомпании (NORDWIND AIRLINES / IKAR AIRLINES)
@@ -3421,7 +3496,7 @@
 
       // Originator должен оставаться пустым, если не передан явно
       setInp('f_originator', data.originator || data.f_originator || '');
-      setInp('f_acreg', data.acreg || data.ac_num || data.f_acreg || data.tail);
+      setInp('f_acreg', formatAircraftRegistration(data.acreg || data.ac_num || data.f_acreg || data.tail || ''));
       let versionVal = resolveLayoutVersionFromModel(data.version || data.f_version || data.ac_config || data.layout || '');
       setInp('f_version', versionVal);
       setInp('f_captain', data.captain || data.f_captain);
@@ -3613,7 +3688,13 @@
       }
       const acregEl = document.getElementById('f_acreg');
       if (acregEl) {
-        acregEl.addEventListener('change', () => lookupAndApplyAircraftWb(true));
+        acregEl.addEventListener('blur', () => {
+          acregEl.value = formatAircraftRegistration(acregEl.value);
+        });
+        acregEl.addEventListener('change', () => {
+          acregEl.value = formatAircraftRegistration(acregEl.value);
+          lookupAndApplyAircraftWb(true);
+        });
       }
       const crewEl = document.getElementById('f_crew');
       if (crewEl) {
