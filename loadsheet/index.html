@@ -746,14 +746,14 @@
       letter-spacing: -0.1px;
     }
 
-    .remarks-shaded-cell {
+    .traffic-table tbody td.remarks-shaded-cell {
       background-color: #e6e7e9;
       background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.08) 0px, rgba(0, 0, 0, 0.08) 1px, transparent 1px, transparent 3px);
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
       vertical-align: top;
       text-align: left;
-      padding: 1.5px 3px;
+      padding: 2px 3px;
     }
 
     .remarks-shaded-inner {
@@ -763,12 +763,26 @@
       align-items: start;
     }
 
+    .remarks-shaded-item {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      text-align: left;
+    }
+
     .remarks-shaded-lbl {
       font-size: 6.4px;
       font-weight: 600;
       color: #222;
       line-height: 1.1;
       text-align: left;
+    }
+
+    .remarks-shaded-val {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: #000;
+      line-height: 1.1;
     }
 
     .balance-header-row {
@@ -2201,7 +2215,7 @@
             tr.innerHTML += `<td style="background:#fff;"></td>`;
             tr.innerHTML += `<td style="background:#fff;"></td>`;
           } else if (idx === 2) {
-            tr.innerHTML += `<td colspan="4" rowspan="4" class="remarks-shaded-cell border-b-thick"><div class="remarks-shaded-inner"><span class="remarks-shaded-lbl">PAX</span><span class="remarks-shaded-lbl">PAD</span></div></td>`;
+            tr.innerHTML += `<td colspan="4" rowspan="4" class="remarks-shaded-cell border-b-thick"><div class="remarks-shaded-inner"><span class="remarks-shaded-item"><span class="remarks-shaded-lbl">PAX</span><span class="remarks-shaded-val" id="rem_shaded_pax_${d}"></span></span><span class="remarks-shaded-item"><span class="remarks-shaded-lbl">PAD</span><span class="remarks-shaded-val" id="rem_shaded_pad_${d}"></span></span></div></td>`;
           }
 
           tbody.appendChild(tr);
@@ -2556,10 +2570,31 @@
         }
 
         // Ремарки
-        sumRem.pax_c += numVal(`rem_pax_c_${d}`);
-        sumRem.pax_y += numVal(`rem_pax_y_${d}`);
-        sumRem.pad_c += numVal(`rem_pad_c_${d}`);
-        sumRem.pad_y += numVal(`rem_pad_y_${d}`);
+        const dRemPaxC = numVal(`rem_pax_c_${d}`);
+        const dRemPaxY = numVal(`rem_pax_y_${d}`);
+        const dRemPadC = numVal(`rem_pad_c_${d}`);
+        const dRemPadY = numVal(`rem_pad_y_${d}`);
+        sumRem.pax_c += dRemPaxC;
+        sumRem.pax_y += dRemPaxY;
+        sumRem.pad_c += dRemPadC;
+        sumRem.pad_y += dRemPadY;
+
+        // Дублирование количества пассажиров (PAX) и 0/суммы PAD в верхней строке серой зоны REMARKS
+        const blockUsed = isDestBlockUsed(d);
+        const remPaxVal = dRemPaxC + dRemPaxY;
+        const seatedPaxVal = m + f + ch;
+        const shadedPaxTotal = remPaxVal > 0 ? remPaxVal : seatedPaxVal;
+        const shadedPadTotal = dRemPadC + dRemPadY;
+        const shadedPaxEl = document.getElementById(`rem_shaded_pax_${d}`);
+        if (shadedPaxEl) {
+          shadedPaxEl.textContent = (blockUsed && (shadedPaxTotal > 0 || hasInputVal(`pax_m_${d}`) || hasInputVal(`rem_pax_y_${d}`)))
+            ? String(shadedPaxTotal)
+            : '';
+        }
+        const shadedPadEl = document.getElementById(`rem_shaded_pad_${d}`);
+        if (shadedPadEl) {
+          shadedPadEl.textContent = blockUsed ? String(shadedPadTotal) : '';
+        }
       }
 
       // Заполнение итоговой строки таблицы загрузки

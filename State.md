@@ -1,5 +1,5 @@
 - 2026-11-24: Доработка бланка `loadsheet/index.html` (секция `REMARKS`, блок `Notes`, бортовой `A/C Reg`):
-  - В `initTrafficTable()` (Вариант А) строки `C`, `M`, `ULD`, `T` под `REMARKS` (`colspan="4" rowspan="4"`) объединены в серую заштрихованную ячейку `.remarks-shaded-cell` с подписями `PAX` и `PAD` (при сохранении `print-color-adjust: exact`).
+  - В `initTrafficTable()` (Вариант А) строки `C`, `M`, `ULD`, `T` под `REMARKS` (`colspan="4" rowspan="4"`) объединены в серую заштрихованную ячейку `.traffic-table tbody td.remarks-shaded-cell` (`vertical-align: top;`, с `print-color-adjust: exact`); в верхней строке в одну линию выводятся `PAX <число>` (`rem_shaded_pax_d`) и `PAD <0/сумма>` (`rem_shaded_pad_d`), заполняемые в `calculate()` только для активных блоков.
   - Блок `.notes-box` приведён к формату образца: сплошная линия под `Notes`, выровненные строки весов с динамическими `#lbl_wt_*` и 4-строчный дисклеймер экипажа/LMC.
   - Добавлена функция `formatAircraftRegistration()`: 5-значные номера российской регистрации и префиксы `RA`/`РА` форматируются как `RA-XXXXX` (`RA-73319`) при загрузке из URL и по `blur`/`change` на `#f_acreg`.
 - 2026-11-24: Обновлён W&B LoadSheet и сквозной проброс данных из AeroPlan/AeroBag (`FlightRow.jsx`, `aerobag/app.js`, `loadsheet/index.html`):
