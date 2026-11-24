@@ -2185,16 +2185,22 @@
           const isLastSubRow = (idx === CARGO_TYPES.length - 1);
           const borderBottomClass = isLastSubRow ? ' border-b-thick' : '';
 
-          // 1. Первая колонка DEST (объединяет 5 подстрок: TR, B, C, M, ULD; строка T заштрихована отдельно)
+          // 1. Первая колонка DEST (rowspan=5: TR, B, C, M, ULD) + отдельная строка TR для транзита + основная зона B..ULD (rowspan=4) + серая строка T
           if (idx === 0) {
             tr.innerHTML += `<td rowspan="5"><input type="text" class="ls-input text-center font-bold" id="dest_code_${d}" oninput="calculate()"></td>`;
-            // PAX M, F, CH, INF
-            tr.innerHTML += `<td rowspan="5"><input type="number" min="0" class="ls-input text-center" id="pax_m_${d}" oninput="onPaxInput(${d})"></td>`;
-            tr.innerHTML += `<td rowspan="5"><input type="number" min="0" class="ls-input text-center" id="pax_f_${d}" oninput="onPaxInput(${d})"></td>`;
-            tr.innerHTML += `<td rowspan="5"><input type="number" min="0" class="ls-input text-center" id="pax_ch_${d}" oninput="onPaxInput(${d})"></td>`;
-            tr.innerHTML += `<td rowspan="5"><input type="number" min="0" class="ls-input text-center" id="pax_inf_${d}" oninput="calculate()"></td>`;
-            // CABIN BAG
-            tr.innerHTML += `<td rowspan="5"><input type="number" min="0" class="ls-input text-right" id="cabin_bag_${d}" oninput="calculate()"></td>`;
+            // Транзитная строка TR (отдельный ввод M, F, CH, INF, CABIN BAG WT)
+            tr.innerHTML += `<td><input type="number" min="0" class="ls-input text-center" id="pax_tr_m_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td><input type="number" min="0" class="ls-input text-center" id="pax_tr_f_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td><input type="number" min="0" class="ls-input text-center" id="pax_tr_ch_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td><input type="number" min="0" class="ls-input text-center" id="pax_tr_inf_${d}" oninput="calculate()"></td>`;
+            tr.innerHTML += `<td><input type="number" min="0" class="ls-input text-right" id="cabin_bag_tr_${d}" oninput="calculate()"></td>`;
+          } else if (idx === 1) {
+            // Основная зона (B..ULD): PAX M, F, CH, INF и CABIN BAG WT
+            tr.innerHTML += `<td rowspan="4"><input type="number" min="0" class="ls-input text-center" id="pax_m_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td rowspan="4"><input type="number" min="0" class="ls-input text-center" id="pax_f_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td rowspan="4"><input type="number" min="0" class="ls-input text-center" id="pax_ch_${d}" oninput="onPaxInput(${d})"></td>`;
+            tr.innerHTML += `<td rowspan="4"><input type="number" min="0" class="ls-input text-center" id="pax_inf_${d}" oninput="calculate()"></td>`;
+            tr.innerHTML += `<td rowspan="4"><input type="number" min="0" class="ls-input text-right" id="cabin_bag_${d}" oninput="calculate()"></td>`;
           } else if (isTotalRow) {
             tr.innerHTML += `<td id="dest_t_${d}" class="traffic-shaded-t-cell border-b-thick"></td>`;
             tr.innerHTML += `<td id="pax_m_t_${d}" class="traffic-shaded-t-cell calc-val center font-bold border-b-thick"></td>`;
@@ -2247,9 +2253,9 @@
 
     // Автоматический расчет количества пассажиров экономического класса (Y = Adults + Child - Business C) и нулей PAD
     function onPaxInput(d) {
-      const m = numVal(`pax_m_${d}`);
-      const f = numVal(`pax_f_${d}`);
-      const ch = numVal(`pax_ch_${d}`);
+      const m = numVal(`pax_m_${d}`) + numVal(`pax_tr_m_${d}`);
+      const f = numVal(`pax_f_${d}`) + numVal(`pax_tr_f_${d}`);
+      const ch = numVal(`pax_ch_${d}`) + numVal(`pax_tr_ch_${d}`);
       const c = numVal(`rem_pax_c_${d}`);
       const seated = m + f + ch;
       const yInput = document.getElementById(`rem_pax_y_${d}`);
@@ -2554,23 +2560,29 @@
       };
 
       for (let d = 1; d <= NUM_DEST_BLOCKS; d++) {
-        if (hasInputVal(`pax_m_${d}`)) hasPaxMVal = true;
-        if (hasInputVal(`pax_f_${d}`)) hasPaxFVal = true;
+        const hasM = hasInputVal(`pax_m_${d}`) || hasInputVal(`pax_tr_m_${d}`);
+        const hasF = hasInputVal(`pax_f_${d}`) || hasInputVal(`pax_tr_f_${d}`);
+        const hasCh = hasInputVal(`pax_ch_${d}`) || hasInputVal(`pax_tr_ch_${d}`);
+        const hasInf = hasInputVal(`pax_inf_${d}`) || hasInputVal(`pax_tr_inf_${d}`);
+        const hasCb = hasInputVal(`cabin_bag_${d}`) || hasInputVal(`cabin_bag_tr_${d}`);
+
+        if (hasM) hasPaxMVal = true;
+        if (hasF) hasPaxFVal = true;
         if (hasInputVal(`rem_pad_c_${d}`)) hasPadCVal = true;
         if (hasInputVal(`rem_pad_y_${d}`)) hasPadYVal = true;
 
-        const m = numVal(`pax_m_${d}`);
-        const f = numVal(`pax_f_${d}`);
-        const ch = numVal(`pax_ch_${d}`);
-        const inf = numVal(`pax_inf_${d}`);
-        const cb = numVal(`cabin_bag_${d}`);
+        const m = numVal(`pax_m_${d}`) + numVal(`pax_tr_m_${d}`);
+        const f = numVal(`pax_f_${d}`) + numVal(`pax_tr_f_${d}`);
+        const ch = numVal(`pax_ch_${d}`) + numVal(`pax_tr_ch_${d}`);
+        const inf = numVal(`pax_inf_${d}`) + numVal(`pax_tr_inf_${d}`);
+        const cb = numVal(`cabin_bag_${d}`) + numVal(`cabin_bag_tr_${d}`);
 
-        // Дублирование значений пассажиров и ручной клади в серой строке T текущего блока
-        setTxt(`pax_m_t_${d}`, m, true, hasInputVal(`pax_m_${d}`));
-        setTxt(`pax_f_t_${d}`, f, true, hasInputVal(`pax_f_${d}`));
-        setTxt(`pax_ch_t_${d}`, ch, true, hasInputVal(`pax_ch_${d}`));
-        setTxt(`pax_inf_t_${d}`, inf, true, hasInputVal(`pax_inf_${d}`));
-        setTxt(`cabin_bag_t_${d}`, cb, true, hasInputVal(`cabin_bag_${d}`));
+        // Дублирование суммы (основная + транзитная TR) в серой строке T текущего блока
+        setTxt(`pax_m_t_${d}`, m, true, hasM);
+        setTxt(`pax_f_t_${d}`, f, true, hasF);
+        setTxt(`pax_ch_t_${d}`, ch, true, hasCh);
+        setTxt(`pax_inf_t_${d}`, inf, true, hasInf);
+        setTxt(`cabin_bag_t_${d}`, cb, true, hasCb);
 
         sumPaxM += m;
         sumPaxF += f;
@@ -2616,7 +2628,7 @@
         const shadedPadTotal = dRemPadC + dRemPadY;
         const shadedPaxEl = document.getElementById(`rem_shaded_pax_${d}`);
         if (shadedPaxEl) {
-          shadedPaxEl.textContent = (blockUsed && (shadedPaxTotal > 0 || hasInputVal(`pax_m_${d}`) || hasInputVal(`rem_pax_y_${d}`)))
+          shadedPaxEl.textContent = (blockUsed && (shadedPaxTotal > 0 || hasM || hasInputVal(`rem_pax_y_${d}`)))
             ? String(shadedPaxTotal)
             : '';
         }
@@ -2969,7 +2981,9 @@
       };
       if (hasVal(`dest_code_${d}`)) return true;
       if (numVal(`pax_m_${d}`) > 0 || numVal(`pax_f_${d}`) > 0 || numVal(`pax_ch_${d}`) > 0 ||
-          numVal(`pax_inf_${d}`) > 0 || numVal(`cabin_bag_${d}`) > 0) {
+          numVal(`pax_inf_${d}`) > 0 || numVal(`cabin_bag_${d}`) > 0 ||
+          numVal(`pax_tr_m_${d}`) > 0 || numVal(`pax_tr_f_${d}`) > 0 || numVal(`pax_tr_ch_${d}`) > 0 ||
+          numVal(`pax_tr_inf_${d}`) > 0 || numVal(`cabin_bag_tr_${d}`) > 0) {
         return true;
       }
       if (numVal(`rem_pax_c_${d}`) > 0 || numVal(`rem_pax_y_${d}`) > 0 ||
@@ -3028,7 +3042,7 @@
             for (let d = 1; d <= NUM_DEST_BLOCKS; d++) {
               if (usedFlags[d - 1]) continue;
               const destTd = document.getElementById(`dest_code_${d}`)?.closest('td');
-              const bagTd = document.getElementById(`cabin_bag_${d}`)?.closest('td');
+              const bagTd = document.getElementById(`cabin_bag_tr_${d}`)?.closest('td') || document.getElementById(`cabin_bag_${d}`)?.closest('td');
               const destBottomTd = document.getElementById(`dest_t_${d}`);
               const cargoBotTd = document.getElementById(`cargo_label_t_${d}`);
               const padEndTd = document.getElementById(`rem_pad_y_${d}`)?.closest('td');
@@ -3160,10 +3174,16 @@
       const acConfigVal = getVal('f_version').toUpperCase();
       const crewVal = getVal('f_crew');
 
-      const paxM = getVal('pax_m_1');
-      const paxF = getVal('pax_f_1');
-      const paxCh = getVal('pax_ch_1');
-      const paxInf = getVal('pax_inf_1');
+      const sumTwoInputs = (id1, id2) => {
+        const s1 = getVal(id1);
+        const s2 = getVal(id2);
+        if (!s1 && !s2) return '';
+        return String((parseInt(s1, 10) || 0) + (parseInt(s2, 10) || 0));
+      };
+      const paxM = sumTwoInputs('pax_m_1', 'pax_tr_m_1');
+      const paxF = sumTwoInputs('pax_f_1', 'pax_tr_f_1');
+      const paxCh = sumTwoInputs('pax_ch_1', 'pax_tr_ch_1');
+      const paxInf = sumTwoInputs('pax_inf_1', 'pax_tr_inf_1');
       const numPaxSum = (parseInt(paxM, 10) || 0) + (parseInt(paxF, 10) || 0) + (parseInt(paxCh, 10) || 0);
       const paxVal = numPaxSum > 0
         ? String(numPaxSum)
