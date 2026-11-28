@@ -3597,11 +3597,11 @@ if (strpos($route, '/admin/aviabit') === 0) {
 }
 
 // ----------------------------------------------------
-// ВСПОМОГАТЕЛЬНЫЙ ПАРСЕР PDF ГРАФИКОВ WBR (DOW / DOI)
 // ----------------------------------------------------
-function parseWbrPdfBinary($pdfBinary, $origName) {
-    // 1. Извлечение потоков FlateDecode
-    $tokens = [];
+// ВСПОМОГАТЕЛЬНЫЙ 2D ПАРСЕР PDF ГРАФИКОВ WBR (DOW / DOI)
+// ----------------------------------------------------
+function extractPdfPositionedText($pdfBinary) {
+    $contentChunks = [];
     if (preg_match_all('/stream[\r\n]+(.*?)[\r\n]+endstream/s', $pdfBinary, $matches)) {
         foreach ($matches[1] as $stream) {
             $decomp = @gzuncompress($stream);
@@ -3611,24 +3611,193 @@ function parseWbrPdfBinary($pdfBinary, $origName) {
                     $decomp = @gzinflate(substr($stream, 2));
                 }
             }
-            if ($decomp) {
-                if (preg_match_all('/\(((?:[^()\\\\]|\\\\.)*)\)/s', $decomp, $textMatches)) {
-                    foreach ($textMatches[1] as $tok) {
-                        $tok = str_replace(['\\(', '\\)', '\\\\'], ['(', ')', '\\'], $tok);
-                        $tok = trim($tok);
-                        if ($tok !== '') {
-                            $tokens[] = $tok;
-                        }
+            if (!$decomp) {
+                continue;
+            }
+            if (strpos($decomp, 'begincmap') !== false) {
+                continue;
+            }
+            if (preg_match('/(?:^|[\r\n\s])(BT|ET|Tj|TJ|Td|TD|Tm)(?=$|[\r\n\s])/', $decomp)) {
+                $contentChunks[] = $decomp;
+            }
+        }
+    }
+
+    if (empty($contentChunks)) {
+        return [];
+    }
+
+    $combined = implode("\n", $contentChunks);
+    $items = [];
+    if (!preg_match_all('/(?:^|[\r\n\s])BT[\r\n\s](.*?)[\r\n\s]ET(?=$|[\r\n\s])/s', $combined, $btMatches)) {
+        return [];
+    }
+
+    $opRegex = '/(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+Tm\b|(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(Td|TD)\b|(-?\d+(?:\.\d+)?)\s+TL\b|T\*|(\[(?:[^\[\]]|\((?:[^()\\\\]|\\\\.)*\))*\]\s*TJ|\((?:[^()\\\\]|\\\\.)*\)\s*Tj)/s';
+
+    foreach ($btMatches[1] as $block) {
+        $x = 0.0;
+        $y = 0.0;
+        $lx = 0.0;
+        $ly = 0.0;
+        $tl = 0.0;
+
+        if (!preg_match_all($opRegex, $block, $opMatches, PREG_SET_ORDER)) {
+            continue;
+        }
+
+        foreach ($opMatches as $om) {
+            if (isset($om[6]) && $om[6] !== '') {
+                $x = (float)$om[5];
+                $y = (float)$om[6];
+                $lx = $x;
+                $ly = $y;
+            } elseif (isset($om[9]) && $om[9] !== '') {
+                $tx = (float)$om[7];
+                $ty = (float)$om[8];
+                $lx += $tx;
+                $ly += $ty;
+                $x = $lx;
+                $y = $ly;
+                if ($om[9] === 'TD') {
+                    $tl = -$ty;
+                }
+            } elseif (isset($om[10]) && $om[10] !== '') {
+                $tl = (float)$om[10];
+            } elseif ($om[0] === 'T*') {
+                $ly -= $tl;
+                $x = $lx;
+                $y = $ly;
+            } elseif (isset($om[11]) && $om[11] !== '') {
+                $joined = '';
+                if (preg_match_all('/\(((?:[^()\\\\]|\\\\.)*)\)/s', $om[11], $strMatches)) {
+                    foreach ($strMatches[1] as $part) {
+                        $part = preg_replace_callback('/\\\\([0-7]{3})/', function ($m) {
+                            return chr(octdec($m[1]));
+                        }, $part);
+                        $part = strtr($part, ['\\(' => '(', '\\)' => ')', '\\\\' => '\\']);
+                        $joined .= $part;
                     }
+                }
+                $joined = trim($joined);
+                if ($joined !== '') {
+                    $items[] = ['x' => $x, 'y' => $y, 'text' => $joined];
                 }
             }
         }
     }
 
-    $fullText = implode(' ', $tokens);
+    return $items;
+}
+
+function groupPdfTextRows($items, $yTol = 3.5) {
+    usort($items, function ($a, $b) {
+        if ($a['y'] !== $b['y']) {
+            return ($b['y'] <=> $a['y']);
+        }
+        return ($a['x'] <=> $b['x']);
+    });
+
+    $rows = [];
+    foreach ($items as $it) {
+        $placed = false;
+        foreach ($rows as &$row) {
+            if (abs($row['y'] - $it['y']) <= $yTol) {
+                $row['items'][] = $it;
+                $placed = true;
+                break;
+            }
+        }
+        unset($row);
+        if (!$placed) {
+            $rows[] = ['y' => $it['y'], 'items' => [$it]];
+        }
+    }
+
+    usort($rows, function ($a, $b) {
+        return ($b['y'] <=> $a['y']);
+    });
+    foreach ($rows as &$row) {
+        usort($row['items'], function ($a, $b) {
+            return ($a['x'] <=> $b['x']);
+        });
+    }
+    unset($row);
+
+    return $rows;
+}
+
+function parsePdfNumericToken($str) {
+    $s = trim(str_replace([' ', ','], ['', '.'], (string)$str));
+    if (!preg_match('/^-?\d+(?:\.\d+)?$/', $s)) {
+        return null;
+    }
+    return (float)$s;
+}
+
+function countFleetMatrixCells($aircraftData) {
+    $crews = 0;
+    $cells = 0;
+    $matrix = $aircraftData['matrix'] ?? null;
+    if (is_array($matrix)) {
+        foreach ($matrix as $pantries) {
+            if (!is_array($pantries)) {
+                continue;
+            }
+            $rowHasCell = false;
+            foreach ($pantries as $cell) {
+                if (is_array($cell) && isset($cell['dow']) && (int)$cell['dow'] > 0) {
+                    $cells++;
+                    $rowHasCell = true;
+                }
+            }
+            if ($rowHasCell) {
+                $crews++;
+            }
+        }
+    }
+    $subMatrices = $aircraftData['sub_matrices'] ?? null;
+    if ($cells === 0 && is_array($subMatrices)) {
+        foreach ($subMatrices as $qMat) {
+            if (!is_array($qMat)) {
+                continue;
+            }
+            foreach ($qMat as $pantries) {
+                if (!is_array($pantries)) {
+                    continue;
+                }
+                $rowHasCell = false;
+                foreach ($pantries as $cell) {
+                    if (is_array($cell) && isset($cell['dow']) && (int)$cell['dow'] > 0) {
+                        $cells++;
+                        $rowHasCell = true;
+                    }
+                }
+                if ($rowHasCell) {
+                    $crews++;
+                }
+            }
+        }
+    }
+    return ['crews' => $crews, 'cells' => $cells];
+}
+
+function parseWbrPdfBinary($pdfBinary, $origName) {
+    $items = extractPdfPositionedText($pdfBinary);
+    $rows = groupPdfTextRows($items, 3.5);
+
+    $rowLines = [];
+    foreach ($rows as $r) {
+        $texts = [];
+        foreach ($r['items'] as $it) {
+            $texts[] = $it['text'];
+        }
+        $rowLines[] = implode(' ', $texts);
+    }
+    $fullText = implode("\n", $rowLines);
     $fname = basename($origName);
 
-    // 2. Бортовой номер (5 цифр)
+    // 1. Бортовой номер (5 цифр)
     $tail = 'UNKNOWN';
     if (preg_match('/(?:Registration:?\s*(?:RA-?)?|RA-?)(\d{5})/i', $fullText, $m)) {
         $tail = $m[1];
@@ -3636,8 +3805,14 @@ function parseWbrPdfBinary($pdfBinary, $origName) {
         $tail = $m[1];
     }
 
-    // 3. Оператор
-    $isIkar = (stripos($fullText, 'ikar') !== false || stripos($fname, 'dnd') !== false || stripos($fname, 'e190') !== false || strpos($tail, '027') === 0);
+    // 2. Оператор
+    $isIkar = (
+        stripos($fullText, 'ikar') !== false ||
+        stripos($fname, 'dnd') !== false ||
+        stripos($fname, 'e190') !== false ||
+        stripos($fname, 'dow_doi') !== false ||
+        strpos($tail, '027') === 0
+    );
     if (stripos($fname, 'wbr_737-900_ra-7334') !== false) {
         $isIkar = false;
     } elseif (stripos($fname, 'dow_doi b739 ra7334') !== false) {
@@ -3645,9 +3820,11 @@ function parseWbrPdfBinary($pdfBinary, $origName) {
     }
     $operator = $isIkar ? 'EO' : 'N4';
 
-    // 4. Модель ВС
+    // 3. Модель ВС
     $model = 'UNKNOWN';
-    if (stripos($fname, '737-800') !== false || stripos($fname, '738') !== false || stripos($fullText, '737-800') !== false) {
+    if (preg_match('/Model:?\s*([A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-]+)?)/i', $fullText, $m)) {
+        $model = trim($m[1]);
+    } elseif (stripos($fname, '737-800') !== false || stripos($fname, '738') !== false || stripos($fullText, '737-800') !== false) {
         $model = 'B737-800';
     } elseif (stripos($fname, '737-900') !== false || stripos($fname, '739') !== false) {
         $model = 'B737-900ER';
@@ -3667,34 +3844,55 @@ function parseWbrPdfBinary($pdfBinary, $origName) {
         $model = 'B777-300ER';
     }
 
-    // 5. Ревизия и дата
+    // 4. Ревизия и дата
     $revision = '';
-    if (preg_match('/Revision\s*(?:No\.?)?:?\s*([^\s]+)/i', $fullText, $m)) {
+    if (preg_match('/Revision\s*(?:No\.?)?:?\s*(Rev\s*\d+(?:\.\d+)?|№\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)/ui', $fullText, $m)) {
         $revision = trim($m[1]);
-    } elseif (preg_match('/rev_?(\d+)/i', $fname, $m)) {
-        $revision = 'Rev ' . $m[1];
     } elseif (preg_match('/№\s*(\d+(?:\.\d+)?)/u', $fullText, $m)) {
         $revision = '№' . $m[1];
+    } elseif (preg_match('/rev_?(\d+(?:\.\d+)?)/i', $fname, $m)) {
+        $revision = 'Rev ' . $m[1];
     }
 
     $dateVal = '';
-    if (preg_match('/Date:?\s*([0-9]{1,2}-[A-Za-z]{3}-[0-9]{2,4})/i', $fullText, $m)) {
+    if (preg_match('/Date:?\s*([0-9]{1,2}-[A-Za-z]{3}-[0-9]{2,4}|[0-9]{2}\.[0-9]{2}\.[0-9]{2,4})/i', $fullText, $m)) {
         $dateVal = $m[1];
-    } elseif (preg_match('/(20\d{6}|\d{2}[A-Za-z]{3}\d{2,4})/i', $fname, $m)) {
+    } elseif (preg_match('/(20\d{6}|\d{2}[A-Za-z]{3}\d{2,4}|\d{8})/i', $fname, $m)) {
         $dateVal = $m[1];
     }
 
-    // 6. Базовый вес и базовый индекс
+    // 5. Базовый вес и базовый индекс
     $basicWeight = null;
     $basicIndex = null;
-    if (preg_match('/(?:Basic Weight|Weight)\s*(\d{5,6})/i', $fullText, $m)) {
+    foreach ($rows as $rIdx => $r) {
+        $lineTxt = $rowLines[$rIdx];
+        if (stripos($lineTxt, 'Weight') !== false && stripos($lineTxt, 'Index') !== false) {
+            for ($k = $rIdx + 1; $k <= min($rIdx + 3, count($rows) - 1); $k++) {
+                foreach ($rows[$k]['items'] as $it) {
+                    $cleanInt = str_replace(' ', '', $it['text']);
+                    if ($basicWeight === null && preg_match('/^\d{5,6}$/', $cleanInt)) {
+                        $basicWeight = (int)$cleanInt;
+                    } elseif ($basicIndex === null) {
+                        $fVal = parsePdfNumericToken($it['text']);
+                        if ($fVal !== null && strpos(str_replace(',', '.', $it['text']), '.') !== false) {
+                            $basicIndex = $fVal;
+                        }
+                    }
+                }
+            }
+            if ($basicWeight !== null || $basicIndex !== null) {
+                break;
+            }
+        }
+    }
+    if ($basicWeight === null && preg_match('/(?:Basic\s+Weight|Weight)[\s\r\n:]+(\d{5,6})/i', $fullText, $m)) {
         $basicWeight = (int)$m[1];
     }
-    if (preg_match('/Index\s*([0-9]+[,\.][0-9]{2})/i', $fullText, $m)) {
+    if ($basicIndex === null && preg_match('/Index[\s\r\n:]+([0-9]+[,\.][0-9]{1,2})/i', $fullText, $m)) {
         $basicIndex = (float)str_replace(',', '.', $m[1]);
     }
 
-    // 7. Fly kit
+    // 6. Fly kit
     $flyKitMode = 'STANDARD';
     if (stripos($fname, 'nofak') !== false) {
         $flyKitMode = 'NO_FAK';
@@ -3702,7 +3900,7 @@ function parseWbrPdfBinary($pdfBinary, $origName) {
         $flyKitMode = 'FAK_2AKE';
     }
 
-    // 8. Предельные веса (MZFW, MTOW, MLAW)
+    // 7. Предельные веса (MZFW, MTOW, MLAW)
     $maxWeightsMap = [
         '72271' => ['mtow' => 89000, 'mlaw' => 75500, 'mzfw' => 71500],
         '72273' => ['mtow' => 89000, 'mlaw' => 75500, 'mzfw' => 71500],
@@ -3749,66 +3947,273 @@ function parseWbrPdfBinary($pdfBinary, $origName) {
     ];
     $mw = $maxWeightsMap[$tail] ?? ['mtow' => null, 'mlaw' => null, 'mzfw' => null];
 
-    // 9. Сборка матрицы кухонь и экипажей
+    // 8. 2D разбор матрицы кухонь и экипажей
+    $matrix = [];
+    $subMatrices = null;
     $pantryCodes = [];
-    $totalTok = count($tokens);
-    for ($i = 0; $i < $totalTok; $i++) {
-        $t = $tokens[$i];
-        if (in_array($t, ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'K'])) {
-            $sub = array_slice($tokens, $i, 7);
-            $allPantry = true;
-            foreach ($sub as $x) {
-                if (!in_array($x, ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'K'])) {
-                    $allPantry = false;
-                    break;
+
+    if (!$isIkar) {
+        $pantryRow = null;
+        $headers = [];
+        foreach ($rows as $r) {
+            $letters = [];
+            $allValid = true;
+            foreach ($r['items'] as $it) {
+                if (preg_match('/^[ABCDEFGK]$/', $it['text'])) {
+                    $letters[] = ['code' => $it['text'], 'x' => $it['x']];
+                } elseif (!preg_match('/pantry|crew|code/i', $it['text'])) {
+                    $allValid = false;
                 }
             }
-            if ($allPantry && count($sub) >= 3) {
-                $pantryCodes = array_values(array_unique($sub));
+            if ($allValid && count($letters) >= 2) {
+                $pantryRow = $r;
+                $headers = $letters;
                 break;
             }
         }
-    }
-    if (empty($pantryCodes)) {
-        if ($isIkar) {
-            $pantryCodes = (strpos($model, '777') !== false || stripos($fname, '772') !== false)
-                ? ['A', 'B', 'C', 'D', 'E']
-                : ['A', 'B', 'E'];
-        } else {
-            $pantryCodes = ['A', 'B', 'D', 'E', 'F', 'G', 'K'];
+        foreach ($headers as $h) {
+            $pantryCodes[] = $h['code'];
         }
-    }
 
-    $matrix = [];
-    $i = 0;
-    while ($i < $totalTok) {
-        $t = $tokens[$i];
-        if (preg_match('/^\d+\/\d+$/', $t)) {
-            $crew = $t;
-            if (!isset($matrix[$crew])) {
-                $matrix[$crew] = [];
+        foreach ($rows as $r) {
+            if ($pantryRow !== null && $r['y'] >= $pantryRow['y'] - 2) {
+                continue;
             }
-            $idx = $i + 1;
-            foreach ($pantryCodes as $p) {
-                if ($idx + 1 < $totalTok) {
-                    $wStr = str_replace([' ', ','], ['', '.'], $tokens[$idx]);
-                    $iStr = str_replace([' ', ','], ['', '.'], $tokens[$idx + 1]);
-                    if (preg_match('/^\d{5,6}$/', $wStr) && preg_match('/^\d+[,\.]\d{1,2}$/', $iStr)) {
-                        $matrix[$crew][$p] = [
-                            'dow' => (int)round((float)$wStr),
-                            'doi' => (float)$iStr
+            $crewItem = null;
+            foreach ($r['items'] as $it) {
+                if (preg_match('/^\d+\/\d+\**$/', $it['text'])) {
+                    $crewItem = $it;
+                    break;
+                }
+            }
+            if (!$crewItem) {
+                continue;
+            }
+            $crew = trim(rtrim($crewItem['text'], '*'));
+            $dataItems = [];
+            foreach ($r['items'] as $it) {
+                if ($it['x'] > $crewItem['x'] + 5) {
+                    $dataItems[] = $it;
+                }
+            }
+
+            $pairs = [];
+            $dataCnt = count($dataItems);
+            for ($j = 0; $j < $dataCnt; $j++) {
+                $wStr = str_replace(' ', '', $dataItems[$j]['text']);
+                if (preg_match('/^\d{4,6}$/', $wStr) && $j + 1 < $dataCnt) {
+                    $idxVal = parsePdfNumericToken($dataItems[$j + 1]['text']);
+                    if ($idxVal !== null) {
+                        $pairs[] = [
+                            'dow' => (int)$wStr,
+                            'doi' => $idxVal,
+                            'midX' => ($dataItems[$j]['x'] + $dataItems[$j + 1]['x']) / 2.0
                         ];
-                        $idx += 2;
+                        $j++;
                     }
                 }
             }
-            $i = max($i + 1, $idx);
-        } else {
-            $i++;
+
+            if (!empty($pairs) && !empty($headers)) {
+                $matrix[$crew] = [];
+                if (count($pairs) === count($headers)) {
+                    foreach ($headers as $k => $h) {
+                        $matrix[$crew][$h['code']] = ['dow' => $pairs[$k]['dow'], 'doi' => $pairs[$k]['doi']];
+                    }
+                } else {
+                    foreach ($pairs as $pr) {
+                        $best = $headers[0];
+                        $bestDist = INF;
+                        foreach ($headers as $h) {
+                            $dist = abs($pr['midX'] - $h['x']);
+                            if ($dist < $bestDist) {
+                                $bestDist = $dist;
+                                $best = $h;
+                            }
+                        }
+                        if ($bestDist < 45.0) {
+                            $matrix[$crew][$best['code']] = ['dow' => $pr['dow'], 'doi' => $pr['doi']];
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        $headerRow = null;
+        foreach ($rows as $r) {
+            $hasCrew = false;
+            $pLetters = 0;
+            foreach ($r['items'] as $it) {
+                if (preg_match('/^Crew$/i', $it['text'])) {
+                    $hasCrew = true;
+                } elseif (preg_match('/^[ABCDE]$/', $it['text'])) {
+                    $pLetters++;
+                }
+            }
+            if ($hasCrew && $pLetters >= 5) {
+                $headerRow = $r;
+                break;
+            }
+        }
+
+        $isB772 = (stripos($fname, 'B772') !== false || stripos($fname, '777') !== false || stripos($fullText, '777') !== false);
+        if ($headerRow !== null) {
+            $crewCols = [];
+            $pantryAnchors = [];
+            foreach ($headerRow['items'] as $it) {
+                if (preg_match('/^Crew$/i', $it['text'])) {
+                    $crewCols[] = $it['x'];
+                } elseif (preg_match('/^[ABCDE]$/', $it['text'])) {
+                    $pantryAnchors[] = ['code' => $it['text'], 'x' => $it['x']];
+                }
+            }
+
+            if ($isB772) {
+                $pantryCodes = ['A', 'B', 'C', 'D', 'E'];
+                $splitX = count($crewCols) >= 2 ? ($crewCols[1] - 15.0) : INF;
+                $leftAnchors = [];
+                $rightAnchors = [];
+                foreach ($pantryAnchors as $a) {
+                    if ($a['x'] < $splitX) {
+                        $leftAnchors[] = $a;
+                    } else {
+                        $rightAnchors[] = $a;
+                    }
+                }
+
+                $rowCnt = count($rows);
+                for ($rIdx = 0; $rIdx < $rowCnt; $rIdx++) {
+                    $r = $rows[$rIdx];
+                    if ($r['y'] >= $headerRow['y'] - 2) {
+                        continue;
+                    }
+                    $crewItems = [];
+                    foreach ($r['items'] as $it) {
+                        if (preg_match('/^\d+\/\d+$/', $it['text'])) {
+                            $crewItems[] = $it;
+                        }
+                    }
+                    if (empty($crewItems)) {
+                        continue;
+                    }
+                    $wtRow = ($rIdx > 0) ? $rows[$rIdx - 1] : null;
+                    foreach ($crewItems as $ci) {
+                        $isRight = ($ci['x'] >= $splitX);
+                        $anchors = $isRight ? $rightAnchors : $leftAnchors;
+                        $minX = $isRight ? $splitX : 0.0;
+                        $maxX = $isRight ? INF : $splitX;
+                        $crew = $ci['text'];
+                        if (!isset($matrix[$crew])) {
+                            $matrix[$crew] = [];
+                        }
+                        $wtItems = [];
+                        if ($wtRow) {
+                            foreach ($wtRow['items'] as $wit) {
+                                if ($wit['x'] >= $minX && $wit['x'] < $maxX) {
+                                    $wtItems[] = $wit;
+                                }
+                            }
+                        }
+                        $idxItems = [];
+                        foreach ($r['items'] as $iit) {
+                            if ($iit['x'] >= $minX && $iit['x'] < $maxX && $iit !== $ci) {
+                                $idxItems[] = $iit;
+                            }
+                        }
+
+                        foreach ($anchors as $a) {
+                            $wIt = null;
+                            foreach ($wtItems as $wit) {
+                                if (abs($wit['x'] - $a['x']) <= 22.0 && preg_match('/^\d{5,6}$/', str_replace(' ', '', $wit['text']))) {
+                                    $wIt = $wit;
+                                    break;
+                                }
+                            }
+                            $dIt = null;
+                            foreach ($idxItems as $iit) {
+                                if (abs($iit['x'] - $a['x']) <= 22.0 && parsePdfNumericToken($iit['text']) !== null) {
+                                    $dIt = $iit;
+                                    break;
+                                }
+                            }
+                            if ($wIt !== null) {
+                                $matrix[$crew][$a['code']] = [
+                                    'dow' => (int)str_replace(' ', '', $wIt['text']),
+                                    'doi' => $dIt !== null ? parsePdfNumericToken($dIt['text']) : null
+                                ];
+                            }
+                        }
+                    }
+                }
+            } else {
+                $pantryCodes = ['A', 'B', 'E'];
+                $quadNames = ['bag_inc_fak_inc', 'bag_inc_fak_exc', 'bag_exc_fak_inc', 'bag_exc_fak_exc'];
+                $subMatrices = [
+                    'bag_inc_fak_inc' => [],
+                    'bag_inc_fak_exc' => [],
+                    'bag_exc_fak_inc' => [],
+                    'bag_exc_fak_exc' => []
+                ];
+                $quadAnchors = [];
+                for ($q = 0; $q < 4; $q++) {
+                    $quadAnchors[] = [
+                        'name' => $quadNames[$q],
+                        'anchors' => array_slice($pantryAnchors, $q * 3, 3)
+                    ];
+                }
+
+                $rowCnt = count($rows);
+                for ($rIdx = 0; $rIdx < $rowCnt; $rIdx++) {
+                    $r = $rows[$rIdx];
+                    if ($r['y'] >= $headerRow['y'] - 2) {
+                        continue;
+                    }
+                    $crewItem = null;
+                    foreach ($r['items'] as $it) {
+                        if (preg_match('/^\d+\/\d+$/', $it['text'])) {
+                            $crewItem = $it;
+                            break;
+                        }
+                    }
+                    if (!$crewItem) {
+                        continue;
+                    }
+                    $crew = $crewItem['text'];
+                    $wtRow = ($rIdx > 0) ? $rows[$rIdx - 1] : null;
+                    $wtItems = $wtRow ? $wtRow['items'] : [];
+
+                    foreach ($quadAnchors as $qa) {
+                        $subMatrices[$qa['name']][$crew] = [];
+                        foreach ($qa['anchors'] as $a) {
+                            $wIt = null;
+                            foreach ($wtItems as $wit) {
+                                if (abs($wit['x'] - $a['x']) <= 18.0 && preg_match('/^\d{5,6}$/', str_replace(' ', '', $wit['text']))) {
+                                    $wIt = $wit;
+                                    break;
+                                }
+                            }
+                            $dIt = null;
+                            foreach ($r['items'] as $iit) {
+                                if (abs($iit['x'] - $a['x']) <= 18.0 && !preg_match('/^\d+\/\d+$/', $iit['text']) && parsePdfNumericToken($iit['text']) !== null) {
+                                    $dIt = $iit;
+                                    break;
+                                }
+                            }
+                            if ($wIt !== null) {
+                                $subMatrices[$qa['name']][$crew][$a['code']] = [
+                                    'dow' => (int)str_replace(' ', '', $wIt['text']),
+                                    'doi' => $dIt !== null ? parsePdfNumericToken($dIt['text']) : null
+                                ];
+                            }
+                        }
+                    }
+                }
+                $matrix = $subMatrices['bag_inc_fak_inc'];
+            }
         }
     }
 
-    return [
+    $result = [
         'file' => $fname,
         'operator' => $operator,
         'tail' => $tail,
@@ -3823,6 +4228,16 @@ function parseWbrPdfBinary($pdfBinary, $origName) {
         'pantry_codes' => $pantryCodes,
         'matrix' => $matrix
     ];
+    if ($subMatrices !== null) {
+        $result['sub_matrices'] = $subMatrices;
+        $result['has_crew_bag_modes'] = true;
+        $result['has_fak_modes'] = true;
+    } else {
+        $result['sub_matrices'] = null;
+        $result['has_crew_bag_modes'] = false;
+        $result['has_fak_modes'] = false;
+    }
+    return $result;
 }
 
 // ----------------------------------------------------
@@ -3873,16 +4288,59 @@ if (strpos($route, '/admin/fleet_wb') === 0) {
             exit;
         }
 
+        // Защита от перезаписи реестра пустой матрицей DOW/DOI
+        $stats = countFleetMatrixCells($aircraftData);
+        if ($stats['crews'] < 1 || $stats['cells'] < 1) {
+            http_response_code(400);
+            echo json_encode(['detail' => 'Сохранение заблокировано: матрица DOW/DOI пуста. Существующие данные борта не изменены.']);
+            exit;
+        }
+
         if ($activeFleetFile) {
             $content = file_get_contents($activeFleetFile);
             $fleet = json_decode($content, true);
+            if (!is_array($fleet)) {
+                $fleet = [];
+            }
+
+            // Автоматический бэкап текущего fleet_wb.json перед изменением (храним до 20 копий)
+            $backupDir = dirname($activeFleetFile) . '/backups';
+            if (!is_dir($backupDir)) {
+                @mkdir($backupDir, 0755, true);
+            }
+            if (is_dir($backupDir) && $content) {
+                $backupPath = $backupDir . '/fleet_wb_' . date('Ymd_His') . '.json';
+                @file_put_contents($backupPath, $content, LOCK_EX);
+                $existingBackups = glob($backupDir . '/fleet_wb_*.json');
+                if (is_array($existingBackups) && count($existingBackups) > 20) {
+                    sort($existingBackups);
+                    foreach (array_slice($existingBackups, 0, count($existingBackups) - 20) as $oldBackup) {
+                        @unlink($oldBackup);
+                    }
+                }
+            }
+
+            // Сохранение предельных весов из старой записи, если в новой они пустые
+            if (isset($fleet[$targetKey]['max_weights']) && is_array($fleet[$targetKey]['max_weights'])) {
+                if (!isset($aircraftData['max_weights']) || !is_array($aircraftData['max_weights'])) {
+                    $aircraftData['max_weights'] = $fleet[$targetKey]['max_weights'];
+                } else {
+                    foreach (['mtow', 'mlaw', 'mzfw'] as $wKey) {
+                        if (empty($aircraftData['max_weights'][$wKey]) && !empty($fleet[$targetKey]['max_weights'][$wKey])) {
+                            $aircraftData['max_weights'][$wKey] = $fleet[$targetKey]['max_weights'][$wKey];
+                        }
+                    }
+                }
+            }
+
             $fleet[$targetKey] = $aircraftData;
-            file_put_contents($activeFleetFile, json_encode($fleet, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            $encoded = json_encode($fleet, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            file_put_contents($activeFleetFile, $encoded, LOCK_EX);
             
             // Также синхронизируем с остальными найденными путями fleet_wb.json
             foreach ($fleetFilePaths as $otherFp) {
                 if ($otherFp !== $activeFleetFile && file_exists(dirname($otherFp))) {
-                    @file_put_contents($otherFp, json_encode($fleet, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                    @file_put_contents($otherFp, $encoded, LOCK_EX);
                 }
             }
 
@@ -3927,6 +4385,13 @@ if (strpos($route, '/admin/fleet_wb') === 0) {
         if (!$parsed || empty($parsed['tail']) || $parsed['tail'] === 'UNKNOWN') {
             http_response_code(422);
             echo json_encode(['detail' => 'Не удалось распознать бортовой номер или структуру PDF-графика WBR']);
+            exit;
+        }
+
+        $stats = countFleetMatrixCells($parsed);
+        if ($stats['crews'] < 1 || $stats['cells'] < 1) {
+            http_response_code(422);
+            echo json_encode(['detail' => 'Не удалось извлечь таблицу DOW/DOI из PDF-файла (распознано 0 строк экипажей). Существующие данные борта не изменены.']);
             exit;
         }
 

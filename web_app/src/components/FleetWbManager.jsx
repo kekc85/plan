@@ -258,10 +258,21 @@ export default function FleetWbManager() {
   // Подтверждение импорта распознанного WBR
   const handleConfirmImport = async () => {
     if (!uploadPreview) return;
+    const { key, data } = uploadPreview;
+    const hasValidCells = Object.values(data?.matrix || {}).some(
+      (pantries) => pantries && Object.values(pantries).some((cell) => cell && Number(cell.dow) > 0)
+    );
+    if (!hasValidCells) {
+      setStatusMsg({
+        type: 'error',
+        text: 'Сохранение заблокировано: в распознанном графике отсутствуют строки DOW/DOI. Существующие данные борта не изменены.'
+      });
+      return;
+    }
+
     setUploadLoading(true);
 
     try {
-      const { key, data } = uploadPreview;
       const updatedFleet = { ...fleet, [key]: data };
       setFleet(updatedFleet);
       setSelectedKey(key);
@@ -1383,7 +1394,13 @@ export default function FleetWbManager() {
       )}
 
             {/* 4. МОДАЛЬНОЕ ОКНО ПРЕДПРОСМОТРА И ПОДТВЕРЖДЕНИЯ ЗАГРУЖЕННОГО WBR PDF */}
-      {showUploadModal && uploadPreview && (
+      {showUploadModal && uploadPreview && (() => {
+        const previewRows = Object.entries(uploadPreview.data?.matrix || {});
+        const previewPantries = uploadPreview.data?.pantry_codes || [];
+        const hasValidMatrix = previewRows.some(
+          ([, pantries]) => pantries && Object.values(pantries).some((cell) => cell && Number(cell.dow) > 0)
+        );
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-2 sm:p-3 animate-in fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-xl w-full max-h-[92vh] overflow-y-auto p-3.5 sm:p-5 space-y-4">
             <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -1420,21 +1437,64 @@ export default function FleetWbManager() {
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 font-bold block">РЕВИЗИЯ И ДАТА:</span>
-                <strong>{uploadPreview.data.revision} ({uploadPreview.data.date || '—'})</strong>
+                <strong>{uploadPreview.data.revision || '—'} ({uploadPreview.data.date || '—'})</strong>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 font-bold block">BASIC WEIGHT:</span>
-                <strong className="text-emerald-600 dark:text-emerald-400">{uploadPreview.data.basic_weight} кг</strong>
+                <strong className="text-emerald-600 dark:text-emerald-400">
+                  {uploadPreview.data.basic_weight != null ? `${uploadPreview.data.basic_weight} кг` : '—'}
+                </strong>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 font-bold block">BASIC INDEX:</span>
-                <strong className="text-sky-600 dark:text-sky-400">{uploadPreview.data.basic_index}</strong>
+                <strong className="text-sky-600 dark:text-sky-400">
+                  {uploadPreview.data.basic_index != null ? uploadPreview.data.basic_index : '—'}
+                </strong>
               </div>
               <div className="col-span-2 pt-1 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 font-sans">
                 <span>Вариантов экипажей: <strong>{uploadPreview.data.crew_count}</strong></span>
-                <span>Кухни (Galleys): <strong>{(uploadPreview.data.pantry_codes || []).join(', ')}</strong></span>
+                <span>Кухни (Galleys): <strong>{previewPantries.join(', ') || '—'}</strong></span>
               </div>
             </div>
+
+            {!hasValidMatrix ? (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-bold">
+                Таблица DOW/DOI не распознана (0 валидных строк экипажей). Импорт заблокирован, чтобы не затереть данные борта.
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-bold uppercase text-slate-400">
+                  Контроль распознанной таблицы (первые {Math.min(3, previewRows.length)} из {previewRows.length} экипажей):
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                  <table className="w-full text-[10px] font-mono border-collapse">
+                    <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                      <tr>
+                        <th className="px-2 py-1 text-left border-b border-slate-200 dark:border-slate-700">Экипаж</th>
+                        {previewPantries.map((p) => (
+                          <th key={p} className="px-1.5 py-1 text-center border-b border-slate-200 dark:border-slate-700">{p}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {previewRows.slice(0, 3).map(([crewCode, pantries]) => (
+                        <tr key={crewCode}>
+                          <td className="px-2 py-1 font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">{crewCode}</td>
+                          {previewPantries.map((p) => {
+                            const cell = pantries?.[p];
+                            return (
+                              <td key={p} className="px-1.5 py-1 text-center whitespace-nowrap">
+                                {cell ? `${cell.dow} / ${cell.doi ?? '—'}` : '—'}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
@@ -1445,8 +1505,8 @@ export default function FleetWbManager() {
               </button>
               <button
                 onClick={handleConfirmImport}
-                disabled={uploadLoading}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
+                disabled={uploadLoading || !hasValidMatrix}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
               >
                 <Check className="w-4 h-4" />
                 <span>{uploadLoading ? 'Сохранение...' : 'Применить в реестр флота'}</span>
@@ -1454,7 +1514,8 @@ export default function FleetWbManager() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
     </div>
   );
