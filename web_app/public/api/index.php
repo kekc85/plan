@@ -4261,10 +4261,41 @@ if (strpos($route, '/admin/fleet_wb') === 0) {
         }
     }
 
+    $normalizeFleetModelName = function ($val) {
+        $s = trim((string)$val);
+        if ($s !== '' && preg_match('/[\r\n]/', $s)) {
+            $parts = preg_split('/[\r\n]+/', $s);
+            return trim((string)($parts[0] ?? $s));
+        }
+        return $s;
+    };
+
     if ($route === '/admin/fleet_wb' && $method === 'GET') {
         if ($activeFleetFile) {
             $content = file_get_contents($activeFleetFile);
             $fleet = json_decode($content, true);
+            if (is_array($fleet)) {
+                $dirty = false;
+                foreach ($fleet as $k => &$item) {
+                    if (is_array($item) && !empty($item['model']) && preg_match('/[\r\n]/', (string)$item['model'])) {
+                        $cleanModel = $normalizeFleetModelName($item['model']);
+                        if ($cleanModel !== $item['model']) {
+                            $item['model'] = $cleanModel;
+                            $dirty = true;
+                        }
+                    }
+                }
+                unset($item);
+                if ($dirty) {
+                    $encoded = json_encode($fleet, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                    @file_put_contents($activeFleetFile, $encoded, LOCK_EX);
+                    foreach ($fleetFilePaths as $otherFp) {
+                        if ($otherFp !== $activeFleetFile && file_exists(dirname($otherFp))) {
+                            @file_put_contents($otherFp, $encoded, LOCK_EX);
+                        }
+                    }
+                }
+            }
             echo json_encode(['success' => true, 'fleet' => $fleet]);
             exit;
         }
@@ -4286,6 +4317,10 @@ if (strpos($route, '/admin/fleet_wb') === 0) {
             http_response_code(400);
             echo json_encode(['detail' => 'Не указан ключ ВС или данные ВС']);
             exit;
+        }
+
+        if (!empty($aircraftData['model'])) {
+            $aircraftData['model'] = $normalizeFleetModelName($aircraftData['model']);
         }
 
         // Защита от перезаписи реестра пустой матрицей DOW/DOI
