@@ -325,53 +325,110 @@
       height: 6.0mm;
     }
 
-    /* 2. Верхний блок расчета весов (37.8 мм) */
+    /* 2. Верхний блок расчета весов (10 строк по 3.9 мм = 39 мм, сетка квадратиков) */
     .weights-upper-table {
       flex-shrink: 0;
     }
     .weights-upper-table td {
-      height: 6.3mm;
-      padding: 0 2px;
+      height: 3.9mm;
+      padding: 0 3px;
+      font-size: 7.5px;
     }
 
-    .weights-upper-table input.ls-input,
-    .weights-upper-table .calc-val {
-      font-size: 11.5px;
-      font-weight: 800;
+    .upper-label-flex {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      height: 100%;
+      font-size: 7.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      line-height: 1.05;
     }
 
-    .limit-box-cell {
-      position: relative;
-      text-align: right;
-      padding-right: 3px;
-      vertical-align: middle;
-      font-weight: 800;
-      font-size: 11.5px;
-    }
-
-    .limit-box-cell .limit-val-text {
-      font-size: 11.5px !important;
-      font-weight: 800 !important;
-      display: inline-block;
+    .upper-sign {
+      font-size: 10.5px;
+      font-weight: 900;
       line-height: 1;
+      flex-shrink: 0;
+      margin-left: 2px;
     }
 
-    .limit-box-cell input.ls-input {
-      font-size: 11.5px !important;
-      font-weight: 800 !important;
-      padding-left: 12px;
-      padding-right: 3px;
+    /* Универсальная сетка квадратиков для цифр (вычисляемых и редактируемых) */
+    .digit-td {
+      padding: 0 !important;
+      position: relative;
+    }
+
+    .digit-grid-cells {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+
+    .digit-cell {
+      flex: 1;
+      height: 100%;
+      border-right: 1px solid #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9.5px;
+      font-weight: 800;
+      color: #000;
+      line-height: 1;
+      box-sizing: border-box;
+    }
+
+    .digit-cell:last-child {
+      border-right: none;
+    }
+
+    .traffic-table .digit-cell {
+      font-size: 8.5px;
+    }
+
+    .digit-input-wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    input.digit-overlay-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: transparent;
+      caret-color: #000;
+      font-family: inherit;
+      font-size: 9.5px;
+      font-weight: 800;
+      text-align: right;
+      padding: 0 3px;
+      z-index: 2;
+      box-sizing: border-box;
+    }
+
+    input.digit-overlay-input:focus {
+      background: #e8f4fd;
+      color: #000;
     }
 
     .limit-box-num {
       position: absolute;
-      top: 1px;
-      left: 2px;
-      font-size: 7.5px;
+      top: 0.5px;
+      left: 1.5px;
+      font-size: 6.5px;
       font-weight: 900;
+      line-height: 1;
       color: #000;
       pointer-events: none;
-      z-index: 2;
+      z-index: 3;
     }
 
     /* 3. Таблица коммерческой загрузки */
@@ -402,14 +459,19 @@
       padding: 0 1px;
     }
     .sub-type-label {
-      font-size: 8px;
+      font-size: 6.8px;
       font-weight: 700;
       text-align: center;
+      padding: 0 !important;
+      letter-spacing: -0.2px;
       background: #fff;
     }
     .sub-type-t {
       font-weight: 900;
-      background: #f1f3f5;
+      background-color: #e6e7e9;
+      background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.08) 0px, rgba(0, 0, 0, 0.08) 1px, transparent 1px, transparent 3px);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
     /* 4. Нижний расчетный блок (полное 1-в-1 соответствие оригинальному бланку NWS) */
@@ -436,7 +498,7 @@
       display: flex;
       flex-direction: row;
       align-items: stretch;
-      flex: 1;
+      flex: 0 0 auto;
       min-height: 0;
       width: 100%;
     }
@@ -451,7 +513,7 @@
 
     .lower-weights-table {
       width: 100%;
-      height: 100%;
+      height: auto;
       border-collapse: collapse;
       table-layout: fixed;
     }
@@ -459,6 +521,10 @@
     /* Строки сетки нижнего блока (равномерная сетка 4.25 мм по высоте для строгого A4) */
     .lower-weights-table tr {
       height: 4.25mm;
+    }
+
+    .lower-weights-table tr:first-child td {
+      border-top: none;
     }
 
     .lower-weights-table td {
@@ -668,8 +734,8 @@
 
     /* Чистое белое поле внизу (под LANDING WEIGHT и LMC TOTAL +/-) */
     .lower-bottom-white-bar {
-      height: 8.5mm;
-      flex-shrink: 0;
+      flex: 1;
+      min-height: 8.5mm;
       width: 100%;
       background: #fff;
       border-top: 1.5px solid #000;
@@ -711,6 +777,10 @@
       height: 4.25mm;
     }
 
+    .underload-calc-table tr:first-child td {
+      border-top: none;
+    }
+
     .underload-calc-table td {
       border: 1px solid #000;
       padding: 0;
@@ -747,7 +817,7 @@
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      flex: 1;
+      flex: 0 0 auto;
     }
 
     .lmc-table th {
@@ -1220,6 +1290,11 @@
         color: #000 !important;
       }
 
+      input.digit-overlay-input {
+        color: transparent !important;
+        background: transparent !important;
+      }
+
       select {
         appearance: none;
         -webkit-appearance: none;
@@ -1321,108 +1396,257 @@
         </tbody>
       </table>
 
-      <!-- 2. Верхний блок расчета предельной коммерческой загрузки (точно 1-в-1 по оригиналу бланка) -->
+      <!-- 2. Верхний блок расчета предельной коммерческой загрузки (10 строк по 3.9 мм, сетка квадратиков 1-в-1) -->
       <div class="table-slash-wrap" id="wrap_weights_upper">
         <svg class="slash-overlay" id="svg_weights_upper" preserveAspectRatio="none"></svg>
         <table class="ls-table weights-upper-table border-b-thick">
         <colgroup>
-          <!-- Левая часть: DOW + Топливо = Operating Weight (43%) -->
-          <col style="width: 25%;">
-          <col style="width: 3%;">
-          <col style="width: 15%;">
-          <!-- Разделитель -->
-          <col style="width: 1%;">
-          <!-- Правая часть: Максимальные веса и расчет Allowed Traffic Load (57%) -->
-          <col style="width: 18%;">
-          <col style="width: 12.6%;">
-          <col style="width: 12.7%;">
-          <col style="width: 12.7%;">
+          <col style="width: 27.5%;">
+          <col style="width: 15.5%;">
+          <col style="width: 16.5%;">
+          <col style="width: 13.5%;">
+          <col style="width: 13.5%;">
+          <col style="width: 13.5%;">
         </colgroup>
         <tbody>
-          <!-- Ряд 1: BASIC WEIGHT | MAXIMUM WEIGHTS FOR | ZERO FUEL | TAKE-OFF | LANDING -->
+          <!-- Ряд 1: BASIC WEIGHT | MAXIMUM WEIGHTS FOR -> | ZERO FUEL | TAKE-OFF (rowspan=4) | LANDING -->
           <tr>
             <td class="cell-label-sm">BASIC WEIGHT</td>
-            <td></td>
-            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_basic_weight" oninput="calculate()"></td>
-            <td rowspan="6" class="border-r-thick" style="background:#f4f5f7;"></td>
-            <td class="cell-label-sm font-bold" style="padding-top:2px;">MAXIMUM WEIGHTS FOR &nbsp;&rarr;</td>
-            <td class="text-center font-bold" style="font-size: 7.5px;">ZERO FUEL</td>
-            <td class="text-center font-bold" style="font-size: 7.5px;">&mdash; TAKE-OFF</td>
-            <td class="text-center font-bold" style="font-size: 7.5px;">LANDING</td>
-          </tr>
-
-          <!-- Ряд 2: Crew | Ввод лимитов Max ZFW, Max LAW | Стрелка TAKE-OFF вниз (rowspan=2) -->
-          <tr>
-            <td class="cell-label-sm">Crew</td>
-            <td></td>
-            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_crew_weight" oninput="calculate()"></td>
-            <td></td>
-            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_max_zfw" oninput="calculate()"></td>
-            <!-- Колонка 2 под TAKE-OFF: единая непрерывная стрелка вниз строго одинаковой толщины по всей длине -->
-            <td rowspan="2" style="position: relative; padding: 0; vertical-align: top; background: #fff;">
-              <div style="position: absolute; top: 0; left: 12px; width: 1.5px; bottom: 5px; background: #000;"></div>
-              <div style="position: absolute; bottom: 0; left: 9.25px; width: 0; height: 0; border-left: 3.5px solid transparent; border-right: 3.5px solid transparent; border-top: 6px solid #000;"></div>
-              <div style="position: absolute; bottom: 0; left: 18px; right: -1px; height: 50%; border-top: 1px solid #000; border-left: 1px solid #000; display: flex; align-items: center; justify-content: space-between; padding: 0 3px; background: #fff; box-sizing: border-box; z-index: 1;">
-                <span style="font-size: 6.8px; font-weight: 700; white-space: nowrap;">TRIP FUEL</span>
-                <span style="font-size: 8px; font-weight: 900;">&rarr;&nbsp;+</span>
+            <td class="digit-td border-r-thick">
+              <div class="digit-input-wrap" data-digit-count="6">
+                <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+                <input type="number" step="any" class="ls-input digit-overlay-input" id="inp_basic_weight" oninput="calculate()">
               </div>
             </td>
-            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_max_law" oninput="calculate()"></td>
+            <td rowspan="2" style="padding: 1px 3px;">
+              <div style="display:flex; flex-direction:column; justify-content:space-between; height:100%;">
+                <span class="cell-label-sm font-bold">MAXIMUM WEIGHTS FOR</span>
+                <div style="display:flex; align-items:center; width:100%;">
+                  <span style="flex:1; height:0; border-top:1px solid #000;"></span>
+                  <svg width="9" height="7" viewBox="0 0 9 7" style="display:block; flex-shrink:0;"><polygon points="0,0.5 9,3.5 0,6.5" fill="#000"/></svg>
+                </div>
+              </div>
+            </td>
+            <td class="text-center font-bold border-b-thick border-r-thick" style="font-size: 7.5px;">ZERO FUEL</td>
+            <!-- Колонка 2 под TAKE-OFF: угловая стрелка вниз + TRIP FUEL + -->
+            <td rowspan="4" class="border-b-thick border-r-thick" style="position: relative; padding: 0; vertical-align: top; background: #fff;">
+              <div style="display: flex; align-items: center; padding: 1px 4px 0 8px; gap: 3px;">
+                <span style="display:inline-block; width:10px; height:5px; border-top:1px solid #000; border-left:1px solid #000; transform: translateY(2px);"></span>
+                <span style="font-size: 7.5px; font-weight: 700;">TAKE-OFF</span>
+              </div>
+              <div style="position: absolute; top: 8px; left: 8px; width: 1px; bottom: 5px; background: #000;"></div>
+              <div style="position: absolute; bottom: 1px; left: 5.5px; width: 0; height: 0; border-left: 3px solid transparent; border-right: 3px solid transparent; border-top: 5px solid #000;"></div>
+              <div style="position: absolute; bottom: 0; left: 16px; right: 0; height: 52%; border-top: 1px solid #000; border-left: 1px solid #000; display: flex; flex-direction: column; justify-content: space-between; padding: 2px 3px; background: #fff; box-sizing: border-box; z-index: 1;">
+                <span style="font-size: 6.8px; font-weight: 700; white-space: nowrap;">TRIP FUEL</span>
+                <div style="display:flex; align-items:center; width:100%;">
+                  <span style="flex:1; height:0; border-top:1px solid #000;"></span>
+                  <svg width="8" height="6" viewBox="0 0 9 7" style="display:block; flex-shrink:0;"><polygon points="0,0.5 9,3.5 0,6.5" fill="#000"/></svg>
+                  <span style="font-size: 9.5px; font-weight: 900; line-height: 1; margin-left: 2px;">+</span>
+                </div>
+              </div>
+            </td>
+            <td class="text-center font-bold border-b-thick" style="font-size: 7.5px;">LANDING</td>
           </tr>
 
-          <!-- Ряд 3: Pantry | TAKE-OFF FUEL (+) | TRIP FUEL (+) -->
+          <!-- Ряд 2: Crew | Max ZFW (rowspan=2) | Max LAW -->
+          <tr>
+            <td class="cell-label-sm">Crew</td>
+            <td class="digit-td border-r-thick">
+              <div class="digit-input-wrap" data-digit-count="6">
+                <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+                <input type="number" step="any" class="ls-input digit-overlay-input" id="inp_crew_weight" oninput="calculate()">
+              </div>
+            </td>
+            <td rowspan="2" class="digit-td border-r-thick">
+              <div class="digit-input-wrap" data-digit-count="6">
+                <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+                <input type="number" step="any" class="ls-input digit-overlay-input" id="inp_max_zfw" oninput="calculate()">
+              </div>
+            </td>
+            <td class="digit-td">
+              <div class="digit-input-wrap" data-digit-count="6">
+                <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+                <input type="number" step="any" class="ls-input digit-overlay-input" id="inp_max_law" oninput="calculate()">
+              </div>
+            </td>
+          </tr>
+
+          <!-- Ряд 3: Pantry | TAKE-OFF FUEL + (rowspan=2) | Пустая строка Max LAW -->
           <tr>
             <td class="cell-label-sm">Pantry</td>
-            <td></td>
-            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_pantry_weight" oninput="calculate()"></td>
-            <td class="cell-label-sm font-bold">TAKE-OFF FUEL <span style="float:right;">+</span></td>
-            <td class="calc-val font-bold" id="disp_lim1_fuel"></td>
-            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_trip_fuel" oninput="calculate()"></td>
+            <td class="digit-td border-r-thick">
+              <div class="digit-input-wrap" data-digit-count="6">
+                <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+                <input type="number" step="any" class="ls-input digit-overlay-input" id="inp_pantry_weight" oninput="calculate()">
+              </div>
+            </td>
+            <td rowspan="2" class="border-b-thick">
+              <div class="upper-label-flex">
+                <span>TAKE-OFF FUEL</span>
+                <span class="upper-sign">+</span>
+              </div>
+            </td>
+            <td class="digit-td">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
           </tr>
 
-          <!-- Ряд 4: DRY OPERATING WEIGHT = | ALLOWED WEIGHT FOR TAKE-OFF (Колонки 1, 2, 3) -->
+          <!-- Ряд 4: Пусто | TAKE-OFF FUEL (lim1) | TRIP FUEL -->
           <tr>
-            <td class="cell-label-sm font-bold">DRY OPERATING WEIGHT</td>
-            <td class="text-center font-bold">=</td>
-            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_dow" oninput="onDowDirectInput()"></td>
-            <td class="cell-label-sm font-bold" style="font-size:6.8px; line-height:1.1;">ALLOWED WEIGHT FOR<br>TAKE-OFF. LOWEST OF 1, 2 OR 3</td>
-            <!-- Колонка 1 (под ZERO FUEL) -->
-            <td class="limit-box-cell" style="background:#fdfefe;">
+            <td class="border-b-thick"></td>
+            <td class="digit-td border-b-thick border-r-thick">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-b-thick border-r-thick" id="disp_lim1_fuel" data-digit-count="6">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-b-thick">
+              <div class="digit-input-wrap" data-digit-count="6">
+                <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+                <input type="number" step="any" class="ls-input digit-overlay-input" id="inp_trip_fuel" oninput="calculate()">
+              </div>
+            </td>
+          </tr>
+
+          <!-- Ряд 5: DRY OPERATING WEIGHT = | ALLOWED WEIGHT FOR TAKE-OFF. LOWEST OF 1, 2 OR 3 -->
+          <tr>
+            <td rowspan="2" class="border-b-thick">
+              <div class="upper-label-flex">
+                <span>DRY OPERATING WEIGHT</span>
+                <span class="upper-sign">=</span>
+              </div>
+            </td>
+            <td class="digit-td border-r-thick">
+              <div class="digit-input-wrap" data-digit-count="6">
+                <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+                <input type="number" step="any" class="ls-input digit-overlay-input" id="inp_dow" oninput="onDowDirectInput()">
+              </div>
+            </td>
+            <td rowspan="2" class="border-b-thick" style="font-size:6.8px; font-weight:700; line-height:1.1;">
+              ALLOWED WEIGHT FOR<br>TAKE-OFF. LOWEST OF 1, 2 OR 3
+            </td>
+            <td class="digit-td border-r-thick" id="disp_lim_1" data-digit-count="6">
               <span class="limit-box-num">1</span>
-              <span class="calc-val font-bold limit-val-text" id="disp_lim_1"></span>
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
             </td>
-            <!-- Колонка 2 (под TAKE-OFF): ввод значения TAKE-OFF -->
-            <td class="limit-box-cell" style="background:#fdfefe; padding: 0;">
+            <td class="digit-td border-r-thick">
               <span class="limit-box-num">2</span>
-              <input type="number" step="any" class="ls-input text-right font-bold" id="inp_max_tow" oninput="calculate()">
+              <div class="digit-input-wrap" data-digit-count="6">
+                <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+                <input type="number" step="any" class="ls-input digit-overlay-input" id="inp_max_tow" oninput="calculate()">
+              </div>
             </td>
-            <!-- Колонка 3 (под LANDING) -->
-            <td class="limit-box-cell" style="background:#fdfefe;">
+            <td class="digit-td" id="disp_lim_3" data-digit-count="6">
               <span class="limit-box-num">3</span>
-              <span class="calc-val font-bold limit-val-text" id="disp_lim_3"></span>
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
             </td>
           </tr>
 
-          <!-- Ряд 5: TAKE-OFF FUEL + | WET OPERATING WEIGHT - (Колонки 1, 2, 3 с вертикальными линиями) -->
+          <!-- Ряд 6: Вторая строка квадратиков DOW и лимитов 1, 2, 3 -->
           <tr>
-            <td class="cell-label-sm">TAKE-OFF FUEL</td>
-            <td class="text-center font-bold">+</td>
-            <td><input type="number" step="any" class="ls-input text-right font-bold" id="inp_takeoff_fuel" oninput="calculate()"></td>
-            <td class="cell-label-sm">WET OPERATING<br>WEIGHT <span style="float:right;">&minus;</span></td>
-            <td class="calc-val font-bold" id="disp_wow_1"></td>
-            <td class="calc-val font-bold" id="disp_wow_2"></td>
-            <td class="calc-val font-bold" id="disp_wow_3"></td>
+            <td class="digit-td border-b-thick border-r-thick">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-b-thick border-r-thick">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-b-thick border-r-thick">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-b-thick">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
           </tr>
 
-          <!-- Ряд 6: OPERATING WEIGHT = | ALLOWED TRAFFIC LOAD = (Колонки 1, 2, 3 с вертикальными линиями) -->
+          <!-- Ряд 7: TAKE-OFF FUEL + | WET OPERATING WEIGHT - -->
           <tr>
-            <td class="cell-label-sm">OPERATING WEIGHT</td>
-            <td class="text-center font-bold">=</td>
-            <td class="calc-val font-bold" id="disp_operating_weight"></td>
-            <td class="cell-label-sm font-bold" style="background:#eaf2f8;">ALLOWED TRAFFIC<br>LOAD <span style="float:right;">=</span></td>
-            <td class="calc-val font-bold" id="disp_atl_1" style="background:#eaf2f8; font-size:11px; color:#1864ab;"></td>
-            <td class="calc-val font-bold" id="disp_atl_2" style="background:#eaf2f8; font-size:11px; color:#1864ab;"></td>
-            <td class="calc-val font-bold" id="disp_atl_3" style="background:#eaf2f8; font-size:11px; color:#1864ab;"></td>
+            <td rowspan="2" class="border-b-thick">
+              <div class="upper-label-flex">
+                <span>TAKE-OFF FUEL</span>
+                <span class="upper-sign">+</span>
+              </div>
+            </td>
+            <td class="digit-td border-r-thick">
+              <div class="digit-input-wrap" data-digit-count="6">
+                <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+                <input type="number" step="any" class="ls-input digit-overlay-input" id="inp_takeoff_fuel" oninput="calculate()">
+              </div>
+            </td>
+            <td rowspan="2" class="border-b-thick">
+              <div class="upper-label-flex">
+                <span>WET OPERATING<br>WEIGHT</span>
+                <span class="upper-sign">&minus;</span>
+              </div>
+            </td>
+            <td class="digit-td border-r-thick" id="disp_wow_1" data-digit-count="6">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-r-thick" id="disp_wow_2" data-digit-count="6">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td" id="disp_wow_3" data-digit-count="6">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+          </tr>
+
+          <!-- Ряд 8: Вторая строка квадратиков TAKE-OFF FUEL и WET OPERATING WEIGHT -->
+          <tr>
+            <td class="digit-td border-b-thick border-r-thick">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-b-thick border-r-thick">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-b-thick border-r-thick">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-b-thick">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+          </tr>
+
+          <!-- Ряд 9: OPERATING WEIGHT = | ALLOWED TRAFFIC LOAD = -->
+          <tr>
+            <td rowspan="2">
+              <div class="upper-label-flex">
+                <span>OPERATING WEIGHT</span>
+                <span class="upper-sign">=</span>
+              </div>
+            </td>
+            <td class="digit-td border-r-thick" id="disp_operating_weight" data-digit-count="6">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td rowspan="2">
+              <div class="upper-label-flex">
+                <span>ALLOWED TRAFFIC<br>LOAD</span>
+                <span class="upper-sign">=</span>
+              </div>
+            </td>
+            <td class="digit-td border-r-thick" id="disp_atl_1" data-digit-count="6" style="background:#eaf2f8;">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-r-thick" id="disp_atl_2" data-digit-count="6" style="background:#eaf2f8;">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td" id="disp_atl_3" data-digit-count="6" style="background:#eaf2f8;">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+          </tr>
+
+          <!-- Ряд 10: Вторая строка квадратиков OPERATING WEIGHT и ALLOWED TRAFFIC LOAD -->
+          <tr>
+            <td class="digit-td border-r-thick">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-r-thick" id="disp_atl_bot_1">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td border-r-thick" id="disp_atl_bot_2">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
+            <td class="digit-td" id="disp_atl_bot_3">
+              <div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -1442,9 +1666,9 @@
           <col style="width: 5.2%;">
           <!-- CABIN BAG WT (6) -> 6.0% (сумма 0..32.0%) -->
           <col style="width: 6.0%;">
-          <!-- TOTAL (Type, Val) (7, 8) -> 12.8% (сумма 32.0..44.8%) -->
-          <col style="width: 2.8%;">
-          <col style="width: 10.0%;">
+          <!-- TOTAL (Type 1 кл. + Val 5 кл.) (7, 8) -> 12.8% (ровно 6 квадратиков 32.0..44.8%) -->
+          <col style="width: 2.133%;">
+          <col style="width: 10.667%;">
           <!-- CPT 1..5 (9, 10, 11, 12, 13) -> 30.5% (сумма 44.8..75.3%) -->
           <col style="width: 6.1%;">
           <col style="width: 6.1%;">
@@ -1499,7 +1723,7 @@
             <td class="calc-val center" id="tot_pax_ch"></td>
             <td class="calc-val center" id="tot_pax_inf"></td>
             <td class="calc-val center" id="tot_cabin_bag"></td>
-            <td colspan="2" class="calc-val font-bold" id="tot_cargo_deadload"></td>
+            <td colspan="2" class="digit-td font-bold" id="tot_cargo_deadload" data-digit-count="6"><div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div></td>
             <td class="calc-val" id="tot_cpt_1"></td>
             <td class="calc-val" id="tot_cpt_2"></td>
             <td class="calc-val" id="tot_cpt_3"></td>
@@ -2314,11 +2538,12 @@
           const labelIdAttr = isTotalRow ? ` id="cargo_label_t_${d}"` : '';
           tr.innerHTML += `<td${labelIdAttr} class="${labelClass}${borderBottomClass}">${type}</td>`;
 
-          // 3. Значение TOTAL для строки данного типа или сумма T
+          // 3. Значение TOTAL для строки данного типа или сумма T (5 квадратиков под цифры)
+          const cells5 = '<div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>';
           if (isTotalRow) {
-            tr.innerHTML += `<td class="calc-val font-bold sub-type-t${borderBottomClass}" id="cargo_tot_${d}"></td>`;
+            tr.innerHTML += `<td class="digit-td sub-type-t${borderBottomClass}" id="cargo_tot_${d}" data-digit-count="5">${cells5}</td>`;
           } else {
-            tr.innerHTML += `<td class="${borderBottomClass}"><input type="number" min="0" class="ls-input text-right" id="cargo_${type.toLowerCase()}_${d}" oninput="onCargoRowInput(${d}, '${type.toLowerCase()}')"></td>`;
+            tr.innerHTML += `<td class="digit-td${borderBottomClass}"><div class="digit-input-wrap" data-digit-count="5">${cells5}<input type="number" min="0" class="ls-input digit-overlay-input" id="cargo_${type.toLowerCase()}_${d}" oninput="onCargoRowInput(${d}, '${type.toLowerCase()}')"></div></td>`;
           }
 
           // 4. Отсеки CPT 1..5
@@ -2522,9 +2747,42 @@
       return isNaN(val) ? 0 : val;
     }
 
+    // Заполнение N квадратиков внутри контейнера по правому краю
+    function fillDigitGrid(containerEl, val, count, showZero = false) {
+      if (!containerEl) return;
+      const cells = containerEl.querySelectorAll('.digit-cell');
+      cells.forEach(c => { c.textContent = ''; });
+      const raw = (val === null || val === undefined) ? '' : String(val).trim();
+      if (raw === '' || raw === 'NaN') return;
+      const num = Number(raw);
+      if (isNaN(num)) return;
+      const rounded = Math.round(num);
+      if (!showZero && rounded <= 0) return;
+      const str = String(rounded);
+      const padded = str.slice(-cells.length).padStart(cells.length, ' ');
+      cells.forEach((cell, idx) => {
+        if (padded[idx] && padded[idx] !== ' ') {
+          cell.textContent = padded[idx];
+        }
+      });
+    }
+
+    // Синхронизация всех полей ввода с наложенной сеткой квадратиков
+    function syncAllDigitInputs() {
+      document.querySelectorAll('.digit-input-wrap').forEach(wrap => {
+        const count = parseInt(wrap.dataset && wrap.dataset.digitCount, 10) || 6;
+        const inp = wrap.querySelector('input');
+        fillDigitGrid(wrap, inp ? inp.value : '', count, false);
+      });
+    }
+
     function setTxt(id, val, formatNum = true, showZero = false) {
       const el = document.getElementById(id);
       if (!el) return;
+      if (el.dataset && el.dataset.digitCount) {
+        fillDigitGrid(el, val, parseInt(el.dataset.digitCount, 10), showZero);
+        return;
+      }
       if (!showZero && (val === 0 || val === '0' || val === '' || val === null || isNaN(val))) {
         el.textContent = '';
         return;
@@ -2855,7 +3113,8 @@
         adjLaw
       });
 
-      // 10. Отрисовка диагонального перечёркивания неиспользуемых граф
+      // 10. Синхронизация квадратиков ввода и диагональное перечёркивание неиспользуемых граф
+      syncAllDigitInputs();
       if (typeof updateUnusedSlashes === 'function') {
         updateUnusedSlashes(lowestLimIdx);
       }
@@ -3125,7 +3384,7 @@
           [1, 2, 3].forEach((k) => {
             if (k === _lastLowestLimIdx) return;
             const tdTop = document.getElementById(`disp_wow_${k}`);
-            const tdBot = document.getElementById(`disp_atl_${k}`);
+            const tdBot = document.getElementById(`disp_atl_bot_${k}`) || document.getElementById(`disp_atl_${k}`);
             const topBox = getCellBoxInTable(tdTop, upperTable);
             const botBox = getCellBoxInTable(tdBot, upperTable);
             if (topBox && botBox) {
@@ -3897,6 +4156,12 @@
       if (crewEl) {
         crewEl.addEventListener('change', () => lookupAndApplyAircraftWb(true));
       }
+
+      document.addEventListener('blur', (e) => {
+        if (e.target && e.target.classList && e.target.classList.contains('digit-overlay-input')) {
+          syncAllDigitInputs();
+        }
+      }, true);
     });
   </script>
 </body>
