@@ -3822,7 +3822,7 @@ function parseWbrPdfBinary($pdfBinary, $origName) {
 
     // 3. Модель ВС
     $model = 'UNKNOWN';
-    if (preg_match('/Model:?\s*([A-Za-z0-9\-]+(?:\s+[A-Za-z0-9\-]+)?)/i', $fullText, $m)) {
+    if (preg_match('/Model:?[ \t]*([A-Za-z0-9\-]+(?:[ \t]+[A-Za-z0-9\-]+)?)/i', $fullText, $m)) {
         $model = trim($m[1]);
     } elseif (stripos($fname, '737-800') !== false || stripos($fname, '738') !== false || stripos($fullText, '737-800') !== false) {
         $model = 'B737-800';
