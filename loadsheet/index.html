@@ -2619,9 +2619,11 @@
         }
       }
 
+      const paxInfEl = document.getElementById(`pax_inf_${d}`);
       const padC = document.getElementById(`rem_pad_c_${d}`);
       const padY = document.getElementById(`rem_pad_y_${d}`);
       if (mainSeated > 0) {
+        if (paxInfEl && paxInfEl.value === '') paxInfEl.value = '0';
         if (padC && padC.value === '') padC.value = '0';
         if (padY && padY.value === '') padY.value = '0';
       }
@@ -2936,6 +2938,7 @@
       let sumRem = { pax_c: 0, pax_y: 0, pad_c: 0, pad_y: 0 };
       let hasPaxMVal = false;
       let hasPaxFVal = false;
+      let hasPaxInfVal = false;
       let hasPadCVal = false;
       let hasPadYVal = false;
 
@@ -2953,6 +2956,7 @@
 
         if (hasM) hasPaxMVal = true;
         if (hasF) hasPaxFVal = true;
+        if (hasInf) hasPaxInfVal = true;
         if (hasInputVal(`rem_pad_c_${d}`) || hasInputVal(`rem_tr_pad_c_${d}`)) hasPadCVal = true;
         if (hasInputVal(`rem_pad_y_${d}`) || hasInputVal(`rem_tr_pad_y_${d}`)) hasPadYVal = true;
 
@@ -3027,7 +3031,7 @@
       setTxt('tot_pax_m', sumPaxM, true, hasPaxMVal);
       setTxt('tot_pax_f', sumPaxF, true, hasPaxFVal);
       setTxt('tot_pax_ch', sumPaxCh, true, false);
-      setTxt('tot_pax_inf', sumPaxInf, true, false);
+      setTxt('tot_pax_inf', sumPaxInf, true, hasPaxInfVal);
       setTxt('tot_cabin_bag', sumCabinBag, true, false);
       setTxt('tot_cargo_deadload', sumDeadload, true, false);
 
@@ -4097,9 +4101,9 @@
       if (hasAnyPaxData) {
         setInp('pax_m_1', String(totalAdults));
         setInp('pax_f_1', '0');
+        setInp('pax_inf_1', String(numInf));
       }
       if (numCh > 0) setInp('pax_ch_1', numCh);
-      if (numInf > 0) setInp('pax_inf_1', numInf);
 
       setInp('cabin_bag_1', data.cabin_bag || data.cabin_bag_1 || data.cargo_cabin_bag_1);
 
