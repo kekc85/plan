@@ -160,7 +160,7 @@
       display: flex;
       width: 100%;
       border-bottom: 1.5px solid #000;
-      height: 13mm;
+      height: 13.5mm;
       flex-shrink: 0;
     }
 
@@ -309,7 +309,7 @@
       border-top: 1.5px solid #000 !important;
     }
 
-    /* 1. Блок данных рейса (10.2 мм) */
+    /* 1. Блок данных рейса (10.5 мм) */
     .flight-info-table {
       flex-shrink: 0;
     }
@@ -319,18 +319,18 @@
       font-size: 7.5px;
       font-weight: 700;
       padding: 1px 3px;
-      height: 4.2mm;
+      height: 4.3mm;
     }
     .flight-info-table td {
-      height: 6.0mm;
+      height: 6.2mm;
     }
 
-    /* 2. Верхний блок расчета весов (10 строк по 3.9 мм = 39 мм, сетка квадратиков) */
+    /* 2. Верхний блок расчета весов (10 строк по 4.15 мм = 41.5 мм, сетка квадратиков) */
     .weights-upper-table {
       flex-shrink: 0;
     }
     .weights-upper-table td {
-      height: 3.9mm;
+      height: 4.15mm;
       padding: 0 3px;
       font-size: 7.5px;
     }
@@ -440,14 +440,14 @@
       font-weight: 700;
       text-align: center;
       padding: 1px 1px;
-      height: 4.2mm;
+      height: 4.3mm;
     }
     .traffic-table tbody td {
-      height: 3.9mm;
+      height: 4.15mm;
       padding: 0 1px;
     }
     .traffic-table tfoot td {
-      height: 5.8mm;
+      height: 6.0mm;
       padding: 0 1px;
     }
     .traffic-table input.ls-input {
@@ -458,13 +458,23 @@
       font-size: 9px;
       padding: 0 1px;
     }
-    .sub-type-label {
-      font-size: 6.8px;
+    .sub-type-cell {
+      flex: 1;
+      height: 100%;
+      border-right: 1px solid #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 7px;
       font-weight: 700;
-      text-align: center;
-      padding: 0 !important;
-      letter-spacing: -0.2px;
-      background: #fff;
+      line-height: 1;
+      color: #000;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .sub-type-cell.sub-type-uld {
+      font-size: 5.8px;
+      letter-spacing: -0.3px;
     }
     .sub-type-t {
       font-weight: 900;
@@ -472,6 +482,9 @@
       background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.08) 0px, rgba(0, 0, 0, 0.08) 1px, transparent 1px, transparent 3px);
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+    }
+    .sub-type-t .sub-type-cell {
+      font-weight: 900;
     }
 
     /* 4. Нижний расчетный блок (полное 1-в-1 соответствие оригинальному бланку NWS) */
@@ -485,12 +498,12 @@
       min-height: 0;
     }
 
-    /* Объединённая левая + средняя область (75.3%) с нижним белым полем */
+    /* Объединённая левая + средняя область (76.0%) с нижним белым полем */
     .lower-left-mid-group {
-      width: 75.3%;
+      width: 76.0%;
       display: flex;
       flex-direction: column;
-      border-right: 1.5px solid #000;
+      border-right: none;
       min-height: 0;
     }
 
@@ -503,10 +516,10 @@
       width: 100%;
     }
 
-    /* Левая секция: расчет весов + 5 колонок отсеков (CPT 1..5) */
+    /* Левая секция: расчет весов + 6 колонок (45.5% от бланка без съедания border-right) */
     .lower-col-left {
-      width: 59.495%;
-      border-right: 1.5px solid #000;
+      width: 59.8684%;
+      border-right: none;
       display: flex;
       flex-direction: column;
     }
@@ -518,9 +531,9 @@
       table-layout: fixed;
     }
 
-    /* Строки сетки нижнего блока (равномерная сетка 4.25 мм по высоте для строгого A4) */
+    /* Строки сетки нижнего блока (равномерная сетка 4.4 мм по высоте для строгого A4) */
     .lower-weights-table tr {
-      height: 4.25mm;
+      height: 4.4mm;
     }
 
     .lower-weights-table tr:first-child td {
@@ -530,21 +543,25 @@
     .lower-weights-table td {
       border: 1px solid #000;
       padding: 0;
-      height: 4.25mm;
+      height: 4.4mm;
       vertical-align: middle;
       font-size: 7.2px;
     }
 
+    .lower-weights-table td:last-child {
+      border-right: 1.5px solid #000;
+    }
+
     .lower-weights-table tr.pax-weight-double-row,
     .lower-weights-table tr.pax-weight-double-row > td {
-      height: 8.5mm;
+      height: 8.8mm;
     }
 
     .pax-merged-cell {
       position: relative;
       padding: 0 !important;
       vertical-align: bottom;
-      height: 12.75mm;
+      height: 13.2mm;
     }
 
     .pax-arrows-svg {
@@ -561,7 +578,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      height: 8.5mm;
+      height: 8.8mm;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -678,16 +695,16 @@
       border-right: none;
     }
 
-    /* Средняя колонка: верхняя строка-проставка под ручную кладь + основной блок */
+    /* Средняя колонка: верхняя строка-проставка под ручную кладь + основной блок (30.5%) */
     .lower-col-mid {
-      width: 40.505%;
+      width: 40.1316%;
       display: flex;
       flex-direction: column;
       align-items: stretch;
     }
 
     .mid-cabin-bag-spacer {
-      height: 4.25mm;
+      height: 4.4mm;
       flex-shrink: 0;
       display: flex;
       width: 100%;
@@ -715,7 +732,7 @@
     }
 
     .right-cabin-bag-spacer {
-      height: 4.25mm;
+      height: 4.4mm;
       flex-shrink: 0;
       display: flex;
       width: 100%;
@@ -735,7 +752,7 @@
     /* Чистое белое поле внизу (под LANDING WEIGHT и LMC TOTAL +/-) */
     .lower-bottom-white-bar {
       flex: 1;
-      min-height: 8.5mm;
+      min-height: 7.5mm;
       width: 100%;
       background: #fff;
       border-top: 1.5px solid #000;
@@ -774,7 +791,7 @@
     }
 
     .underload-calc-table tr {
-      height: 4.25mm;
+      height: 4.4mm;
     }
 
     .underload-calc-table tr:first-child td {
@@ -784,9 +801,15 @@
     .underload-calc-table td {
       border: 1px solid #000;
       padding: 0;
-      height: 4.25mm;
+      height: 4.4mm;
       font-size: 7.2px;
       vertical-align: middle;
+    }
+
+    .underload-calc-table td:first-child,
+    .lmc-table th:first-child,
+    .lmc-table td:first-child {
+      border-left: none;
     }
 
     .underload-label-cell {
@@ -807,7 +830,7 @@
       letter-spacing: 0.5px;
       padding: 0;
       border-bottom: 1px solid #000;
-      height: 4.25mm;
+      height: 4.4mm;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -827,12 +850,12 @@
       text-align: center;
       background: #fff;
       padding: 0;
-      height: 4.25mm;
+      height: 4.4mm;
     }
 
     .lmc-table td {
       border: 1px solid #000;
-      height: 4.25mm;
+      height: 4.4mm;
       padding: 0 1px;
     }
 
@@ -880,9 +903,11 @@
       color: #000;
     }
 
-    /* Правая колонка: Notes / Balance / Total Passengers / Signatures (24.7%) */
+    /* Правая колонка: Notes / Balance / Total Passengers / Signatures (24.0%) */
     .lower-col-right {
-      width: 24.7%;
+      width: 24.0%;
+      border-left: 1.5px solid #000;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
     }
@@ -892,7 +917,7 @@
       line-height: 1.12;
       padding: 2px 4px;
       border-bottom: 1px solid #000;
-      height: 25.5mm;
+      height: 26.4mm;
       flex-shrink: 0;
       box-sizing: border-box;
       overflow: hidden;
@@ -986,7 +1011,7 @@
       display: flex;
       border-bottom: 1px solid #000;
       background: #fff;
-      height: 4.25mm;
+      height: 4.4mm;
       flex-shrink: 0;
     }
 
@@ -1006,7 +1031,7 @@
       display: flex;
       flex: 1;
       border-bottom: 1px solid #000;
-      min-height: 29.75mm;
+      min-height: 28mm;
     }
 
     .balance-open-col {
@@ -1082,7 +1107,7 @@
       border-bottom: 1px solid #000;
       padding: 1px 3px;
       text-align: center;
-      height: 8.5mm;
+      height: 8.8mm;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
@@ -1111,7 +1136,7 @@
       line-height: 1.15;
       padding: 2px 3.5px;
       border-bottom: 1px solid #000;
-      height: 8.5mm;
+      height: 8.8mm;
       flex-shrink: 0;
       display: flex;
       align-items: center;
@@ -1122,7 +1147,7 @@
     .signatures-block {
       display: flex;
       width: 100%;
-      height: 12.75mm;
+      height: 13.2mm;
       flex-shrink: 0;
       box-sizing: border-box;
     }
@@ -1666,27 +1691,26 @@
           <col style="width: 5.2%;">
           <!-- CABIN BAG WT (6) -> 6.0% (сумма 0..32.0%) -->
           <col style="width: 6.0%;">
-          <!-- TOTAL (Type 1 кл. + Val 5 кл.) (7, 8) -> 12.8% (ровно 6 квадратиков 32.0..44.8%) -->
-          <col style="width: 2.133%;">
-          <col style="width: 10.667%;">
-          <!-- CPT 1..5 (9, 10, 11, 12, 13) -> 30.5% (сумма 44.8..75.3%) -->
+          <!-- TOTAL (единая колонка 6 равных квадратиков: 1 тип + 5 цифр) (7) -> 13.5% (сумма 32.0..45.5%) -->
+          <col style="width: 13.5%;">
+          <!-- CPT 1..5 (8..12) -> 30.5% (сумма 45.5..76.0%) -->
           <col style="width: 6.1%;">
           <col style="width: 6.1%;">
           <col style="width: 6.1%;">
           <col style="width: 6.1%;">
           <col style="width: 6.1%;">
-          <!-- REMARKS PAX C, Y / PAD C, Y (14, 15, 16, 17) -> 24.7% (сумма 75.3..100.0%) -->
-          <col style="width: 5.5%;">
-          <col style="width: 6.8%;">
-          <col style="width: 5.6%;">
-          <col style="width: 6.8%;">
+          <!-- REMARKS PAX C, Y / PAD C, Y (13..16) -> 24.0% (сумма 76.0..100.0%) -->
+          <col style="width: 5.4%;">
+          <col style="width: 6.6%;">
+          <col style="width: 5.4%;">
+          <col style="width: 6.6%;">
         </colgroup>
         <thead>
           <tr>
             <th rowspan="3">DEST.</th>
             <th colspan="4">No. OF PASSENGERS</th>
             <th rowspan="3">CABIN<br>BAG<br>WT</th>
-            <th colspan="2" rowspan="3" style="vertical-align: top; padding-top: 3px;">TOTAL</th>
+            <th rowspan="3" style="vertical-align: top; padding-top: 3px;">TOTAL</th>
             <th colspan="5">DISTRIBUTION WEIGHT</th>
             <th colspan="4">REMARKS</th>
           </tr>
@@ -1723,7 +1747,7 @@
             <td class="calc-val center" id="tot_pax_ch"></td>
             <td class="calc-val center" id="tot_pax_inf"></td>
             <td class="calc-val center" id="tot_cabin_bag"></td>
-            <td colspan="2" class="digit-td font-bold" id="tot_cargo_deadload" data-digit-count="6"><div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div></td>
+            <td class="digit-td font-bold" id="tot_cargo_deadload" data-digit-count="6"><div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div></td>
             <td class="calc-val" id="tot_cpt_1"></td>
             <td class="calc-val" id="tot_cpt_2"></td>
             <td class="calc-val" id="tot_cpt_3"></td>
@@ -1742,12 +1766,12 @@
       <div class="lower-block-container">
         <div class="lower-left-mid-group">
           <div class="lower-left-mid-top">
-            <!-- Левая колонка: Расчет весов самолета + 6 колонок отсеков -->
+            <!-- Левая колонка: Расчет весов самолета + 6 колонок (32.0% / 13.5% от бланка = 70.3297% / 29.6703%) -->
             <div class="lower-col-left">
           <table class="lower-weights-table">
             <colgroup>
-              <col style="width: 71.43%;">
-              <col style="width: 28.57%;">
+              <col style="width: 70.3297%;">
+              <col style="width: 29.6703%;">
             </colgroup>
             <tbody>
               <!-- 1: РУЧНАЯ КЛАДЬ + PASSENGER WEIGHT (4.25 мм + 8.5 мм = 12.75 мм) -->
@@ -1856,15 +1880,15 @@
                 </td>
               </tr>
 
-              <!-- 4: ZERO FUEL WEIGHT (3 строки по 4.25 мм) -->
+              <!-- 4: ZERO FUEL WEIGHT (3 строки по 4.4 мм) -->
               <tr>
                 <td rowspan="3" style="padding: 1px 3px; vertical-align: middle;">
                   <div style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.25mm;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.4mm;">
                       <span style="font-weight:700; font-size:7.5px;">ZERO FUEL WEIGHT</span>
                       <span style="font-size:7px; font-weight:900; margin-right:6px;">LMC</span>
                     </div>
-                    <div style="display:flex; justify-content:flex-end; align-items:center; height: 4.25mm;">
+                    <div style="display:flex; justify-content:flex-end; align-items:center; height: 4.4mm;">
                       <div class="lmc-sub-row">
                         <span>+/&minus;</span>
                         <div class="lmc-box-field"><input type="text" class="lmc-sub-input" id="lmc_zfw_inp1" oninput="calculate()"></div>
@@ -1872,7 +1896,7 @@
                         <div class="lmc-box-field" id="lmc_zfw_res1"></div>
                       </div>
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.25mm;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.4mm;">
                       <div class="max-digits-wrap">
                         <span class="max-label">MAX</span>
                         <div class="digit-box-row">
@@ -1961,15 +1985,15 @@
                 </td>
               </tr>
 
-              <!-- 6: TAKE-OFF WEIGHT (3 строки по 4.25 мм) -->
+              <!-- 6: TAKE-OFF WEIGHT (3 строки по 4.4 мм) -->
               <tr>
                 <td rowspan="3" style="padding: 1px 3px; vertical-align: middle;">
                   <div style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.25mm;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.4mm;">
                       <span style="font-weight:700; font-size:7.5px;">TAKE-OFF WEIGHT</span>
                       <span style="font-size:7px; font-weight:900; margin-right:6px;">LMC</span>
                     </div>
-                    <div style="display:flex; justify-content:flex-end; align-items:center; height: 4.25mm;">
+                    <div style="display:flex; justify-content:flex-end; align-items:center; height: 4.4mm;">
                       <div class="lmc-sub-row">
                         <span>+/&minus;</span>
                         <div class="lmc-box-field"><input type="text" class="lmc-sub-input" id="lmc_tow_inp1" oninput="calculate()"></div>
@@ -1977,7 +2001,7 @@
                         <div class="lmc-box-field" id="lmc_tow_res1"></div>
                       </div>
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.25mm;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.4mm;">
                       <div class="max-digits-wrap">
                         <span class="max-label">MAX</span>
                         <div class="digit-box-row">
@@ -2066,15 +2090,15 @@
                 </td>
               </tr>
 
-              <!-- 8: LANDING WEIGHT (3 строки по 4.25 мм) -->
+              <!-- 8: LANDING WEIGHT (3 строки по 4.4 мм) -->
               <tr>
                 <td rowspan="3" style="padding: 1px 3px; vertical-align: middle;">
                   <div style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.25mm;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.4mm;">
                       <span style="font-weight:700; font-size:7.5px;">LANDING WEIGHT</span>
                       <span style="font-size:7px; font-weight:900; margin-right:6px;">LMC</span>
                     </div>
-                    <div style="display:flex; justify-content:flex-end; align-items:center; height: 4.25mm;">
+                    <div style="display:flex; justify-content:flex-end; align-items:center; height: 4.4mm;">
                       <div class="lmc-sub-row">
                         <span>+/&minus;</span>
                         <div class="lmc-box-field"><input type="text" class="lmc-sub-input" id="lmc_law_inp1" oninput="calculate()"></div>
@@ -2082,7 +2106,7 @@
                         <div class="lmc-box-field" id="lmc_law_res1"></div>
                       </div>
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.25mm;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; height: 4.4mm;">
                       <div class="max-digits-wrap">
                         <span class="max-label">MAX</span>
                         <div class="digit-box-row">
@@ -2345,8 +2369,8 @@
                   <td></td>
                   <td></td>
                 </tr>
-                <!-- LMC TOTAL +/- (2 строки по 4.25 мм = 8.5 мм) -->
-                <tr style="background:#fff; height: 8.5mm;">
+                <!-- LMC TOTAL +/- (2 строки по 4.4 мм = 8.8 мм) -->
+                <tr style="background:#fff; height: 8.8mm;">
                   <td colspan="4" class="cell-label-sm font-bold" style="padding-left:3px; text-align:center;">LMC TOTAL &nbsp; +/&minus;</td>
                   <td class="calc-val font-bold" id="disp_lmc_total" style="font-size:9.5px;"></td>
                 </tr>
@@ -2356,7 +2380,7 @@
 
           <!-- Вертикальная полоса со стрелками CHECK LMC TOTAL WITH UNDERLOAD (1-в-1 по оригиналу) -->
           <div class="check-lmc-strip">
-            <div style="height: 25.5mm; width: 100%; background: #e2e8f0; border-bottom: 1px solid #000; box-sizing: border-box;"></div>
+            <div style="height: 26.4mm; width: 100%; background: #e2e8f0; border-bottom: 1px solid #000; box-sizing: border-box;"></div>
             <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 2px 0; width: 100%; box-sizing: border-box;">
               <span class="check-lmc-arrow">&uarr;</span>
               <span class="check-lmc-text">CHECK LMC TOTAL WITH UNDERLOAD</span>
@@ -2372,13 +2396,13 @@
           </div>
         </div>
 
-        <!-- Правая колонка: Notes, Balance & Seating, Total Passengers, Сертификация, Подписи (~24.7%) -->
+        <!-- Правая колонка: Notes, Balance & Seating, Total Passengers, Сертификация, Подписи (24.0%) -->
         <div class="lower-col-right">
           <div class="right-cabin-bag-spacer">
-            <div style="width: 22.27%;"></div>
-            <div style="width: 27.53%;"></div>
-            <div style="width: 22.67%;"></div>
-            <div style="width: 27.53%;"></div>
+            <div style="width: 22.5%;"></div>
+            <div style="width: 27.5%;"></div>
+            <div style="width: 22.5%;"></div>
+            <div style="width: 27.5%;"></div>
           </div>
           <!-- Notes (точно как в бланке NWS) -->
           <div class="notes-box">
@@ -2533,17 +2557,13 @@
             tr.innerHTML += `<td id="cabin_bag_t_${d}" class="traffic-shaded-t-cell calc-val center font-bold border-b-thick"></td>`;
           }
 
-          // 2. Метка подтипа груза: TR, B, C, M, ULD, T
-          const labelClass = isTotalRow ? 'sub-type-label sub-type-t' : 'sub-type-label';
-          const labelIdAttr = isTotalRow ? ` id="cargo_label_t_${d}"` : '';
-          tr.innerHTML += `<td${labelIdAttr} class="${labelClass}${borderBottomClass}">${type}</td>`;
-
-          // 3. Значение TOTAL для строки данного типа или сумма T (5 квадратиков под цифры)
+          // 2+3. Объединённая колонка TOTAL (6 равных клеток: 1 метка типа TR..ULD/T + 5 квадратиков под цифры)
           const cells5 = '<div class="digit-grid-cells"><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div>';
+          const typeCellClass = type === 'ULD' ? 'sub-type-cell sub-type-uld' : 'sub-type-cell';
           if (isTotalRow) {
-            tr.innerHTML += `<td class="digit-td sub-type-t${borderBottomClass}" id="cargo_tot_${d}" data-digit-count="5">${cells5}</td>`;
+            tr.innerHTML += `<td class="digit-td sub-type-t${borderBottomClass}" id="cargo_tot_${d}" data-digit-count="5"><div class="digit-grid-cells"><div class="sub-type-cell" id="cargo_label_t_${d}">${type}</div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div><div class="digit-cell"></div></div></td>`;
           } else {
-            tr.innerHTML += `<td class="digit-td${borderBottomClass}"><div class="digit-input-wrap" data-digit-count="5">${cells5}<input type="number" min="0" class="ls-input digit-overlay-input" id="cargo_${type.toLowerCase()}_${d}" oninput="onCargoRowInput(${d}, '${type.toLowerCase()}')"></div></td>`;
+            tr.innerHTML += `<td class="digit-td${borderBottomClass}"><div class="digit-grid-cells"><div class="${typeCellClass}">${type}</div><div class="digit-input-wrap" data-digit-count="5" style="flex: 5; height: 100%; display: flex;">${cells5}<input type="number" min="0" class="ls-input digit-overlay-input" id="cargo_${type.toLowerCase()}_${d}" oninput="onCargoRowInput(${d}, '${type.toLowerCase()}')"></div></div></td>`;
           }
 
           // 4. Отсеки CPT 1..5
